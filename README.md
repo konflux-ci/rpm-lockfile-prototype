@@ -97,11 +97,11 @@ This approach doesn’t really work though.
 
 We need to have information about the base image contents at the time the
 transaction is being resolved. Let’s not even consider listing package details
-with some incantation of rpm -qa --queryformat.
+with some incantation of `rpm -qa --queryformat`.
 
 We can copy the rpmdb from the base image into some temporary directory and use
-that as installroot during solving. A cleaner way might be to do rpmdb
---exportdb from the container and rpmdb --importdb –root into the temporary
+that as installroot during solving. A cleaner way might be to do `rpmdb
+--exportdb` from the container and `rpmdb --importdb –root` into the temporary
 location.
 
 So the last thing is what the tool actually implements. It will pull the image,
