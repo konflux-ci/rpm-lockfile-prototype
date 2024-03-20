@@ -3,6 +3,15 @@ import os
 
 import requests
 
+"""
+The user specifies URL pointing to a .repo file in the input file. This module
+will download the file and extract baseurls and repoids from it. Disabled
+repositories are ignored.
+
+The repos must have exactly one base url. Mirror lists are not supported. Any
+repo level options are ignored.
+"""
+
 
 class RepofileOrigin:
     schema = {"type": "string"}

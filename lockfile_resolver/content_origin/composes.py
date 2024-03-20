@@ -5,6 +5,15 @@ import requests
 
 from .. import schema
 
+"""
+This allows users to specify composes by ID or by CTS filters.
+
+In order for this to work, the CTS_URL environment variable needs to be set and
+point to an accessible CTS instance. Authentication is not supported.
+
+The composes must have URL stored in CTS in order for this to work.
+"""
+
 
 class ComposeOrigin:
     schema = {
@@ -43,12 +52,9 @@ class ComposeOrigin:
 
     def collect(self, sources):
         for spec in sources:
-            yield from self.collect_from_spec(spec)
-
-    def collect_from_spec(self, spec):
-        key = list(spec.keys())[0]
-        collector = getattr(self, f"collect_by_{key}")
-        yield from collector(spec[key])
+            key = list(spec.keys())[0]
+            collector = getattr(self, f"collect_by_{key}")
+            yield from collector(spec[key])
 
     def collect_from_url(self, compose_url):
         compose = productmd.Compose(compose_url)
