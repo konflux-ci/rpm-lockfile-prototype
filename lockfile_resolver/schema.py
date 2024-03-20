@@ -20,6 +20,8 @@ def get_schema():
         "$schema": "http://json-schema.org/draft-04/schema#",
         "type": "object",
         "properties": {
+            # TODO Packages should not be required. If possible, they should be
+            # extracted from other input files.
             "packages": {
                 "type": "array",
                 "items": {"type": "string"},

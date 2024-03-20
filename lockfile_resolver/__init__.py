@@ -53,7 +53,7 @@ def logged_run(cmd, *args, **kwargs):
 
 def setup_rpmdb(cache_dir, baseimage, arch, pull):
     # This may be better done by running `rpm --exportdb` in the container and
-    # then `rpm --importdb --root={cache_dir}` on localhost. It selinux blocks
+    # then `rpm --importdb --root={cache_dir}` on localhost. But selinux blocks
     # it on Fedora 38 and it doesn't seem to work even in Permissive mode.
     dest_dir = os.path.join(cache_dir, RPMDB_PATH)
     os.makedirs(dest_dir)
@@ -133,6 +133,7 @@ def resolver(arch: str, root_dir, repos, solvables):
             conf.substitutions["arch"] = conf.substitutions["basearch"] = arch
             # Configure repos
             for repo in repos:
+                # TODO we may need to support excluding packages
                 base.repos.add_new_repo(repo["repoid"], conf, baseurl=[repo["baseurl"]])
             base.fill_sack(load_system_repo=True)
             # Mark packages for installation
@@ -207,7 +208,7 @@ def process_arch(arch, rpmdb, pull, repos, packages):
     }
 
 
-def collect_repos(config_dir, origins):
+def collect_content_origins(config_dir, origins):
     loaders = content_origin.load()
     repos = []
     for source_type, source_data in origins.items():
@@ -220,6 +221,7 @@ def collect_repos(config_dir, origins):
 
 
 def read_packages_from_treefile(arch, treefile):
+    # TODO this should move to a separate module
     packages = set()
     with open(treefile) as f:
         data = yaml.safe_load(f)
@@ -289,7 +291,7 @@ def main():
             f"Only current architecture ({platform.machine()}) can be resolved against local system.",
         )
 
-    repos = collect_repos(config_dir, config["contentOrigin"])
+    repos = collect_content_origins(config_dir, config["contentOrigin"])
 
     if args.local_system:
         rpmdb = local_rpmdb()
@@ -298,6 +300,7 @@ def main():
     else:
         rpmdb = image_rpmdb(args.image or extract_image(args.containerfile), args.pull)
 
+    # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
         packages = set()
         if args.rpm_ostree_treefile:
