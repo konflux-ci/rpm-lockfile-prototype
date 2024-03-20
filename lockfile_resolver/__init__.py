@@ -240,7 +240,9 @@ def read_packages_from_treefile(arch, treefile):
         data = yaml.safe_load(f)
         for path in data.get("include", []):
             packages.update(
-                read_packages_from_treefile(arch, os.path.join(os.path.dirname(treefile), path))
+                read_packages_from_treefile(
+                    arch, os.path.join(os.path.dirname(treefile), path)
+                )
             )
 
         for key in ("packages", f"packages-{arch}"):
@@ -314,7 +316,13 @@ def main():
         if args.rpm_ostree_treefile:
             packages = read_packages_from_treefile(arch, args.rpm_ostree_treefile)
         data["arches"].append(
-            process_arch(arch, rpmdb, args.pull, repos, set(config.get("packages", [])) | packages)
+            process_arch(
+                arch,
+                rpmdb,
+                args.pull,
+                repos,
+                set(config.get("packages", [])) | packages,
+            )
         )
 
     with open(args.outfile, "w") as f:
