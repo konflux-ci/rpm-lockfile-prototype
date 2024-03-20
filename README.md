@@ -111,3 +111,13 @@ location is used as installroot for calling DNF.
 It seems to work with any architecture, though it can result in pulling quite a
 few images locally.
 
+The main issue with this approach is that it's complicated to execute in
+containers. To be able to run `podman run` inside a container, the parent
+container has to be running with `--privileged` option. This may be a problem
+for running in CI.
+
+An alternative would be to pull the image, mount it, and copy the rpmdb out
+using host tools. This way there could even be a cache for different images,
+avoiding some pulls. I didn't experiment with this too much. The main hurdle
+was turning the base image specification from Containerfile into an image id to
+pull. I got stuck on resolving short names, but maybe it's not necessary?
