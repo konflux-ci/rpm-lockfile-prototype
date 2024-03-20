@@ -1,0 +1,41 @@
+import configparser
+import os
+
+import requests
+
+
+class RepofileOrigin:
+    schema = {"type": "string"}
+
+    def __init__(self, config_dir):
+        self.session = requests.Session()
+        self.config_dir = config_dir
+
+    def collect(self, sources):
+        for repofile in sources:
+            yield from self.collect_repofile(repofile)
+
+    def collect_repofile(self, url):
+        if url.startswith("http"):
+            yield from self.collect_http(url)
+        else:
+            yield from self.collect_local(url)
+
+    def collect_http(self, url):
+        resp = self.session.get(url, timeout=(2, 5))
+        resp.raise_for_status()
+
+        yield from self.parse_repofile(resp.text)
+
+    def collect_local(self, url):
+        with open(os.path.join(self.config_dir, url)) as f:
+            yield from self.parse_repofile(f.read())
+
+    def parse_repofile(self, contents):
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read_string(contents)
+
+        for section in parser.sections():
+            if not parser.getboolean(section, "enabled", fallback=True):
+                continue
+            yield {"repoid": section, "baseurl": parser.get(section, "baseurl")}
