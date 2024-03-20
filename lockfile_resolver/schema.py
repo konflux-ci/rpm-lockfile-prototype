@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 
@@ -47,3 +48,13 @@ def validate(config):
 
 def print_schema():
     print(json.dumps(get_schema(), indent=2))
+
+
+class HelpAction(argparse.Action):
+    def __init__(self, option_strings, **kwargs):
+        kwargs["nargs"] = 0
+        super().__init__(option_strings, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print_schema()
+        parser.exit()

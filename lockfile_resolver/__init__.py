@@ -219,21 +219,6 @@ def collect_repos(config_dir, origins):
     return repos
 
 
-class CustomFormatter(argparse.HelpFormatter):
-    def _format_text(self, text):
-        return text
-
-
-class SchemaAction(argparse.Action):
-    def __init__(self, option_strings, **kwargs):
-        kwargs["nargs"] = 0
-        super().__init__(option_strings, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        schema.print_schema()
-        parser.exit()
-
-
 def read_packages_from_treefile(arch, treefile):
     packages = set()
     with open(treefile) as f:
@@ -281,7 +266,9 @@ def main():
     parser.add_argument("infile", metavar="INPUT_FILE", default="rpms.in.yaml")
     parser.add_argument("--outfile", default="rpms.lock.yaml")
     parser.add_argument("--validate", action="store_true", help=VALIDATE_HELP)
-    parser.add_argument("--print-schema", action=SchemaAction, help=PRINT_SCHEMA_HELP)
+    parser.add_argument(
+        "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
