@@ -221,6 +221,7 @@ def collect_content_origins(config_dir, origins):
 
 
 def read_packages_from_treefile(arch, treefile):
+    # Reference: https://coreos.github.io/rpm-ostree/treefile/
     # TODO this should move to a separate module
     packages = set()
     with open(treefile) as f:
@@ -242,7 +243,7 @@ def read_packages_from_treefile(arch, treefile):
             for e in entry.get("packages", []):
                 packages.update(e.split())
 
-        # TODO arch_include, conditional_include
+        # TODO arch-include, conditional-include
         # TODO exclude-packages might be needed here
     return packages
 
