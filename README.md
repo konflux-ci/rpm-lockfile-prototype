@@ -1,0 +1,114 @@
+# How to run this
+
+The tool requires on dnf libraries, which are painful to get into virtual
+environment. Enabling system packages makes it easier.
+
+```
+$ python -m venv venv --system-site-packages
+$ . venv/bin/activate
+(venv) $ python -m pip install -e .
+(venv) $ lockfile-resolver --help
+usage: lockfile-resolver [-h]
+                         [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
+                         [--debug] [--arch ARCH]
+                         [--pull {always,missing,never,newer}]
+                         [--outfile OUTFILE] [--validate] [--print-schema]
+                         INPUT_FILE
+
+positional arguments:
+  INPUT_FILE
+
+options:
+  -h, --help            show this help message and exit
+  -f CONTAINERFILE, --containerfile CONTAINERFILE
+                        Load installed packages from base image specified in
+                        Containerfile and make them available during dependency
+                        resolution.
+  --image IMAGE         Use rpmdb from the given image.
+  --local-system        Resolve dependencies for current system.
+  --bare                Resolve dependencies as if nothing is installed in the
+                        target system.
+  --rpm-ostree-treefile RPM_OSTREE_TREEFILE
+  --debug
+  --arch ARCH           Run the resolution for this architecture. Can be
+                        specified multiple times.
+  --pull {always,missing,never,newer}
+                        Pull policy for the base image. See `podman-run --pull`
+                        for more details. Only makes sense if Containerfile is
+                        used.
+  --outfile OUTFILE
+  --validate            Run schema validation on the input file.
+  --print-schema        Print schema for the input file to stdout.
+(venv) $
+```
+
+## What does this do
+
+High-level overview: given a list of packages, repo urls and installed
+packages, resolve all dependencies for the packages.
+
+There are three options for how the installed packages can be handled.
+
+1. Resolve in the current system (`--local-system`). This is probably not
+   useful for anything.
+
+2. Resolve in empty root (`--bare`, `--rpm-ostree-treefile`). This is useful
+   when the final image is starting from scratch, like a base image or ostree.
+
+3. Extract installed packages from a container image. This would be used for
+   layered images. The base image can be explicitly provided, or discovered
+   from `Containerfile`.
+
+Getting package information from the container is tricky, and went through a
+few iterations:
+
+### Iteration 1
+Let’s run the solver directly in the base image. This has a few cons though:
+
+* Solving for non-native architectures requires emulation.
+* It only works if the solver is using DNF 4 and the container provides dnf.
+  Once the solver uses DNF 5, or for any base image using microdnf (or yum, or
+  zypper…), it doesn’t work.
+  * That can not be solved by installing the solver library into the image, as
+    it would affect the results and where would it be installed from anyway?
+    Using a statically linked depsolver would avoid installing dependencies,
+    but then you need a different binary for each architecture.
+
+### Iteration 2
+
+Let’s run the solver on the host system, but filter out base image packages
+after solving. Listing installed packages in the container is fairly easy, and
+we can rely on rpm executable being present if the user wants to install
+packages.
+
+This approach doesn’t really work though.
+
+* If the configured repos do not contain the full set of transitive
+  dependencies, the solver will fail (or at least not see the full list of
+  transitive dependencies, which can hide issues).
+* If the configured repos contain newer versions of the packages already
+  present on the image, the solver will include them in the result, and it
+  becomes impossible to tell if the older version is sufficient or not.
+  * If we keep the updated version in the result but the older version is fine,
+    then we are prefetching something that will not be used.
+  * If we remove the package but it is actually needed, the build process will
+    fail.
+
+### Iteration 3
+
+We need to have information about the base image contents at the time the
+transaction is being resolved. Let’s not even consider listing package details
+with some incantation of rpm -qa --queryformat.
+
+We can copy the rpmdb from the base image into some temporary directory and use
+that as installroot during solving. A cleaner way might be to do rpmdb
+--exportdb from the container and rpmdb --importdb –root into the temporary
+location.
+
+So the last thing is what the tool actually implements. It will pull the image,
+run it and copy the rpmdb out to a temporary location on the host system. This
+location is used as installroot for calling DNF.
+
+It seems to work with any architecture, though it can result in pulling quite a
+few images locally.
+
