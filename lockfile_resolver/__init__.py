@@ -268,7 +268,6 @@ def main():
     )
     parser.add_argument("infile", metavar="INPUT_FILE", default="rpms.in.yaml")
     parser.add_argument("--outfile", default="rpms.lock.yaml")
-    parser.add_argument("--validate", action="store_true", help=VALIDATE_HELP)
     parser.add_argument(
         "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
     )
@@ -280,9 +279,7 @@ def main():
     with open(args.infile) as f:
         config = yaml.safe_load(f)
 
-    if args.validate:
-        schema.validate(config)
-        return
+    schema.validate(config)
 
     data = {"lockfileVersion": 1, "arches": []}
     arches = args.arch or [platform.machine()]

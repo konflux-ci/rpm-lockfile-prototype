@@ -12,7 +12,7 @@ usage: lockfile-resolver [-h]
                          [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
                          [--debug] [--arch ARCH]
                          [--pull {always,missing,never,newer}]
-                         [--outfile OUTFILE] [--validate] [--print-schema]
+                         [--outfile OUTFILE] [--print-schema]
                          INPUT_FILE
 
 positional arguments:
@@ -37,7 +37,6 @@ options:
                         for more details. Only makes sense if Containerfile is
                         used.
   --outfile OUTFILE
-  --validate            Run schema validation on the input file.
   --print-schema        Print schema for the input file to stdout.
 (venv) $
 ```
