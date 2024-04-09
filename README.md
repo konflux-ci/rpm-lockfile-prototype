@@ -1,3 +1,15 @@
+# What is this?
+
+This repo contains a proof-of-concept tool that implements most of the
+requirements for KONFLUX-2110.
+
+**There are no stability guarantees.**
+
+The output should generally be compatible with what is being implemented in
+cachi2, but there are some differences, like adding additional `sourcerpm` key
+for binary packages to make it easier to map the package to corresponding
+source.
+
 # How to run this
 
 The tool requires on dnf libraries, which are painful to get into virtual
