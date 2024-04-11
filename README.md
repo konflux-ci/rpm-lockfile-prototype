@@ -10,7 +10,22 @@ cachi2, but there are some differences, like adding additional `sourcerpm` key
 for binary packages to make it easier to map the package to corresponding
 source.
 
-# How to run this
+## Installation
+
+Install with pip directly from Git:
+
+```
+$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
+```
+
+Or latest released version:
+
+```
+$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.1.0-alpha.1.tar.gz
+```
+
+
+# How to run this from git
 
 The tool requires on dnf libraries, which are painful to get into virtual
 environment. Enabling system packages makes it easier.
