@@ -15,6 +15,8 @@ source.
 The tool requires on dnf libraries, which are painful to get into virtual
 environment. Enabling system packages makes it easier.
 
+Additionally, the tool requires podman and rpm to be available on the system.
+
 ```
 $ python -m venv venv --system-site-packages
 $ . venv/bin/activate
@@ -52,7 +54,47 @@ options:
 (venv) $
 ```
 
-## What does this do
+It is possible to run the tool in a container, but you need to use the
+`--privileged` option to be able to run podman inside podman. Good luck!
+
+# What's the `INPUT_FILE`
+
+The input file tells this tool where to look for RPMs and what packages to
+install. If not specified, `rpms.in.yaml` from current working directory will
+be used. It's a yaml file with following structure.
+
+```yaml
+contentOrigin:
+  # Define at least one source of packages, but you can have as many as you want.
+  repos:
+    # List of objects with repoid and baseurl
+    - repoid: fedora
+      baseurl: https://kojipkgs.fedoraproject.org/compose/rawhide/latest-Fedora-Rawhide/compose/Everything/$basearch/os/
+  repofiles:
+    # Either local path or url pointing to .repo file
+    - ./c9s.repo
+    - https://example.com/updates.repo
+  composes:
+    # If your environment uses Compose Tracking Service [0] and you define
+    # environment variable CTS_URL, you can look up repos from composes either by
+    # compose ID or by finding latest compose matching some filters.
+    # Fedora doesn't use CTS, so the examples are just for illustration and do
+    # not work.
+    - id: Fedora-Rawhide-20240411.n.0
+    - latest:
+        release_short: Fedora
+        release_version: Rawhide
+        release_type: ga
+        tag: nightly
+
+packages:
+  # list of rpm names to resolve
+  - vim-enhanced
+```
+
+[0]: https://pagure.io/cts/
+
+# What does this do
 
 High-level overview: given a list of packages, repo urls and installed
 packages, resolve all dependencies for the packages.
@@ -65,14 +107,22 @@ There are three options for how the installed packages can be handled.
 2. Resolve in empty root (`--bare`, `--rpm-ostree-treefile`). This is useful
    when the final image is starting from scratch, like a base image or ostree.
 
+   When using rpm-ostree treefile, the list of packages in input file is not
+   needed. The tool will try to get list of required packages from the
+   treefile. The support for some stanzas in the treefile is currently missing,
+   so some packages may not be discovered.
+
 3. Extract installed packages from a container image. This would be used for
    layered images. The base image can be explicitly provided, or discovered
    from `Containerfile`.
 
+
+# Implementation details and notes
+
 Getting package information from the container is tricky, and went through a
 few iterations:
 
-### Iteration 1
+## Iteration 1
 Let’s run the solver directly in the base image. This has a few cons though:
 
 * Solving for non-native architectures requires emulation.
@@ -84,7 +134,7 @@ Let’s run the solver directly in the base image. This has a few cons though:
     Using a statically linked depsolver would avoid installing dependencies,
     but then you need a different binary for each architecture.
 
-### Iteration 2
+## Iteration 2
 
 Let’s run the solver on the host system, but filter out base image packages
 after solving. Listing installed packages in the container is fairly easy, and
@@ -104,7 +154,7 @@ This approach doesn’t really work though.
   * If we remove the package but it is actually needed, the build process will
     fail.
 
-### Iteration 3
+## Iteration 3
 
 We need to have information about the base image contents at the time the
 transaction is being resolved. Let’s not even consider listing package details
