@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ['rpm_lockfile']
+packages = ['rpm_lockfile', 'rpm_lockfile.content_origin']
 
 [project.scripts]
 rpm-lockfile-prototype = "rpm_lockfile:main"
