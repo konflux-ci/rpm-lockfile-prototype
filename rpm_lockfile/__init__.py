@@ -204,7 +204,7 @@ def process_arch(arch, rpmdb, pull, repos, packages):
     return {
         "arch": arch,
         "packages": [p.as_dict() for p in sorted(packages)],
-        "sources": [s.as_dict() for s in sorted(sources)],
+        "source": [s.as_dict() for s in sorted(sources)],
     }
 
 
