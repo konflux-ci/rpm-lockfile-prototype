@@ -19,13 +19,13 @@ environment. Enabling system packages makes it easier.
 $ python -m venv venv --system-site-packages
 $ . venv/bin/activate
 (venv) $ python -m pip install -e .
-(venv) $ lockfile-resolver --help
-usage: lockfile-resolver [-h]
-                         [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
-                         [--debug] [--arch ARCH]
-                         [--pull {always,missing,never,newer}]
-                         [--outfile OUTFILE] [--print-schema]
-                         INPUT_FILE
+(venv) $ rpm-lockfile-prototype --help
+usage: rpm-lockfile-prototype [-h]
+                              [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
+                              [--debug] [--arch ARCH]
+                              [--pull {always,missing,never,newer}] [--outfile OUTFILE]
+                              [--print-schema]
+                              INPUT_FILE
 
 positional arguments:
   INPUT_FILE
@@ -38,16 +38,15 @@ options:
                         resolution.
   --image IMAGE         Use rpmdb from the given image.
   --local-system        Resolve dependencies for current system.
-  --bare                Resolve dependencies as if nothing is installed in the
-                        target system.
+  --bare                Resolve dependencies as if nothing is installed in the target
+                        system.
   --rpm-ostree-treefile RPM_OSTREE_TREEFILE
   --debug
-  --arch ARCH           Run the resolution for this architecture. Can be
-                        specified multiple times.
+  --arch ARCH           Run the resolution for this architecture. Can be specified
+                        multiple times.
   --pull {always,missing,never,newer}
-                        Pull policy for the base image. See `podman-run --pull`
-                        for more details. Only makes sense if Containerfile is
-                        used.
+                        Pull policy for the base image. See `podman-run --pull` for more
+                        details. Only makes sense if Containerfile is used.
   --outfile OUTFILE
   --print-schema        Print schema for the input file to stdout.
 (venv) $

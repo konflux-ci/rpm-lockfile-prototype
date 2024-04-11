@@ -1,5 +1,5 @@
 [project]
-name = "lockfile-resolver"
+name = "rpm-lockfile-prototype"
 version = "0.1.0"
 description = ""
 authors = [
@@ -15,17 +15,17 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ['lockfile_resolver']
+packages = ['rpm_lockfile']
 
 [project.scripts]
-lockfile-resolver = "lockfile_resolver:main"
+rpm-lockfile-prototype = "rpm_lockfile:main"
 
 
 [build-system]
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
-[project.entry-points."lockfile_resolver.content_origins"]
-repos = "lockfile_resolver.content_origin.repos:RepoOrigin"
-repofiles = "lockfile_resolver.content_origin.repofiles:RepofileOrigin"
-composes = "lockfile_resolver.content_origin.composes:ComposeOrigin"
+[project.entry-points."rpm_lockfile.content_origins"]
+repos = "rpm_lockfile.content_origin.repos:RepoOrigin"
+repofiles = "rpm_lockfile.content_origin.repofiles:RepofileOrigin"
+composes = "rpm_lockfile.content_origin.composes:ComposeOrigin"
