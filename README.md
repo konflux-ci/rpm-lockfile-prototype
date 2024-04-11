@@ -75,11 +75,11 @@ contentOrigin:
     - ./c9s.repo
     - https://example.com/updates.repo
   composes:
-    # If your environment uses Compose Tracking Service [0] and you define
-    # environment variable CTS_URL, you can look up repos from composes either by
-    # compose ID or by finding latest compose matching some filters.
-    # Fedora doesn't use CTS, so the examples are just for illustration and do
-    # not work.
+    # If your environment uses Compose Tracking Service (https://pagure.io/cts/)
+    # and you define environment variable CTS_URL, you can look up repos from
+    # composes either by compose ID or by finding latest compose matching some
+    # filters. Fedora doesn't use CTS, so the examples are just for illustration
+    # and do not work.
     - id: Fedora-Rawhide-20240411.n.0
     - latest:
         release_short: Fedora
@@ -91,8 +91,6 @@ packages:
   # list of rpm names to resolve
   - vim-enhanced
 ```
-
-[0]: https://pagure.io/cts/
 
 # What does this do
 
