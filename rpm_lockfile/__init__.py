@@ -281,7 +281,7 @@ def main():
 
     schema.validate(config)
 
-    data = {"lockfileVersion": 1, "arches": []}
+    data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or [platform.machine()]
 
     if args.local_system and arches != [platform.machine()]:
