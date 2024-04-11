@@ -25,7 +25,6 @@ def get_schema():
             "packages": {
                 "type": "array",
                 "items": {"type": "string"},
-                "minItems": 1,
             },
             "contentOrigin": {
                 "type": "object",
