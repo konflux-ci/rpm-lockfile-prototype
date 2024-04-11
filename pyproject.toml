@@ -6,6 +6,13 @@ authors = [
     {name = "Lubomír Sedlář", email = "lsedlar@redhat.com"},
 ]
 readme = "README.md"
+dependencies = [
+    "dnf",
+    "jsonschema",
+    "productmd",
+    "pyyaml",
+    "requests",
+]
 
 [tool.setuptools]
 packages = ['lockfile_resolver']
