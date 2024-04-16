@@ -153,7 +153,7 @@ def resolver(arch: str, root_dir, repos, solvables):
                     name=n, version=v, release=r, arch="src"
                 )
                 if len(results) == 0:
-                    logging.error("No sources found for %s", pkg)
+                    logging.warning("No sources found for %s", pkg)
                 else:
                     src = results[0]
                     sources.add(PackageItem.from_dnf(src))
