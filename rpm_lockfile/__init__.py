@@ -233,6 +233,13 @@ def read_packages_from_treefile(arch, treefile):
                 )
             )
 
+        if arch_include := data.get("arch-include", {}).get(arch):
+            packages.update(
+                read_packages_from_treefile(
+                    arch, os.path.join(os.path.dirname(treefile), arch_include)
+                )
+            )
+
         for key in ("packages", f"packages-{arch}"):
             for entry in data.get(key, []):
                 packages.update(entry.split())
@@ -243,7 +250,7 @@ def read_packages_from_treefile(arch, treefile):
             for e in entry.get("packages", []):
                 packages.update(e.split())
 
-        # TODO arch-include, conditional-include
+        # TODO conditional-include
         # TODO exclude-packages might be needed here
     return packages
 
