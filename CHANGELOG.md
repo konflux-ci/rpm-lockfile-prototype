@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `arch-include` directive in treefile is now handled
+
 ### Changed
 
 - Missing sources are reported as a warning only.
