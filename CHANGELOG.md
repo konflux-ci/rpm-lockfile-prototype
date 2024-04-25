@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.0-alpha.2] - 2024-04-25
+
 ### Added
 
 - `arch-include` directive in treefile is now handled
