@@ -3,13 +3,15 @@ import os
 
 import requests
 
+from . import Repo
+
 """
 The user specifies URL pointing to a .repo file in the input file. This module
 will download the file and extract baseurls and repoids from it. Disabled
 repositories are ignored.
 
 The repos must have exactly one base url. Mirror lists are not supported. Any
-repo level options are ignored.
+repo level options are passed over to DNF.
 """
 
 
@@ -45,6 +47,5 @@ class RepofileOrigin:
         parser.read_string(contents)
 
         for section in parser.sections():
-            if not parser.getboolean(section, "enabled", fallback=True):
-                continue
-            yield {"repoid": section, "baseurl": parser.get(section, "baseurl")}
+            options = {"repoid": section} | dict(parser.items(section))
+            yield Repo.from_dict(options)

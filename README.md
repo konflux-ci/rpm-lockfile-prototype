@@ -85,6 +85,8 @@ contentOrigin:
     # List of objects with repoid and baseurl
     - repoid: fedora
       baseurl: https://kojipkgs.fedoraproject.org/compose/rawhide/latest-Fedora-Rawhide/compose/Everything/$basearch/os/
+      # You can list any option that would be in .repo file here too.
+      # For example sslverify, proxy or excludepkgs might be of interest
   repofiles:
     # Either local path or url pointing to .repo file
     - ./c9s.repo

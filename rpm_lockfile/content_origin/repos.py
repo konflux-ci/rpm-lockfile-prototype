@@ -1,3 +1,6 @@
+from . import Repo
+
+
 class RepoOrigin:
     schema = {
         "type": "object",
@@ -12,4 +15,4 @@ class RepoOrigin:
         pass
 
     def collect(self, sources):
-        return sources
+        yield from (Repo.from_dict(s) for s in sources)

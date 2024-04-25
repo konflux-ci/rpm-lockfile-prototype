@@ -1,4 +1,19 @@
 from importlib.metadata import entry_points
+from dataclasses import dataclass, field
+
+
+
+@dataclass(frozen=True, order=True)
+class Repo:
+    repoid: str
+    baseurl: str
+    kwargs: dict() = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data):
+        repoid = data.pop("repoid")
+        baseurl = data.pop("baseurl")
+        return cls(repoid=repoid, baseurl=baseurl, kwargs=data)
 
 
 def load():

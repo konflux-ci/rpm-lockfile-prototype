@@ -3,6 +3,7 @@ import os
 import productmd
 import requests
 
+from . import Repo
 from .. import schema
 
 """
@@ -64,10 +65,10 @@ class ComposeOrigin:
                 paths.add(path.replace(arch, "$basearch"))
             if len(paths) != 1:
                 raise RuntimeError("Unexpected compose metadata")
-            yield {
-                "repoid": f"{compose.info.compose.id}-{variant.uid}-rpms",
-                "baseurl": f"{compose.compose_path}/{paths.pop()}",
-            }
+            yield Repo(
+                repoid=f"{compose.info.compose.id}-{variant.uid}-rpms",
+                baseurl=f"{compose.compose_path}/{paths.pop()}",
+            )
 
     def collect_by_id(self, compose_id):
         resp = self.session.get(f"{self.cts_url}/api/1/composes/{compose_id}")
