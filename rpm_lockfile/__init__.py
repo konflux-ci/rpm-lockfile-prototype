@@ -2,13 +2,16 @@
 
 import argparse
 import contextlib
+import json
 import logging
 import os
 import platform
 import shlex
 import shutil
 import subprocess
+import tarfile
 import tempfile
+from pathlib import Path
 from dataclasses import asdict, dataclass
 
 import dnf
@@ -30,11 +33,6 @@ ARCH_HELP = """
 Run the resolution for this architecture. Can be specified multiple times.
 """
 
-PULL_HELP = """
-Pull policy for the base image. See `podman-run --pull` for more details. Only
-makes sense if Containerfile is used.
-"""
-
 IMAGE_HELP = "Use rpmdb from the given image."
 
 VALIDATE_HELP = "Run schema validation on the input file."
@@ -51,27 +49,42 @@ def logged_run(cmd, *args, **kwargs):
     return subprocess.run(cmd, *args, **kwargs)
 
 
-def setup_rpmdb(cache_dir, baseimage, arch, pull):
-    # This may be better done by running `rpm --exportdb` in the container and
-    # then `rpm --importdb --root={cache_dir}` on localhost. But selinux blocks
-    # it on Fedora 38 and it doesn't seem to work even in Permissive mode.
-    dest_dir = os.path.join(cache_dir, RPMDB_PATH)
-    os.makedirs(dest_dir)
-    cmd = [
-        "podman",
-        "run",
-        "--rm",
-        "-ti",
-        f"--arch={arch}",
-        f"--pull={pull}",
-        f"--volume={dest_dir}:/dest:z",
-        baseimage,
-        "sh",
-        "-c",
-        "cp -r $(rpm --eval %_dbpath)/* /dest/",
-    ]
-    logging.info("Copying rpmdb from base image")
-    logged_run(cmd, check=True)
+def setup_rpmdb(cache_dir, baseimage, arch):
+    # Known locations for rpmdb inside the image.
+    RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
+    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
+    # amd64.
+    arch = "amd64" if arch == "x86_64" else arch
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        # Copy the image into a local directory.
+        cmd = [
+            "skopeo",
+            f"--override-arch={arch}",
+            "copy",
+            f"docker://{baseimage}",
+            f"dir:{tmpdir}",
+        ]
+        logged_run(cmd, check=True)
+
+        # The manifest is always in the same location, and contains information
+        # about individual layers.
+        with open(tmpdir / "manifest.json") as f:
+            manifest = json.load(f)
+
+        # One layer at a time...
+        for layer in manifest["layers"]:
+            digest = layer["digest"].split(":", 1)[1]
+            logging.info("Extracting rpmdb from layer %s", digest)
+            # ...find all files in interesting locations...
+            archive = tarfile.open(tmpdir / digest)
+            to_extract = []
+            for member in archive.getmembers():
+                if any(member.name.startswith(path) for path in RPMDB_PATHS):
+                    to_extract.append(member)
+            # ...and extract them to the destination cache.
+            archive.extractall(path=cache_dir, members=to_extract, filter="data")
 
 
 def copy_local_rpmdb(cache_dir):
@@ -179,9 +192,9 @@ def local_rpmdb():
     return rpmdb_preparer(lambda root_dir, _: copy_local_rpmdb(root_dir))
 
 
-def image_rpmdb(baseimage, pull):
+def image_rpmdb(baseimage):
     return rpmdb_preparer(
-        lambda root_dir, arch: setup_rpmdb(root_dir, baseimage, arch, pull)
+        lambda root_dir, arch: setup_rpmdb(root_dir, baseimage, arch)
     )
 
 
@@ -194,7 +207,7 @@ def extract_image(containerfile):
     raise RuntimeError("Base image could not be identified.")
 
 
-def process_arch(arch, rpmdb, pull, repos, packages):
+def process_arch(arch, rpmdb, repos, packages):
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
@@ -270,7 +283,7 @@ def main():
         "--pull",
         choices=["always", "missing", "never", "newer"],
         default="newer",
-        help=PULL_HELP,
+        help="DEPRECATED",
     )
     parser.add_argument("infile", metavar="INPUT_FILE", default="rpms.in.yaml")
     parser.add_argument("--outfile", default="rpms.lock.yaml")
@@ -302,7 +315,7 @@ def main():
     elif args.bare or args.rpm_ostree_treefile:
         rpmdb = empty_rpmdb()
     else:
-        rpmdb = image_rpmdb(args.image or extract_image(args.containerfile), args.pull)
+        rpmdb = image_rpmdb(args.image or extract_image(args.containerfile))
 
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
@@ -313,7 +326,6 @@ def main():
             process_arch(
                 arch,
                 rpmdb,
-                args.pull,
                 repos,
                 set(config.get("packages", [])) | packages,
             )

@@ -15,6 +15,9 @@
 - All options from repofiles are now honored and passed over to DNF. This means
   that DNF will now see even disabled repos, but will not include any packages
   from there.
+- Extracting rpmdb from an image is now done with skopeo. This makes it
+  possible to run inside non-privileged containers. The `--pull` option is now
+  deprecated and doesn't do anything, the image is always pulled fresh.
 
 ## [0.1.0-alpha.2] - 2024-04-25
 
