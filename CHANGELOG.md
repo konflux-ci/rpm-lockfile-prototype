@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Correctly process aarch64 images.
+
 ## [0.1.0-alpha.3] - 2024-06-10
 
 ### Added

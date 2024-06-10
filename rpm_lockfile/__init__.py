@@ -49,12 +49,17 @@ def logged_run(cmd, *args, **kwargs):
     return subprocess.run(cmd, *args, **kwargs)
 
 
+def _translate_arch(arch):
+    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
+    # amd64. The same goes for aarch64 -> arm64.
+    ARCHES = {"aarch64": "arm64", "x86_64": "amd64"}
+    return ARCHES.get(arch, arch)
+
+
 def setup_rpmdb(cache_dir, baseimage, arch):
     # Known locations for rpmdb inside the image.
     RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
-    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
-    # amd64.
-    arch = "amd64" if arch == "x86_64" else arch
+    arch = _translate_arch(arch)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
