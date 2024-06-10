@@ -30,7 +30,7 @@ $ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archiv
 The tool requires on dnf libraries, which are painful to get into virtual
 environment. Enabling system packages makes it easier.
 
-Additionally, the tool requires podman and rpm to be available on the system.
+Additionally, the tool requires skopeo and rpm to be available on the system.
 
 ```
 $ python -m venv venv --system-site-packages
@@ -61,16 +61,10 @@ options:
   --debug
   --arch ARCH           Run the resolution for this architecture. Can be specified
                         multiple times.
-  --pull {always,missing,never,newer}
-                        Pull policy for the base image. See `podman-run --pull` for more
-                        details. Only makes sense if Containerfile is used.
   --outfile OUTFILE
   --print-schema        Print schema for the input file to stdout.
 (venv) $
 ```
-
-It is possible to run the tool in a container, but you need to use the
-`--privileged` option to be able to run podman inside podman. Good luck!
 
 # What's the `INPUT_FILE`
 
