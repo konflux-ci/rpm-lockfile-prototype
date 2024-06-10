@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- There is no explicit dependency on DNF anymore. It was causing problems in
+  certain installation scenarios. Instead, if you run the tool with no
+  python3-dnf package available, an error message is printed with instructions
+  on what to do.
+
 ## [0.1.0-alpha.4] - 2024-06-10
 
 ### Fixed

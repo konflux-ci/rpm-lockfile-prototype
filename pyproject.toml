@@ -7,7 +7,6 @@ authors = [
 ]
 readme = "README.md"
 dependencies = [
-    "dnf",
     "jsonschema",
     "productmd",
     "pyyaml",
