@@ -191,3 +191,9 @@ using host tools. This way there could even be a cache for different images,
 avoiding some pulls. I didn't experiment with this too much. The main hurdle
 was turning the base image specification from Containerfile into an image id to
 pull. I got stuck on resolving short names, but maybe it's not necessary?
+
+## Iteration 4
+
+This is a minor improvement over iteration 3. The `podman` usage can be
+replaced by using `skopeo`, which can obtain the data witout requiring any
+additional permissions when running inside containers.
