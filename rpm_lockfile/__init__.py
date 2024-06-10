@@ -14,8 +14,17 @@ import tempfile
 from pathlib import Path
 from dataclasses import asdict, dataclass
 
-import dnf
-import hawkey
+try:
+    import dnf
+    import hawkey
+except ImportError:
+    print(
+        "Python bindings for DNF are missing.",
+        "Please install python3-dnf (or equivalent) with system package manager.",
+        sep="\n",
+        file=sys.stderr
+    )
+    sys.exit(127)
 import yaml
 
 from . import content_origin, schema
