@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## Added
+
+- Any repository option can be specified in `contentOrigins.repos`. There is no
+  schema validation on them though. The resolver only requires `repoid` and
+  `baseurl`. Anything else will be forwarded to DNF. Handling unrecognized
+  options depends on what DNF does. On Fedora 39 it silently ignores unknown
+  options.
+
+## Changed
+
+- All options from repofiles are now honored and passed over to DNF. This means
+  that DNF will now see even disabled repos, but will not include any packages
+  from there.
+
 ## [0.1.0-alpha.2] - 2024-04-25
 
 ### Added

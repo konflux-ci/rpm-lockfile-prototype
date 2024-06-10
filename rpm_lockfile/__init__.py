@@ -133,8 +133,7 @@ def resolver(arch: str, root_dir, repos, solvables):
             conf.substitutions["arch"] = conf.substitutions["basearch"] = arch
             # Configure repos
             for repo in repos:
-                # TODO we may need to support excluding packages
-                base.repos.add_new_repo(repo["repoid"], conf, baseurl=[repo["baseurl"]])
+                base.repos.add_new_repo(repo.repoid, conf, baseurl=[repo.baseurl], **repo.kwargs)
             base.fill_sack(load_system_repo=True)
             # Mark packages for installation
             for solvable in solvables:
