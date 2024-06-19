@@ -46,6 +46,7 @@ IMAGE_HELP = "Use rpmdb from the given image."
 
 VALIDATE_HELP = "Run schema validation on the input file."
 PRINT_SCHEMA_HELP = "Print schema for the input file to stdout."
+ALLOWERASING_HELP = "Allow  erasing  of  installed  packages to resolve dependencies."
 
 
 RPMDB_PATH = subprocess.run(
@@ -145,7 +146,7 @@ def mkdir(dir):
     return dir
 
 
-def resolver(arch: str, root_dir, repos, solvables):
+def resolver(arch: str, root_dir, repos, solvables, allow_erasing: bool):
     packages = set()
     sources = set()
 
@@ -169,7 +170,7 @@ def resolver(arch: str, root_dir, repos, solvables):
                 except dnf.exceptions.PackageNotFoundError:
                     raise RuntimeError(f"No match found for {solvable}")
             # And resolve the transaction
-            base.resolve()
+            base.resolve(allow_erasing=allow_erasing)
             # These packages would be installed
             for pkg in base.transaction.install_set:
                 packages.add(PackageItem.from_dnf(pkg))
@@ -221,11 +222,11 @@ def extract_image(containerfile):
     raise RuntimeError("Base image could not be identified.")
 
 
-def process_arch(arch, rpmdb, repos, packages):
+def process_arch(arch, rpmdb, repos, packages, allow_erasing):
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
-        packages, sources = resolver(arch, root_dir, repos, packages)
+        packages, sources = resolver(arch, root_dir, repos, packages, allow_erasing)
 
     return {
         "arch": arch,
@@ -304,6 +305,9 @@ def main():
     parser.add_argument(
         "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
     )
+    parser.add_argument(
+        "--allowerasing", action="store_true", help=ALLOWERASING_HELP
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
@@ -342,6 +346,7 @@ def main():
                 rpmdb,
                 repos,
                 set(config.get("packages", [])) | packages,
+                allow_erasing=args.allowerasing
             )
         )
 

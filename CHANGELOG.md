@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- New command line option `--allowerasing` makes it possible to remove packages
+  from the base image to replace them with a conflicting one.
+
+
+## [0.1.0-alpha.5] - 2024-06-10
+
 ### Changed
 
 - There is no explicit dependency on DNF anymore. It was causing problems in
