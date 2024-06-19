@@ -39,9 +39,8 @@ $ . venv/bin/activate
 (venv) $ rpm-lockfile-prototype --help
 usage: rpm-lockfile-prototype [-h]
                               [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
-                              [--debug] [--arch ARCH]
-                              [--pull {always,missing,never,newer}] [--outfile OUTFILE]
-                              [--print-schema]
+                              [--debug] [--arch ARCH] [--outfile OUTFILE]
+                              [--print-schema] [--allowerasing]
                               INPUT_FILE
 
 positional arguments:
@@ -63,6 +62,7 @@ options:
                         multiple times.
   --outfile OUTFILE
   --print-schema        Print schema for the input file to stdout.
+  --allowerasing        Allow erasing of installed packages to resolve dependencies.
 (venv) $
 ```
 
