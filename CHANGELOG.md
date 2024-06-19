@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.0-alpha.6] - 2024-06-19
+
 ### Added
 
 - New command line option `--allowerasing` makes it possible to remove packages
