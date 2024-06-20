@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- The input file can specify `reinstallPackages` as a list of strings. These
+  are packages already installed in the base image that will be reinstalled.
+
+  Listing something that is not in the base image will lead to an error.
+
+  There will also be an error if the configured repos do not contain identical
+  version to the package in the base image.
+
 ## [0.1.0-alpha.7] - 2024-06-20
 
 ### Added

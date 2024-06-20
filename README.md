@@ -101,6 +101,10 @@ contentOrigin:
 packages:
   # list of rpm names to resolve
   - vim-enhanced
+
+reinstallPackages: []
+  # list of rpms already provided in the base image, but which should be
+  # reinstalled
 ```
 
 # What does this do

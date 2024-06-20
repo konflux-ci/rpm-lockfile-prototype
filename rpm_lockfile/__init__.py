@@ -146,7 +146,14 @@ def mkdir(dir):
     return dir
 
 
-def resolver(arch: str, root_dir, repos, solvables, allow_erasing: bool):
+def resolver(
+    arch: str,
+    root_dir,
+    repos,
+    solvables,
+    allow_erasing: bool,
+    reinstall_packages: set[str],
+):
     packages = set()
     sources = set()
 
@@ -163,6 +170,16 @@ def resolver(arch: str, root_dir, repos, solvables, allow_erasing: bool):
             for repo in repos:
                 base.repos.add_new_repo(repo.repoid, conf, baseurl=[repo.baseurl], **repo.kwargs)
             base.fill_sack(load_system_repo=True)
+            # Mark packages to remove
+            for pkg in reinstall_packages:
+                try:
+                    base.reinstall(pkg)
+                except dnf.exceptions.PackagesNotInstalledError:
+                    raise RuntimeError(f"Can not reinstall {pkg}: it is not installed")
+                except dnf.exceptions.PackageNotFoundError:
+                    raise RuntimeError(
+                        f"Can not reinstall {pkg}: no package matched in configured repo"
+                    )
             # Mark packages for installation
             for solvable in solvables:
                 try:
@@ -222,11 +239,15 @@ def extract_image(containerfile):
     raise RuntimeError("Base image could not be identified.")
 
 
-def process_arch(arch, rpmdb, repos, packages, allow_erasing):
+def process_arch(
+    arch, rpmdb, repos, packages, allow_erasing, reinstall_packages: set[str]
+):
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
-        packages, sources = resolver(arch, root_dir, repos, packages, allow_erasing)
+        packages, sources = resolver(
+            arch, root_dir, repos, packages, allow_erasing, reinstall_packages
+        )
 
     return {
         "arch": arch,
@@ -346,7 +367,8 @@ def main():
                 rpmdb,
                 repos,
                 set(config.get("packages", [])) | packages,
-                allow_erasing=args.allowerasing
+                allow_erasing=args.allowerasing,
+                reinstall_packages=set(config.get("reinstallPackages", [])),
             )
         )
 
