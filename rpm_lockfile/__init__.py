@@ -319,7 +319,7 @@ def main():
     schema.validate(config)
 
     data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
-    arches = args.arch or [platform.machine()]
+    arches = args.arch or config.get("arches") or [platform.machine()]
 
     if args.local_system and arches != [platform.machine()]:
         parser.error(

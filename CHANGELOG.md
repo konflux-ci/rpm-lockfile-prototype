@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- List of architectures to resolve on can now be specified in the input file.
+  The list can be overridden by command line options. The precedence is 1.
+  architectures specified on command line, 2. list from config file, 3. current
+  host architecture. The first one provided wins.
+
 ## [0.1.0-alpha.6] - 2024-06-19
 
 ### Added

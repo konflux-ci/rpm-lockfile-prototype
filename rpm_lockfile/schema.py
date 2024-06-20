@@ -26,6 +26,10 @@ def get_schema():
                 "type": "array",
                 "items": {"type": "string"},
             },
+            "arches": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
             "contentOrigin": {
                 "type": "object",
                 "properties": {
