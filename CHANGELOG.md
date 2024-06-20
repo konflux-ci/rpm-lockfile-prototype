@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.0-alpha.7] - 2024-06-20
+
 ### Added
 
 - List of architectures to resolve on can now be specified in the input file.
