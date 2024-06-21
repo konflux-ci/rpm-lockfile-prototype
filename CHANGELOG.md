@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.0] - 2024-06-21
+
 ### Added
 
 - The input file can specify `reinstallPackages` as a list of strings. These
