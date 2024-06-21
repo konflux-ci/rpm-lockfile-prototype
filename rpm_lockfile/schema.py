@@ -30,6 +30,10 @@ def get_schema():
                 "type": "array",
                 "items": {"type": "string"},
             },
+            "reinstallPackages": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
             "contentOrigin": {
                 "type": "object",
                 "properties": {
