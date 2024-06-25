@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.2.0] - 2024-06-25
+
 ### Changed
 
 - When image specification contains both a tag and a digest, remove the tag and
