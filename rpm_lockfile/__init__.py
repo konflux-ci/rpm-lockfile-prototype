@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -66,6 +67,23 @@ def _translate_arch(arch):
     return ARCHES.get(arch, arch)
 
 
+def _strip_tag(image_spec):
+    """
+    If the image specification contains both a tag and a digest, remove the
+    tag. Skopeo rejects such images. The behaviour is chosen to match podman
+    4.9.4, which silently ignores the tag if digest is available.
+
+    https://github.com/containers/image/issues/1736
+    """
+    # De don't want to validate the digest here in any way, so even wrong
+    # length should be accepted.
+    m = re.match(r'([^:]+)(:[^@]+)(@sha\d+:[a-f0-9]+)$', image_spec)
+    if m:
+        logging.info("Digest was provided, ignoring tag %s", m.group(2)[1:])
+        return f"{m.group(1)}{m.group(3)}"
+    return image_spec
+
+
 def setup_rpmdb(cache_dir, baseimage, arch):
     # Known locations for rpmdb inside the image.
     RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
@@ -78,7 +96,7 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             "skopeo",
             f"--override-arch={arch}",
             "copy",
-            f"docker://{baseimage}",
+            f"docker://{_strip_tag(baseimage)}",
             f"dir:{tmpdir}",
         ]
         logged_run(cmd, check=True)

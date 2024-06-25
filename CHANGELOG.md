@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- When image specification contains both a tag and a digest, remove the tag and
+  ignore it. Skopeo fails when both are provided, and this new behaviour
+  matches what podman 4.9.4 does. There's a message provided that the tag is
+  being stripped out.
+
 ## [0.1.0] - 2024-06-21
 
 ### Added
