@@ -132,7 +132,6 @@ def strip_suffix(s, suf):
 
 @dataclass(frozen=True, order=True)
 class PackageItem:
-    url: str
     repoid: str
     size: int
     checksum: str = None
@@ -143,7 +142,6 @@ class PackageItem:
     @classmethod
     def from_dnf(cls, pkg):
         return cls(
-            pkg.remote_location(),
             pkg.repoid,
             pkg.downloadsize,
             f"{hawkey.chksum_name(pkg.chksum[0])}:{pkg.chksum[1].hex()}",
