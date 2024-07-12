@@ -39,6 +39,10 @@ LOCAL_SYSTEM_HELP = "Resolve dependencies for current system."
 
 BARE_HELP = "Resolve dependencies as if nothing is installed in the target system."
 
+FLATPAK_HELP = """
+Determine the set of packages from the flatpak: section of container.yaml.
+"""
+
 ARCH_HELP = """
 Run the resolution for this architecture. Can be specified multiple times.
 """
@@ -321,6 +325,32 @@ def read_packages_from_treefile(arch, treefile):
     return packages
 
 
+def read_packages_from_container_yaml(arch):
+    packages = set()
+
+    with open("container.yaml") as f:
+        data = yaml.safe_load(f)
+        for package in data.get("flatpak", {}).get("packages", []):
+            if isinstance(package, str):
+                packages.add(package)
+            else:
+                platforms = package.get('platforms', {})
+                only = platforms.get('only', [])
+                if isinstance(only, str):
+                    only = [only]
+                not_ = platforms.get('not', [])
+                if isinstance(not_, str):
+                    not_ = [not_]
+
+                if (
+                    (not only or arch in only) and
+                    (not not_ or arch not in not_)
+                ):
+                    packages.add(package['name'])
+
+    return packages
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -331,6 +361,7 @@ def main():
     group.add_argument("--local-system", action="store_true", help=LOCAL_SYSTEM_HELP)
     group.add_argument("--bare", action="store_true", help=BARE_HELP)
     group.add_argument("--rpm-ostree-treefile")
+    parser.add_argument("--flatpak", action="store_true", help=FLATPAK_HELP)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--arch", action="append", help=ARCH_HELP)
     parser.add_argument(
@@ -379,6 +410,8 @@ def main():
         packages = set()
         if args.rpm_ostree_treefile:
             packages = read_packages_from_treefile(arch, args.rpm_ostree_treefile)
+        elif args.flatpak:
+            packages = read_packages_from_container_yaml(arch)
         data["arches"].append(
             process_arch(
                 arch,

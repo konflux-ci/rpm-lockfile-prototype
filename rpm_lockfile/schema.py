@@ -42,7 +42,7 @@ def get_schema():
                 },
             },
         },
-        "required": ["packages", "contentOrigin"],
+        "required": ["contentOrigin"],
         "additionalProperties": False,
     }
 
