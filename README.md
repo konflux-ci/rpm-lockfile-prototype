@@ -21,7 +21,7 @@ $ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archiv
 Or latest released version:
 
 ```
-$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.2.0.tar.gz
+$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.3.0.tar.gz
 ```
 
 
@@ -39,7 +39,7 @@ $ . venv/bin/activate
 (venv) $ rpm-lockfile-prototype --help
 usage: rpm-lockfile-prototype [-h]
                               [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
-                              [--debug] [--arch ARCH] [--outfile OUTFILE]
+                              [--flatpak] [--debug] [--arch ARCH] [--outfile OUTFILE]
                               [--print-schema] [--allowerasing]
                               INPUT_FILE
 
@@ -57,6 +57,8 @@ options:
   --bare                Resolve dependencies as if nothing is installed in the target
                         system.
   --rpm-ostree-treefile RPM_OSTREE_TREEFILE
+  --flatpak             Determine the set of packages from the flatpak: section of
+                        container.yaml.
   --debug
   --arch ARCH           Run the resolution for this architecture. Can be specified
                         multiple times.

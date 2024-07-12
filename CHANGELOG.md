@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [0.3.0] - 2024-07-12
+
+### Added
+
+- Add `--flatpak` option to read packages from `container.yaml`. For Flatpak
+  containers, the set of packages to include in the Flatpak is defined in the
+  `container.yaml`, and for runtimes, can be very big, so we don't want to
+  duplicate it in `rpms.in.yaml`. Instead read the package list from
+  `container.yaml`.
+
+
 ## [0.2.0] - 2024-06-25
 
 ### Changed
