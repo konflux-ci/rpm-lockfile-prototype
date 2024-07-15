@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Most command line options can now also be set in the input configuration file
+  in the new `context` section.
+
+
 ## [0.3.0] - 2024-07-12
 
 ### Added

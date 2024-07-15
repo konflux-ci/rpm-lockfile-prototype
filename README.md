@@ -107,6 +107,23 @@ packages:
 reinstallPackages: []
   # list of rpms already provided in the base image, but which should be
   # reinstalled
+
+arches:
+  # The list of architectures can be set in the config file. Any `--arch` option set
+  # on the command line will override this list.
+  - aarch64
+  - x86_64
+
+context:
+    # Alternative to setting command line options. Usually you will only want
+    # to include one of these options, with the exception of `flatpak` that
+    # can be combined with `image` and `containerfile`
+    image: registry.fedoraproject.org/fedora:latest
+    containerfile: Containerfile.fedora
+    flatpak: true
+    bare: true
+    localSystem: true
+    rpmOstreeTreefile: centos-bootc/centos-bootc.yaml
 ```
 
 # What does this do
