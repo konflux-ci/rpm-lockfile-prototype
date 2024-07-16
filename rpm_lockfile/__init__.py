@@ -418,7 +418,7 @@ def main():
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
         packages = set()
-        if args.rpm_ostree_treefile:
+        if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
             packages = read_packages_from_treefile(
                 arch,
                 args.rpm_ostree_treefile
