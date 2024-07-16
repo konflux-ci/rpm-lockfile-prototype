@@ -41,6 +41,37 @@ def get_schema():
                     for source_type, collector in content_origin.load().items()
                 },
             },
+            "context": {
+                "type": "object",
+                "anyOf": [
+                    {
+                        "additionalProperties": False,
+                        "properties": {
+                            "image": {"type": "string"},
+                            "flatpak": {"type": "boolean"},
+                        },
+                    },
+                    {
+                        "additionalProperties": False,
+                        "properties": {
+                            "containerfile": {"type": "string"},
+                            "flatpak": {"type": "boolean"},
+                        },
+                    },
+                    {
+                        "additionalProperties": False,
+                        "properties": {"rpmOstreeTreefile": {"type": "string"}}
+                    },
+                    {
+                        "additionalProperties": False,
+                        "properties": {"localSystem": {"type": "boolean"}}
+                    },
+                    {
+                        "additionalProperties": False,
+                        "properties": {"bare": {"type": "boolean"}}
+                    },
+                ],
+            },
         },
         "required": ["contentOrigin"],
         "additionalProperties": False,

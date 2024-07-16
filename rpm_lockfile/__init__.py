@@ -10,6 +10,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -28,7 +29,7 @@ except ImportError:
     sys.exit(127)
 import yaml
 
-from . import content_origin, schema
+from . import content_origin, schema, utils
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -354,9 +355,7 @@ def read_packages_from_container_yaml(arch):
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "-f", "--containerfile", default="Containerfile", help=CONTAINERFILE_HELP
-    )
+    group.add_argument("-f", "--containerfile", help=CONTAINERFILE_HELP)
     group.add_argument("--image", help=IMAGE_HELP)
     group.add_argument("--local-system", action="store_true", help=LOCAL_SYSTEM_HELP)
     group.add_argument("--bare", action="store_true", help=BARE_HELP)
@@ -391,26 +390,41 @@ def main():
     data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or config.get("arches") or [platform.machine()]
 
-    if args.local_system and arches != [platform.machine()]:
+    context = config.get("context", {})
+
+    local = args.local_system or context.get("localSystem")
+    if local and arches != [platform.machine()]:
         parser.error(
             f"Only current architecture ({platform.machine()}) can be resolved against local system.",
         )
 
     repos = collect_content_origins(config_dir, config["contentOrigin"])
 
-    if args.local_system:
+    if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
-    elif args.bare or args.rpm_ostree_treefile:
+    elif args.bare or context.get("bare") or args.rpm_ostree_treefile:
+        rpmdb = empty_rpmdb()
+    elif args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
         rpmdb = empty_rpmdb()
     else:
-        rpmdb = image_rpmdb(args.image or extract_image(args.containerfile))
+        image = args.image or context.get("image")
+        containerfile = (
+            args.containerfile
+            or utils.relative_to(config_dir, context.get("containerfile"))
+            or "Containerfile"
+        )
+        rpmdb = image_rpmdb(image or extract_image(containerfile))
 
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
         packages = set()
-        if args.rpm_ostree_treefile:
-            packages = read_packages_from_treefile(arch, args.rpm_ostree_treefile)
-        elif args.flatpak:
+        if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
+            packages = read_packages_from_treefile(
+                arch,
+                args.rpm_ostree_treefile
+                or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
+            )
+        elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
         data["arches"].append(
             process_arch(
