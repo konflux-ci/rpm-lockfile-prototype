@@ -255,11 +255,14 @@ def image_rpmdb(baseimage):
 
 def extract_image(containerfile):
     """Find image mentioned in the first FROM statement in the containerfile."""
+    baseimg = ""
     with open(containerfile) as f:
         for line in f:
             if line.startswith("FROM "):
-                return line.split()[1]
-    raise RuntimeError("Base image could not be identified.")
+                baseimg = line.split()[1]
+    if baseimg == "":
+        raise RuntimeError("Base image could not be identified.")
+    return baseimg
 
 
 def process_arch(
