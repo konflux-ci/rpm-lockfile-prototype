@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0] - 2024-07-23
+
+### Changed
+
+- If Containerfile defines multiple stage, the last base image will be
+  extracted.
+
 ## [0.4.0] - 2024-07-16
 
 ### Added
