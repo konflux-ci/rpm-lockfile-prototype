@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.1] - 2024-07-25
+
+### Changed
+
+- Allow `--flatpak` to be combined with `--bare` in config file.
+
 ## [0.5.0] - 2024-07-23
 
 ### Changed
