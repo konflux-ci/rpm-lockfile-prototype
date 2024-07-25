@@ -68,7 +68,10 @@ def get_schema():
                     },
                     {
                         "additionalProperties": False,
-                        "properties": {"bare": {"type": "boolean"}}
+                        "properties": {
+                            "bare": {"type": "boolean"},
+                            "flatpak": {"type": "boolean"},
+                        }
                     },
                 ],
             },
