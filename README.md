@@ -117,7 +117,7 @@ arches:
 context:
     # Alternative to setting command line options. Usually you will only want
     # to include one of these options, with the exception of `flatpak` that
-    # can be combined with `image` and `containerfile`
+    # can be combined with `image`, `containerfile`, or `bare`
     image: registry.fedoraproject.org/fedora:latest
     containerfile: Containerfile.fedora
     flatpak: true
