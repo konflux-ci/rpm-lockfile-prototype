@@ -1,3 +1,4 @@
+import logging
 import os
 
 
@@ -17,3 +18,16 @@ def find_containerfile(dir):
         if candidate.exists():
             return candidate
     return None
+
+
+def extract_image(containerfile):
+    """Find image mentioned in the first FROM statement in the containerfile."""
+    logging.debug("Looking for base image in %s", containerfile)
+    baseimg = ""
+    with open(containerfile) as f:
+        for line in f:
+            if line.startswith("FROM "):
+                baseimg = line.split()[1]
+    if baseimg == "":
+        raise RuntimeError("Base image could not be identified.")
+    return baseimg

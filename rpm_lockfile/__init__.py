@@ -277,19 +277,6 @@ def image_rpmdb(baseimage):
     )
 
 
-def extract_image(containerfile):
-    """Find image mentioned in the first FROM statement in the containerfile."""
-    logging.debug("Looking for base image in %s", containerfile)
-    baseimg = ""
-    with open(containerfile) as f:
-        for line in f:
-            if line.startswith("FROM "):
-                baseimg = line.split()[1]
-    if baseimg == "":
-        raise RuntimeError("Base image could not be identified.")
-    return baseimg
-
-
 def process_arch(
     arch, rpmdb, repos, packages, allow_erasing, reinstall_packages: set[str]
 ):
@@ -441,7 +428,7 @@ def main():
             or utils.relative_to(config_dir, context.get("containerfile"))
             or utils.find_containerfile(Path.cwd())
         )
-        rpmdb = image_rpmdb(image or extract_image(containerfile))
+        rpmdb = image_rpmdb(image or utils.extract_image(containerfile))
 
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
