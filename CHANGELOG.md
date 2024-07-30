@@ -2,11 +2,22 @@
 
 ## Unreleased
 
+### Added
+
+- The repofiles can now be specified by an object with `location` key (with the
+  same meaning as the original single string specification). If the object
+  additionally specifies `varsFromImage` or `varsFromContainerfile`, the
+  resolver will query the image labels and interpolate them into the URL.
+
+  This way it is possible to get to the exact same repos that were used to
+  build the base image, but user must know where the raw repofile is.
+
 ### Changed
 
 - When no Containerfile is specified, stop assuming `Containerfile` and instead
   inspect current working directory to find either `Containerfile` or
   `Dockerfile`. If both exist, `Containerfile` will be preferred.
+
 
 ## [0.6.1] - 2024-07-31
 

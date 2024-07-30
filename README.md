@@ -84,9 +84,14 @@ contentOrigin:
       # You can list any option that would be in .repo file here too.
       # For example sslverify, proxy or excludepkgs might be of interest
   repofiles:
-    # Either local path or url pointing to .repo file
+    # Either local path, url pointing to .repo file or an object
     - ./c9s.repo
     - https://example.com/updates.repo
+    - location: https://scm.example.com/cgit/base/plain/devel.repo?commit={vcs-ref}
+      # The labels from image specified either directly or via Containerfile
+      # can be interpolated into the repofile URL.
+      varsFromImage: registry.fedoraproject.org/fedora:latest
+      varsFromContainerfile: Containerfile
   composes:
     # If your environment uses Compose Tracking Service (https://pagure.io/cts/)
     # and you define environment variable CTS_URL, you can look up repos from

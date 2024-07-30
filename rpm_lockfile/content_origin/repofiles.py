@@ -1,9 +1,12 @@
 import configparser
+import json
 import os
+import subprocess
 
 import requests
 
 from . import Repo
+from .. import utils
 
 """
 The user specifies URL pointing to a .repo file in the input file. This module
@@ -16,15 +19,57 @@ repo level options are passed over to DNF.
 
 
 class RepofileOrigin:
-    schema = {"type": "string"}
+    schema = {
+        "oneOf": [
+            {"type": "string"},
+            {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string"},
+                    "varsFromContainerfile": {"type": "string"},
+                    "varsFromImage": {"type": "string"},
+                },
+                "required": ["location"],
+                "additionalProperties": False,
+            },
+        ],
+    }
 
     def __init__(self, config_dir):
         self.session = requests.Session()
         self.config_dir = config_dir
 
     def collect(self, sources):
-        for repofile in sources:
+        for source in sources:
+            repofile = self._get_repofile(source)
             yield from self.collect_repofile(repofile)
+
+    def _get_repofile(self, source):
+        if isinstance(source, str):
+            return source
+        return subst_vars(
+            source["location"],
+            self._get_image_labels(source.get("varsFromImage"))
+            | self._get_containerfile_labels(source.get("varsFromContainerfile")),
+        )
+
+    def _get_image_labels(self, image_spec):
+        if not image_spec:
+            return {}
+        cp = utils.logged_run(
+            ["skopeo", "inspect", f"docker://{image_spec}"],
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        data = json.loads(cp.stdout)
+        return data["Labels"]
+
+    def _get_containerfile_labels(self, containerfile):
+        if not containerfile:
+            return {}
+        return self._get_image_labels(
+            utils.extract_image(os.path.join(self.config_dir, containerfile))
+        )
 
     def collect_repofile(self, url):
         if url.startswith("http"):
@@ -49,3 +94,9 @@ class RepofileOrigin:
         for section in parser.sections():
             options = {"repoid": section} | dict(parser.items(section))
             yield Repo.from_dict(options)
+
+
+def subst_vars(template, vars):
+    for key, value in vars.items():
+        template = template.replace(f"{{{key}}}", value)
+    return template
