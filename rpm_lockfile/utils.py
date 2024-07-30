@@ -1,5 +1,7 @@
 import logging
 import os
+import shlex
+import subprocess
 
 
 def relative_to(directory, path):
@@ -18,6 +20,11 @@ def find_containerfile(dir):
         if candidate.exists():
             return candidate
     return None
+
+
+def logged_run(cmd, *args, **kwargs):
+    logging.info("$ %s", shlex.join(cmd))
+    return subprocess.run(cmd, *args, **kwargs)
 
 
 def extract_image(containerfile):

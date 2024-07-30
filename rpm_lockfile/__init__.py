@@ -7,7 +7,6 @@ import logging
 import os
 import platform
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -60,11 +59,6 @@ RPMDB_PATH = subprocess.run(
 ).stdout.strip()[1:]
 
 
-def logged_run(cmd, *args, **kwargs):
-    logging.info("$ %s", shlex.join(cmd))
-    return subprocess.run(cmd, *args, **kwargs)
-
-
 def _translate_arch(arch):
     # This is a horrible hack. Skopeo will reject x86_64, but is happy with
     # amd64. The same goes for aarch64 -> arm64.
@@ -104,7 +98,7 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             f"docker://{_strip_tag(baseimage)}",
             f"dir:{tmpdir}",
         ]
-        logged_run(cmd, check=True)
+        utils.logged_run(cmd, check=True)
 
         # The manifest is always in the same location, and contains information
         # about individual layers.
