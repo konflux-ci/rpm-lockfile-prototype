@@ -118,11 +118,29 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             # ...find all files in interesting locations...
             archive = tarfile.open(tmpdir / digest)
             to_extract = []
+            # This is the location of rpmdb in the image.
+            dbpath = None
             for member in archive.getmembers():
-                if any(member.name.startswith(path) for path in RPMDB_PATHS):
-                    to_extract.append(member)
+                for candidate_path in RPMDB_PATHS:
+                    if member.name.startswith(candidate_path):
+                        dbpath = candidate_path
+                        to_extract.append(member)
+                        break
             # ...and extract them to the destination cache.
             archive.extractall(path=cache_dir, members=to_extract, filter="data")
+
+        if dbpath != RPMDB_PATH:
+            # The rpmdb in the image doesn't match local rpm setup. Let's make
+            # a symlink. When running DNF, it will use configuration from the
+            # local system, and the database in wrong location will be silently
+            # ignored, resulting in lock file that includes packages that are
+            # already installed.
+            logging.debug("Creating rpmdb symlink %s -> %s", RPMDB_PATH, dbpath)
+            os.makedirs(os.path.dirname(os.path.join(cache_dir, RPMDB_PATH)))
+            os.symlink(
+                os.path.join(cache_dir, dbpath),
+                os.path.join(cache_dir, RPMDB_PATH),
+            )
 
 
 def copy_local_rpmdb(cache_dir):
