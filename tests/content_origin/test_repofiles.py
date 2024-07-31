@@ -133,3 +133,38 @@ def test_collect_http_with_vars_from_containerfile():
     mock_run.assert_called_once_with(
         ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
     )
+
+
+def test_collect_git_with_vars_from_image(tmpdir):
+    origin = repofiles.RepofileOrigin("/test")
+    giturl = "https://example.com/repo.git"
+    repofile = "test.repo"
+
+    (tmpdir / repofile).write_text(REPOFILE, encoding="utf-8")
+
+    image = "registry.example.com/image:latest"
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(
+            stdout=json.dumps(INSPECT_OUTPUT)
+        )
+        with patch("rpm_lockfile.utils.get_file_from_git") as mock_get_file:
+            mock_get_file.return_value = str(tmpdir / repofile)
+            repos = list(
+                origin.collect(
+                    [
+                        {
+                            "giturl": giturl,
+                            "file": repofile,
+                            "gitref": "{vcs-ref}",
+                            "varsFromImage": image,
+                        }
+                    ]
+                )
+            )
+
+    assert repos == [REPO]
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+    )
+    mock_get_file.assert_called_once_with(giturl, "abcdef", "test.repo")

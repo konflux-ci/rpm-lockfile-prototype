@@ -12,6 +12,15 @@
   This way it is possible to get to the exact same repos that were used to
   build the base image, but user must know where the raw repofile is.
 
+- Alternatively, the repofiles can also be specified as a reference to a git
+  repository, from which the actual repofile will be obtained. The keys in this
+  case are `giturl`, `gitref` and `file`. Their meanings are in order: clone
+  URL for the repository, commit sha and path inside the repo. All of the
+  values can reference image labels if `varsFromImage` or
+  `varsFromContainerfile` is specified using `{label-name}` syntax. The repo
+  url can also reference environment variables using shell syntax (`$VAR` or
+  `${VAR}`).
+
 ### Changed
 
 - When no Containerfile is specified, stop assuming `Containerfile` and instead

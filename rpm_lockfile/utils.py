@@ -2,6 +2,7 @@ import logging
 import os
 import shlex
 import subprocess
+import tempfile
 
 
 def relative_to(directory, path):
@@ -38,3 +39,19 @@ def extract_image(containerfile):
     if baseimg == "":
         raise RuntimeError("Base image could not be identified.")
     return baseimg
+
+
+def get_file_from_git(repo, ref, file):
+    tmp_dir = tempfile.mkdtemp(prefix="rpm-lockfile-checkout-")
+    logging.info("Extracting commit %s from repo %s to %s", ref, repo, tmp_dir)
+    cmds = [
+        ["git", "init"],
+        ["git", "remote", "add", "origin", os.path.expandvars(repo)],
+        ["git", "fetch", "--depth=1", "origin", ref],
+        ["git", "checkout", "FETCH_HEAD"],
+    ]
+    for cmd in cmds:
+        # The commands can possibly contain a secret token. They can not be
+        # logged.
+        subprocess.run(cmd, cwd=tmp_dir, check=True)
+    return os.path.join(tmp_dir, file)

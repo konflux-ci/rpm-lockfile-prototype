@@ -92,6 +92,13 @@ contentOrigin:
       # can be interpolated into the repofile URL.
       varsFromImage: registry.fedoraproject.org/fedora:latest
       varsFromContainerfile: Containerfile
+    - giturl: https://$USER:$TOKEN@example.com/my-repo.git
+      gitref: '{vcs-ref}'
+      file: custom.repo
+      # The labels from image specified either directly or via Containerfile
+      # can be interpolated into the repofile URL.
+      varsFromImage: registry.fedoraproject.org/fedora:latest
+      varsFromContainerfile: Containerfile
   composes:
     # If your environment uses Compose Tracking Service (https://pagure.io/cts/)
     # and you define environment variable CTS_URL, you can look up repos from

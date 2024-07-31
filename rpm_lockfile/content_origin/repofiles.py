@@ -32,6 +32,18 @@ class RepofileOrigin:
                 "required": ["location"],
                 "additionalProperties": False,
             },
+            {
+                "type": "object",
+                "properties": {
+                    "giturl": {"type": "string"},
+                    "file": {"type": "string"},
+                    "gitref": {"type": "string"},
+                    "varsFromContainerfile": {"type": "string"},
+                    "varsFromImage": {"type": "string"},
+                },
+                "required": ["giturl", "file", "gitref"],
+                "additionalProperties": False,
+            },
         ],
     }
 
@@ -41,16 +53,22 @@ class RepofileOrigin:
 
     def collect(self, sources):
         for source in sources:
-            repofile = self._get_repofile(source)
+            repofile = self._get_repofile_path(source)
             yield from self.collect_repofile(repofile)
 
-    def _get_repofile(self, source):
+    def _get_repofile_path(self, source):
         if isinstance(source, str):
             return source
-        return subst_vars(
-            source["location"],
+        vars = (
             self._get_image_labels(source.get("varsFromImage"))
-            | self._get_containerfile_labels(source.get("varsFromContainerfile")),
+            | self._get_containerfile_labels(source.get("varsFromContainerfile"))
+        )
+        if "location" in source:
+            return subst_vars(source["location"], vars)
+        return utils.get_file_from_git(
+            subst_vars(source["giturl"], vars),
+            subst_vars(source["gitref"], vars),
+            subst_vars(source["file"], vars),
         )
 
     def _get_image_labels(self, image_spec):
