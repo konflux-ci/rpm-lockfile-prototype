@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Detection of installed packages in container images did not work correctly if
+  the rpmdb in the image differed from local system. This is now fixed.
+
 ## [0.5.1] - 2024-07-25
 
 ### Changed
