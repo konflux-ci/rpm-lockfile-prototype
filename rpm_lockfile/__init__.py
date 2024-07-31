@@ -111,6 +111,9 @@ def setup_rpmdb(cache_dir, baseimage, arch):
         with open(tmpdir / "manifest.json") as f:
             manifest = json.load(f)
 
+        # This are all possible locations for rpmdb that are populated by the
+        # image.
+        dbpaths = set()
         # One layer at a time...
         for layer in manifest["layers"]:
             digest = layer["digest"].split(":", 1)[1]
@@ -118,28 +121,31 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             # ...find all files in interesting locations...
             archive = tarfile.open(tmpdir / digest)
             to_extract = []
-            # This is the location of rpmdb in the image.
-            dbpath = None
             for member in archive.getmembers():
                 for candidate_path in RPMDB_PATHS:
                     if member.name.startswith(candidate_path):
-                        dbpath = candidate_path
+                        dbpaths.add(candidate_path)
                         to_extract.append(member)
                         break
             # ...and extract them to the destination cache.
             archive.extractall(path=cache_dir, members=to_extract, filter="data")
 
-        if dbpath != RPMDB_PATH:
-            # The rpmdb in the image doesn't match local rpm setup. Let's make
-            # a symlink. When running DNF, it will use configuration from the
-            # local system, and the database in wrong location will be silently
+        if dbpaths and RPMDB_PATH not in dbpaths:
+            # If we have at least possible rpmdb location populated by the
+            # image, and the local rpmdb is not in the set, we need to create a
+            # symlink so that local dnf can find the database.
+            #
+            # When running DNF, it will use configuration from the local
+            # system, and the database in wrong location will be silently
             # ignored, resulting in lock file that includes packages that are
             # already installed.
+            dbpath = dbpaths.pop()
             logging.debug("Creating rpmdb symlink %s -> %s", RPMDB_PATH, dbpath)
-            os.makedirs(os.path.dirname(os.path.join(cache_dir, RPMDB_PATH)))
+            os.makedirs(
+                os.path.dirname(os.path.join(cache_dir, RPMDB_PATH)), exist_ok=True
+            )
             os.symlink(
-                os.path.join(cache_dir, dbpath),
-                os.path.join(cache_dir, RPMDB_PATH),
+                os.path.join(cache_dir, dbpath), os.path.join(cache_dir, RPMDB_PATH)
             )
 
 
