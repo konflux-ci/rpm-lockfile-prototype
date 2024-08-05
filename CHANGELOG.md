@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- When no Containerfile is specified, stop assuming `Containerfile` and instead
+  inspect current working directory to find either `Containerfile` or
+  `Dockerfile`. If both exist, `Containerfile` will be preferred.
+
 ## [0.6.1] - 2024-07-31
 
 - Follow up patch to prevous fix to correctly handle images that provide rpmdb

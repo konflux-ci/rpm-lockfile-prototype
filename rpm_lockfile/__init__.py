@@ -279,6 +279,7 @@ def image_rpmdb(baseimage):
 
 def extract_image(containerfile):
     """Find image mentioned in the first FROM statement in the containerfile."""
+    logging.debug("Looking for base image in %s", containerfile)
     baseimg = ""
     with open(containerfile) as f:
         for line in f:
@@ -438,7 +439,7 @@ def main():
         containerfile = (
             args.containerfile
             or utils.relative_to(config_dir, context.get("containerfile"))
-            or "Containerfile"
+            or utils.find_containerfile(Path.cwd())
         )
         rpmdb = image_rpmdb(image or extract_image(containerfile))
 
