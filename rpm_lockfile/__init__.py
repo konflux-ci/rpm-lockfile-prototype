@@ -7,7 +7,6 @@ import logging
 import os
 import platform
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -60,11 +59,6 @@ RPMDB_PATH = subprocess.run(
 ).stdout.strip()[1:]
 
 
-def logged_run(cmd, *args, **kwargs):
-    logging.info("$ %s", shlex.join(cmd))
-    return subprocess.run(cmd, *args, **kwargs)
-
-
 def _translate_arch(arch):
     # This is a horrible hack. Skopeo will reject x86_64, but is happy with
     # amd64. The same goes for aarch64 -> arm64.
@@ -104,7 +98,7 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             f"docker://{_strip_tag(baseimage)}",
             f"dir:{tmpdir}",
         ]
-        logged_run(cmd, check=True)
+        utils.logged_run(cmd, check=True)
 
         # The manifest is always in the same location, and contains information
         # about individual layers.
@@ -277,19 +271,6 @@ def image_rpmdb(baseimage):
     )
 
 
-def extract_image(containerfile):
-    """Find image mentioned in the first FROM statement in the containerfile."""
-    logging.debug("Looking for base image in %s", containerfile)
-    baseimg = ""
-    with open(containerfile) as f:
-        for line in f:
-            if line.startswith("FROM "):
-                baseimg = line.split()[1]
-    if baseimg == "":
-        raise RuntimeError("Base image could not be identified.")
-    return baseimg
-
-
 def process_arch(
     arch, rpmdb, repos, packages, allow_erasing, reinstall_packages: set[str]
 ):
@@ -441,7 +422,7 @@ def main():
             or utils.relative_to(config_dir, context.get("containerfile"))
             or utils.find_containerfile(Path.cwd())
         )
-        rpmdb = image_rpmdb(image or extract_image(containerfile))
+        rpmdb = image_rpmdb(image or utils.extract_image(containerfile))
 
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
