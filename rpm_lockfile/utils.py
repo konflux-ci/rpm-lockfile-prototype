@@ -5,6 +5,12 @@ import subprocess
 import tempfile
 
 
+# Path to where local dnf expects to find rpmdb. This is relative to /.
+RPMDB_PATH = subprocess.run(
+    ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
+).stdout.strip()[1:]
+
+
 def relative_to(directory, path):
     """os.path.join() that gracefully handles None"""
     if path:
