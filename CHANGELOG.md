@@ -30,10 +30,10 @@
 
 ## [0.6.1] - 2024-07-31
 
+### Fixed
+
 - Follow up patch to prevous fix to correctly handle images that provide rpmdb
   in multiple locations via symlink.
-
-### Fixed
 
 ## [0.6.0] - 2024-07-31
 
