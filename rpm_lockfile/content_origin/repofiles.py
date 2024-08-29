@@ -1,7 +1,5 @@
 import configparser
-import json
 import os
-import subprocess
 
 import requests
 
@@ -59,35 +57,22 @@ class RepofileOrigin:
     def _get_repofile_path(self, source):
         if isinstance(source, str):
             return source
-        vars = (
-            self._get_image_labels(source.get("varsFromImage"))
-            | self._get_containerfile_labels(source.get("varsFromContainerfile"))
+        vars = utils.get_labels(
+            source.get("varsFromImage"),
+            self._get_container_file(source.get("varsFromContainerfile")),
         )
         if "location" in source:
-            return subst_vars(source["location"], vars)
+            return utils.subst_vars(source["location"], vars)
         return utils.get_file_from_git(
-            subst_vars(source["giturl"], vars),
-            subst_vars(source["gitref"], vars),
-            subst_vars(source["file"], vars),
+            utils.subst_vars(source["giturl"], vars),
+            utils.subst_vars(source["gitref"], vars),
+            utils.subst_vars(source["file"], vars),
         )
 
-    def _get_image_labels(self, image_spec):
-        if not image_spec:
-            return {}
-        cp = utils.logged_run(
-            ["skopeo", "inspect", f"docker://{image_spec}"],
-            stdout=subprocess.PIPE,
-            check=True,
-        )
-        data = json.loads(cp.stdout)
-        return data["Labels"]
-
-    def _get_containerfile_labels(self, containerfile):
-        if not containerfile:
-            return {}
-        return self._get_image_labels(
-            utils.extract_image(os.path.join(self.config_dir, containerfile))
-        )
+    def _get_container_file(self, containerfile):
+        if containerfile:
+            return os.path.join(self.config_dir, containerfile)
+        return None
 
     def collect_repofile(self, url):
         if url.startswith("http"):
@@ -112,9 +97,3 @@ class RepofileOrigin:
         for section in parser.sections():
             options = {"repoid": section} | dict(parser.items(section))
             yield Repo.from_dict(options)
-
-
-def subst_vars(template, vars):
-    for key, value in vars.items():
-        template = template.replace(f"{{{key}}}", value)
-    return template
