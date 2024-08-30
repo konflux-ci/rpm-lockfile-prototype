@@ -80,7 +80,12 @@ contentOrigin:
   repos:
     # List of objects with repoid and baseurl
     - repoid: fedora
-      baseurl: https://kojipkgs.fedoraproject.org/compose/rawhide/latest-Fedora-Rawhide/compose/Everything/$basearch/os/
+      baseurl: https://kojipkgs.fedoraproject.org/compose/rawhide/{compose-id}/compose/Everything/$basearch/os/
+      # The baseurl can reference labels from a base image, such as the
+      # compose-id above. The image to get the labels from can be specified
+      # either directly or via a Containerfile.
+      varsFromImage: registry.fedoraproject.org/fedora:latest
+      varsFromContainerfile: Containerfile
       # You can list any option that would be in .repo file here too.
       # For example sslverify, proxy or excludepkgs might be of interest
   repofiles:

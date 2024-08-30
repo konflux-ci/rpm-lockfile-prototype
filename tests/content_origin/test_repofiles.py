@@ -2,23 +2,7 @@ import json
 import subprocess
 from unittest.mock import patch, mock_open, Mock, ANY
 
-import pytest
-
 from rpm_lockfile.content_origin import Repo, repofiles
-
-
-@pytest.mark.parametrize(
-    "template,vars,expected",
-    [
-        ("foo{x}bar", {"x": "X"}, "fooXbar"),
-        ("{x}{y}", {"x": "X", "y": "Y"}, "XY"),
-        ("foo{x}bar}", {}, "foo{x}bar}"),
-        ("foobar", {}, "foobar"),
-        ("foobar", {"x": "X"}, "foobar"),
-    ]
-)
-def test_subst_vars(template, vars, expected):
-    assert repofiles.subst_vars(template, vars) == expected
 
 
 REPOFILE = """
@@ -70,12 +54,9 @@ def test_collect_http_complex():
     origin.session.get.assert_called_once_with(repourl, timeout=ANY)
 
 
-INSPECT_OUTPUT = {
-    "Labels": {
-        "vcs-ref": "abcdef",
-        "architecture": "x86_64",
-    },
-    "Os": "linux",
+LABELS = {
+    "vcs-ref": "abcdef",
+    "architecture": "x86_64",
 }
 
 
@@ -86,10 +67,8 @@ def test_collect_http_with_vars_from_image():
     repourl = "http://example.com/test.repo"
     image = "registry.example.com/image:latest"
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = Mock(
-            stdout=json.dumps(INSPECT_OUTPUT)
-        )
+    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
+        mock_get_labels.return_value = LABELS
         repos = list(
             origin.collect(
                 [{"location": f"{repourl}?x={{vcs-ref}}", "varsFromImage": image}]
@@ -98,24 +77,20 @@ def test_collect_http_with_vars_from_image():
 
     assert repos == [REPO]
     origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
-    mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
-    )
+    mock_get_labels.assert_called_once_with(image, None)
 
 
-def test_collect_http_with_vars_from_containerfile():
-    origin = repofiles.RepofileOrigin("/test")
+def test_collect_http_with_vars_from_containerfile(tmpdir):
+    origin = repofiles.RepofileOrigin(tmpdir)
     origin.session = Mock()
     origin.session.get.return_value = Mock(text=REPOFILE)
     repourl = "http://example.com/test.repo"
-    image = "registry.example.com/image:latest"
-    CONTAINERFILE = f"FROM {image}\nRUN date\n"
+    (tmpdir / "Containerfile").write_text(
+        "FROM registry.example.com/image:latest\nRUN date\n", encoding="utf-8"
+    )
 
-    with patch("builtins.open", mock_open(read_data=CONTAINERFILE)) as m_open, \
-            patch("subprocess.run") as mock_run:
-        mock_run.return_value = Mock(
-            stdout=json.dumps(INSPECT_OUTPUT)
-        )
+    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
+        mock_get_labels.return_value = LABELS
         repos = list(
             origin.collect(
                 [
@@ -129,10 +104,7 @@ def test_collect_http_with_vars_from_containerfile():
 
     assert repos == [REPO]
     origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
-    m_open.assert_called_once_with("/test/Containerfile")
-    mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
-    )
+    mock_get_labels.assert_called_once_with(None, tmpdir / "Containerfile")
 
 
 def test_collect_git_with_vars_from_image(tmpdir):
@@ -144,10 +116,8 @@ def test_collect_git_with_vars_from_image(tmpdir):
 
     image = "registry.example.com/image:latest"
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = Mock(
-            stdout=json.dumps(INSPECT_OUTPUT)
-        )
+    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
+        mock_get_labels.return_value = LABELS
         with patch("rpm_lockfile.utils.get_file_from_git") as mock_get_file:
             mock_get_file.return_value = str(tmpdir / repofile)
             repos = list(
@@ -164,7 +134,5 @@ def test_collect_git_with_vars_from_image(tmpdir):
             )
 
     assert repos == [REPO]
-    mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
-    )
+    mock_get_labels.assert_called_once_with(image, None)
     mock_get_file.assert_called_once_with(giturl, "abcdef", "test.repo")

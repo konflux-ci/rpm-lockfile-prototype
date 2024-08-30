@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The repos specified directly in the input file can now interpolate base image
+  labels too. The specification for which image to use is the same as for the
+  repofiles origin.
+
+  This only works for `baseurl`.
+
+
 ## [0.7.0] - 2024-08-05
 
 ### Added
