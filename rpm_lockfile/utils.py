@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -29,16 +30,36 @@ def logged_run(cmd, *args, **kwargs):
     return subprocess.run(cmd, *args, **kwargs)
 
 
-def extract_image(containerfile):
-    """Find image mentioned in the last FROM statement in the containerfile."""
+def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=None):
+    """Find matching image mentioned in the containerfile.
+    If no filters are specified, then the last image is returned.
+    """
     logging.debug("Looking for base image in %s", containerfile)
     baseimg = ""
+    stages = 0
+    from_line_re = re.compile(
+        r"^\s*FROM\s+(--platform=\S+\s+)?(?P<img>\S+)(\s+AS\s+(?P<name>\S+))?\s*$",
+        re.IGNORECASE,
+    )
     with open(containerfile) as f:
         for line in f:
-            if line.startswith("FROM "):
-                baseimg = line.split()[1]
+            m = from_line_re.match(line.strip())
+            if m:
+                baseimg = m.group("img")
+                if stage_name and stage_name == m.group("name"):
+                    return baseimg
+                stages += 1
+
+                if stage_num == stages:
+                    return baseimg
+
+                if image_pattern and re.search(image_pattern, baseimg):
+                    return baseimg
+
     if baseimg == "":
         raise RuntimeError("Base image could not be identified.")
+    if stage_num or stage_name or image_pattern:
+        raise RuntimeError("No stage matched.")
     return baseimg
 
 
@@ -67,8 +88,6 @@ def subst_vars(template, vars):
 
 def _get_image_labels(image_spec):
     """Given an image specification, return a dict with labels from the image."""
-    if not image_spec:
-        return {}
     cp = logged_run(
         ["skopeo", "inspect", f"docker://{image_spec}"],
         stdout=subprocess.PIPE,
@@ -78,15 +97,52 @@ def _get_image_labels(image_spec):
     return data["Labels"]
 
 
-def _get_containerfile_labels(containerfile):
+def _get_containerfile_labels(containerfile, config_dir):
     """Find labels of the last base image used in the given containerfile."""
-    if not containerfile:
-        return {}
-    if not containerfile.startswith("/"):
-        raise ValueError("Containerfile must be specified by absolute path")
-    return _get_image_labels(extract_image(containerfile))
+    if isinstance(containerfile, dict):
+        fp = containerfile["file"]
+        filters = {
+            "stage_num": containerfile.get("stageNum"),
+            "stage_name": containerfile.get("stageName"),
+            "image_pattern": containerfile.get("imagePattern"),
+        }
+    else:
+        fp = containerfile
+        filters = {}
+
+    return _get_image_labels(extract_image(os.path.join(config_dir, fp), **filters))
 
 
-def get_labels(image_spec, containerfile):
-    """Find labels from given image or the base image used in the containerfile."""
-    return _get_image_labels(image_spec) | _get_containerfile_labels(containerfile)
+def get_labels(obj, config_dir):
+    """Find labels from an image or the base image used in the containerfile
+    from given configuration object. The given configuration dict is modified
+    in place to remove any keys relevant for this lookup.
+    """
+    vars = {}
+    image = obj.pop("varsFromImage", None)
+    if image:
+        vars |= _get_image_labels(image)
+
+    containerfile = obj.pop("varsFromContainerfile", None)
+    if containerfile:
+        vars |= _get_containerfile_labels(containerfile, config_dir)
+
+    return vars
+
+
+CONTAINERFILE_SCHEMA = {
+    "oneOf": [
+        {"type": "string"},
+        {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "stageNum": {"type": "number"},
+                "stageName": {"type": "string"},
+                "imagePattern": {"type": "string"},
+            },
+            "additionalProperties": False,
+            "required": ["file"],
+        },
+    ],
+}

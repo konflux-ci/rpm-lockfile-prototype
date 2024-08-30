@@ -361,6 +361,26 @@ def read_packages_from_container_yaml(arch):
     return packages
 
 
+def _get_containerfile_path(config_dir, context):
+    cf = context.get("containerfile")
+    if isinstance(cf, dict):
+        return utils.relative_to(config_dir, cf["file"])
+    if isinstance(cf, str):
+        return utils.relative_to(config_dir, cf)
+    return None
+
+
+def _get_containerfile_filters(context):
+    cf = context.get("containerfile")
+    if isinstance(cf, dict):
+        return {
+            "stage_num": cf.get("stageNum"),
+            "stage_name": cf.get("stageName"),
+            "image_pattern": cf.get("imagePattern"),
+        }
+    return {}
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -419,10 +439,14 @@ def main():
         image = args.image or context.get("image")
         containerfile = (
             args.containerfile
-            or utils.relative_to(config_dir, context.get("containerfile"))
+            or _get_containerfile_path(config_dir, context)
             or utils.find_containerfile(Path.cwd())
         )
-        rpmdb = image_rpmdb(image or utils.extract_image(containerfile))
+        rpmdb = image_rpmdb(
+            image or utils.extract_image(
+                containerfile, **_get_containerfile_filters(context)
+            )
+        )
 
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):

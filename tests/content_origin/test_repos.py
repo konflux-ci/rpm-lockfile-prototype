@@ -13,10 +13,14 @@ def test_collect_simple(tmpdir):
     assert repos == [Repo(repoid="a", baseurl=baseurl)]
 
 
-LABELS = {
-    "vcs-ref": "abcdef",
-    "architecture": "x86_64",
-}
+def fake_get_labels(obj, config_dir):
+    obj.pop("varsFromContainerfile", None)
+    obj.pop("varsFromImage", None)
+    return {
+        "vcs-ref": "abcdef",
+        "architecture": "x86_64",
+    }
+
 
 TEMPLATE_CONFIG = {
     "repoid": "a", "baseurl": "https://example.com/{architecture}/repo"
@@ -28,12 +32,10 @@ def test_collect_with_vars_from_image(tmpdir):
     origin = RepoOrigin(tmpdir)
     image = "registry.example.com/image:latest"
 
-    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
-        mock_get_labels.return_value = LABELS
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         repos = list(origin.collect([TEMPLATE_CONFIG | {"varsFromImage": image}]))
 
     assert repos == [EXPANDED_REPO]
-    mock_get_labels.assert_called_once_with(image, None)
 
 
 def test_collect_with_vars_from_containerfile(tmpdir):
@@ -42,8 +44,7 @@ def test_collect_with_vars_from_containerfile(tmpdir):
         "FROM registry.example.com/image:latest\nRUN date\n", encoding="utf-8"
     )
 
-    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
-        mock_get_labels.return_value = LABELS
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         repos = list(
             origin.collect(
                 [TEMPLATE_CONFIG | {"varsFromContainerfile": "Containerfile"}]
@@ -51,4 +52,3 @@ def test_collect_with_vars_from_containerfile(tmpdir):
         )
 
     assert repos == [EXPANDED_REPO]
-    mock_get_labels.assert_called_once_with(None, tmpdir / "Containerfile")

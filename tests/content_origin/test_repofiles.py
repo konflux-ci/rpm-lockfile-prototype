@@ -54,10 +54,13 @@ def test_collect_http_complex():
     origin.session.get.assert_called_once_with(repourl, timeout=ANY)
 
 
-LABELS = {
-    "vcs-ref": "abcdef",
-    "architecture": "x86_64",
-}
+def fake_get_labels(obj, config_dir):
+    obj.pop("varsFromContainerfile", None)
+    obj.pop("varsFromImage", None)
+    return {
+        "vcs-ref": "abcdef",
+        "architecture": "x86_64",
+    }
 
 
 def test_collect_http_with_vars_from_image():
@@ -67,8 +70,7 @@ def test_collect_http_with_vars_from_image():
     repourl = "http://example.com/test.repo"
     image = "registry.example.com/image:latest"
 
-    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
-        mock_get_labels.return_value = LABELS
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         repos = list(
             origin.collect(
                 [{"location": f"{repourl}?x={{vcs-ref}}", "varsFromImage": image}]
@@ -77,7 +79,6 @@ def test_collect_http_with_vars_from_image():
 
     assert repos == [REPO]
     origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
-    mock_get_labels.assert_called_once_with(image, None)
 
 
 def test_collect_http_with_vars_from_containerfile(tmpdir):
@@ -89,8 +90,7 @@ def test_collect_http_with_vars_from_containerfile(tmpdir):
         "FROM registry.example.com/image:latest\nRUN date\n", encoding="utf-8"
     )
 
-    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
-        mock_get_labels.return_value = LABELS
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         repos = list(
             origin.collect(
                 [
@@ -104,7 +104,6 @@ def test_collect_http_with_vars_from_containerfile(tmpdir):
 
     assert repos == [REPO]
     origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
-    mock_get_labels.assert_called_once_with(None, tmpdir / "Containerfile")
 
 
 def test_collect_git_with_vars_from_image(tmpdir):
@@ -116,8 +115,7 @@ def test_collect_git_with_vars_from_image(tmpdir):
 
     image = "registry.example.com/image:latest"
 
-    with patch("rpm_lockfile.utils.get_labels") as mock_get_labels:
-        mock_get_labels.return_value = LABELS
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         with patch("rpm_lockfile.utils.get_file_from_git") as mock_get_file:
             mock_get_file.return_value = str(tmpdir / repofile)
             repos = list(
@@ -134,5 +132,4 @@ def test_collect_git_with_vars_from_image(tmpdir):
             )
 
     assert repos == [REPO]
-    mock_get_labels.assert_called_once_with(image, None)
     mock_get_file.assert_called_once_with(giturl, "abcdef", "test.repo")

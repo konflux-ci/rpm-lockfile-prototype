@@ -10,6 +10,11 @@
 
   This only works for `baseurl`.
 
+- Where input configuration file specifies an image by pointing to Container
+  file, it is now possible to provide an object with additional info on which
+  stage to use. The stage can be specified by order (first, second, etc.), by
+  name, or by a pattern that must be found in the image name.
+
 
 ## [0.7.0] - 2024-08-05
 
