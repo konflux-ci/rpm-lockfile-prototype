@@ -30,7 +30,7 @@ def logged_run(cmd, *args, **kwargs):
 
 
 def extract_image(containerfile):
-    """Find image mentioned in the first FROM statement in the containerfile."""
+    """Find image mentioned in the last FROM statement in the containerfile."""
     logging.debug("Looking for base image in %s", containerfile)
     baseimg = ""
     with open(containerfile) as f:
