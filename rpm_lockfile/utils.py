@@ -37,6 +37,7 @@ def extract_image(containerfile):
         for line in f:
             if line.startswith("FROM "):
                 baseimg = line.split()[1]
+                break
     if baseimg == "":
         raise RuntimeError("Base image could not be identified.")
     return baseimg
