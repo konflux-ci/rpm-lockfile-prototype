@@ -85,7 +85,7 @@ def test_get_labels_from_image():
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
-        labels = utils.get_labels(image, None)
+        labels = utils.get_labels({"varsFromImage": image}, "/top")
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
@@ -100,7 +100,45 @@ def test_get_labels_from_containerfile(tmpdir):
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
-        labels = utils.get_labels(None, str(containerfile))
+        labels = utils.get_labels({"varsFromContainerfile": "Containerfile"}, tmpdir)
+
+    assert labels == INSPECT_OUTPUT["Labels"]
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+    )
+
+
+@pytest.mark.parametrize(
+    "filter",
+    [
+        pytest.param({"stageNum": 2}, id="stageNum"),
+        pytest.param({"stageName": "something"}, id="stageName"),
+        pytest.param({"imagePattern": "example.com"}, id="imagePattern"),
+    ]
+)
+def test_get_labels_from_containerfile_stage(tmpdir, filter):
+    image = "registry.example.com/image:latest"
+    containerfile = tmpdir / "Containerfile"
+    containerfile.write_text(
+        "\n".join(
+            [
+                "FROM --platform=amd64 foobar:latest AS builder",
+                "RUN id",
+                f"FROM {image} AS something",
+                "RUN date",
+                "FROM foobar:latest AS last",
+                "RUN pwd",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        labels = utils.get_labels(
+            {"varsFromContainerfile": {"file": "Containerfile"} | filter},
+            tmpdir,
+        )
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(

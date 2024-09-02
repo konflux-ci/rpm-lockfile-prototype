@@ -24,7 +24,7 @@ class RepofileOrigin:
                 "type": "object",
                 "properties": {
                     "location": {"type": "string"},
-                    "varsFromContainerfile": {"type": "string"},
+                    "varsFromContainerfile": utils.CONTAINERFILE_SCHEMA,
                     "varsFromImage": {"type": "string"},
                 },
                 "required": ["location"],
@@ -36,7 +36,7 @@ class RepofileOrigin:
                     "giturl": {"type": "string"},
                     "file": {"type": "string"},
                     "gitref": {"type": "string"},
-                    "varsFromContainerfile": {"type": "string"},
+                    "varsFromContainerfile": utils.CONTAINERFILE_SCHEMA,
                     "varsFromImage": {"type": "string"},
                 },
                 "required": ["giturl", "file", "gitref"],
@@ -57,10 +57,7 @@ class RepofileOrigin:
     def _get_repofile_path(self, source):
         if isinstance(source, str):
             return source
-        vars = utils.get_labels(
-            source.get("varsFromImage"),
-            self._get_container_file(source.get("varsFromContainerfile")),
-        )
+        vars = utils.get_labels(source, self.config_dir)
         if "location" in source:
             return utils.subst_vars(source["location"], vars)
         return utils.get_file_from_git(
@@ -68,11 +65,6 @@ class RepofileOrigin:
             utils.subst_vars(source["gitref"], vars),
             utils.subst_vars(source["file"], vars),
         )
-
-    def _get_container_file(self, containerfile):
-        if containerfile:
-            return os.path.join(self.config_dir, containerfile)
-        return None
 
     def collect_repofile(self, url):
         if url.startswith("http"):

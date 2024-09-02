@@ -143,6 +143,28 @@ context:
     rpmOstreeTreefile: centos-bootc/centos-bootc.yaml
 ```
 
+The configuration file can specify a containerfile to extract a base image from
+either in the `context` section or in `varsFromContainerfile` inside
+`contentOrigin`. This containerfile can be either a simple string (file path
+relative to the config file), or a more complex object. In the complex case you
+can specify which stage you want to extract the image from, either by its
+order, name or by pattern matching the image.
+
+```yaml
+containerfile:
+  # Only the `file` key is required.
+  file: path/relative/to/rpms.yaml.in
+  # Get image from stage given by the order. Numbering starts from 1.
+  stageNum: 1
+  # Get image from a stage with the given name.
+  stageName: builder
+  # Get base image that contains a match for the given regular expression.
+  imagePattern: example.com
+```
+
+If multiple filters for selecting stage are set, the first one to match is
+used.
+
 # What does this do
 
 High-level overview: given a list of packages, repo urls and installed

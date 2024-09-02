@@ -4,7 +4,7 @@ import sys
 
 import jsonschema
 
-from . import content_origin
+from . import content_origin, utils
 
 
 STRINGS = {
@@ -54,7 +54,7 @@ def get_schema():
                     {
                         "additionalProperties": False,
                         "properties": {
-                            "containerfile": {"type": "string"},
+                            "containerfile": utils.CONTAINERFILE_SCHEMA,
                             "flatpak": {"type": "boolean"},
                         },
                     },
