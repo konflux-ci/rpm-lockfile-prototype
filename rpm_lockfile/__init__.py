@@ -2,15 +2,11 @@
 
 import argparse
 import contextlib
-import json
 import logging
 import os
 import platform
-import re
 import shutil
-import subprocess
 import sys
-import tarfile
 import tempfile
 from pathlib import Path
 from dataclasses import asdict, dataclass
@@ -28,7 +24,7 @@ except ImportError:
     sys.exit(127)
 import yaml
 
-from . import content_origin, schema, utils
+from . import containers, content_origin, schema, utils
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -54,97 +50,8 @@ PRINT_SCHEMA_HELP = "Print schema for the input file to stdout."
 ALLOWERASING_HELP = "Allow  erasing  of  installed  packages to resolve dependencies."
 
 
-RPMDB_PATH = subprocess.run(
-    ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
-).stdout.strip()[1:]
-
-
-def _translate_arch(arch):
-    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
-    # amd64. The same goes for aarch64 -> arm64.
-    ARCHES = {"aarch64": "arm64", "x86_64": "amd64"}
-    return ARCHES.get(arch, arch)
-
-
-def _strip_tag(image_spec):
-    """
-    If the image specification contains both a tag and a digest, remove the
-    tag. Skopeo rejects such images. The behaviour is chosen to match podman
-    4.9.4, which silently ignores the tag if digest is available.
-
-    https://github.com/containers/image/issues/1736
-    """
-    # De don't want to validate the digest here in any way, so even wrong
-    # length should be accepted.
-    m = re.match(r'([^:]+)(:[^@]+)(@sha\d+:[a-f0-9]+)$', image_spec)
-    if m:
-        logging.info("Digest was provided, ignoring tag %s", m.group(2)[1:])
-        return f"{m.group(1)}{m.group(3)}"
-    return image_spec
-
-
-def setup_rpmdb(cache_dir, baseimage, arch):
-    # Known locations for rpmdb inside the image.
-    RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
-    arch = _translate_arch(arch)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        # Copy the image into a local directory.
-        cmd = [
-            "skopeo",
-            f"--override-arch={arch}",
-            "copy",
-            f"docker://{_strip_tag(baseimage)}",
-            f"dir:{tmpdir}",
-        ]
-        utils.logged_run(cmd, check=True)
-
-        # The manifest is always in the same location, and contains information
-        # about individual layers.
-        with open(tmpdir / "manifest.json") as f:
-            manifest = json.load(f)
-
-        # This are all possible locations for rpmdb that are populated by the
-        # image.
-        dbpaths = set()
-        # One layer at a time...
-        for layer in manifest["layers"]:
-            digest = layer["digest"].split(":", 1)[1]
-            logging.info("Extracting rpmdb from layer %s", digest)
-            # ...find all files in interesting locations...
-            archive = tarfile.open(tmpdir / digest)
-            to_extract = []
-            for member in archive.getmembers():
-                for candidate_path in RPMDB_PATHS:
-                    if member.name.startswith(candidate_path):
-                        dbpaths.add(candidate_path)
-                        to_extract.append(member)
-                        break
-            # ...and extract them to the destination cache.
-            archive.extractall(path=cache_dir, members=to_extract, filter="data")
-
-        if dbpaths and RPMDB_PATH not in dbpaths:
-            # If we have at least possible rpmdb location populated by the
-            # image, and the local rpmdb is not in the set, we need to create a
-            # symlink so that local dnf can find the database.
-            #
-            # When running DNF, it will use configuration from the local
-            # system, and the database in wrong location will be silently
-            # ignored, resulting in lock file that includes packages that are
-            # already installed.
-            dbpath = dbpaths.pop()
-            logging.debug("Creating rpmdb symlink %s -> %s", RPMDB_PATH, dbpath)
-            os.makedirs(
-                os.path.dirname(os.path.join(cache_dir, RPMDB_PATH)), exist_ok=True
-            )
-            os.symlink(
-                os.path.join(cache_dir, dbpath), os.path.join(cache_dir, RPMDB_PATH)
-            )
-
-
 def copy_local_rpmdb(cache_dir):
-    shutil.copytree("/" + RPMDB_PATH, os.path.join(cache_dir, RPMDB_PATH))
+    shutil.copytree("/" + utils.RPMDB_PATH, os.path.join(cache_dir, utils.RPMDB_PATH))
 
 
 def strip_suffix(s, suf):
@@ -267,7 +174,7 @@ def local_rpmdb():
 
 def image_rpmdb(baseimage):
     return rpmdb_preparer(
-        lambda root_dir, arch: setup_rpmdb(root_dir, baseimage, arch)
+        lambda root_dir, arch: containers.setup_rpmdb(root_dir, baseimage, arch)
     )
 
 
