@@ -207,67 +207,6 @@ def collect_content_origins(config_dir, origins):
     return repos
 
 
-def read_packages_from_treefile(arch, treefile):
-    # Reference: https://coreos.github.io/rpm-ostree/treefile/
-    # TODO this should move to a separate module
-    packages = set()
-    with open(treefile) as f:
-        data = yaml.safe_load(f)
-        for path in data.get("include", []):
-            packages.update(
-                read_packages_from_treefile(
-                    arch, os.path.join(os.path.dirname(treefile), path)
-                )
-            )
-
-        if arch_include := data.get("arch-include", {}).get(arch):
-            packages.update(
-                read_packages_from_treefile(
-                    arch, os.path.join(os.path.dirname(treefile), arch_include)
-                )
-            )
-
-        for key in ("packages", f"packages-{arch}"):
-            for entry in data.get(key, []):
-                packages.update(entry.split())
-
-        for entry in data.get("repo-packages", []):
-            # The repo should not be needed, as the packages should be present
-            # in only one place.
-            for e in entry.get("packages", []):
-                packages.update(e.split())
-
-        # TODO conditional-include
-        # TODO exclude-packages might be needed here
-    return packages
-
-
-def read_packages_from_container_yaml(arch):
-    packages = set()
-
-    with open("container.yaml") as f:
-        data = yaml.safe_load(f)
-        for package in data.get("flatpak", {}).get("packages", []):
-            if isinstance(package, str):
-                packages.add(package)
-            else:
-                platforms = package.get('platforms', {})
-                only = platforms.get('only', [])
-                if isinstance(only, str):
-                    only = [only]
-                not_ = platforms.get('not', [])
-                if isinstance(not_, str):
-                    not_ = [not_]
-
-                if (
-                    (not only or arch in only) and
-                    (not not_ or arch not in not_)
-                ):
-                    packages.add(package['name'])
-
-    return packages
-
-
 def _get_containerfile_path(config_dir, context):
     cf = context.get("containerfile")
     if isinstance(cf, dict):
@@ -359,13 +298,13 @@ def main():
     for arch in sorted(arches):
         packages = set()
         if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
-            packages = read_packages_from_treefile(
+            packages = utils.read_packages_from_treefile(
                 arch,
                 args.rpm_ostree_treefile
                 or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
             )
         elif args.flatpak or context.get("flatpak"):
-            packages = read_packages_from_container_yaml(arch)
+            packages = utils.read_packages_from_container_yaml(arch)
         data["arches"].append(
             process_arch(
                 arch,
