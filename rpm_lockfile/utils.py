@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import tempfile
 
+import yaml
 
 # Path to where local dnf expects to find rpmdb. This is relative to /.
 RPMDB_PATH = subprocess.run(
@@ -152,3 +153,63 @@ CONTAINERFILE_SCHEMA = {
         },
     ],
 }
+
+
+def read_packages_from_treefile(arch, treefile):
+    # Reference: https://coreos.github.io/rpm-ostree/treefile/
+    packages = set()
+    with open(treefile) as f:
+        data = yaml.safe_load(f)
+        for path in data.get("include", []):
+            packages.update(
+                read_packages_from_treefile(
+                    arch, os.path.join(os.path.dirname(treefile), path)
+                )
+            )
+
+        if arch_include := data.get("arch-include", {}).get(arch):
+            packages.update(
+                read_packages_from_treefile(
+                    arch, os.path.join(os.path.dirname(treefile), arch_include)
+                )
+            )
+
+        for key in ("packages", f"packages-{arch}"):
+            for entry in data.get(key, []):
+                packages.update(entry.split())
+
+        for entry in data.get("repo-packages", []):
+            # The repo should not be needed, as the packages should be present
+            # in only one place.
+            for e in entry.get("packages", []):
+                packages.update(e.split())
+
+        # TODO conditional-include
+        # TODO exclude-packages might be needed here
+    return packages
+
+
+def read_packages_from_container_yaml(arch):
+    packages = set()
+
+    with open("container.yaml") as f:
+        data = yaml.safe_load(f)
+        for package in data.get("flatpak", {}).get("packages", []):
+            if isinstance(package, str):
+                packages.add(package)
+            else:
+                platforms = package.get('platforms', {})
+                only = platforms.get('only', [])
+                if isinstance(only, str):
+                    only = [only]
+                not_ = platforms.get('not', [])
+                if isinstance(not_, str):
+                    not_ = [not_]
+
+                if (
+                    (not only or arch in only) and
+                    (not not_ or arch not in not_)
+                ):
+                    packages.add(package['name'])
+
+    return packages

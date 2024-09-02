@@ -3,6 +3,7 @@ import subprocess
 from unittest.mock import patch, mock_open, Mock
 
 import pytest
+import yaml
 
 from rpm_lockfile import utils
 
@@ -143,4 +144,62 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
         ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+    )
+
+
+@pytest.mark.parametrize(
+    "arch,expected",
+    [
+        pytest.param("x86_64", {"glibc", "bash", "openssl"}, id="x8_64"),
+        pytest.param("s390x", {"glibc", "zsh", "ant"}, id="s390x"),
+    ],
+)
+def test_read_container_yaml_single_pkg(arch, expected):
+    contents = """
+        flatpak:
+          packages:
+          - glibc
+          - name: bash
+            platforms:
+              only: x86_64
+          - name: zsh
+            platforms:
+              not: x86_64
+          - name: openssl
+            platforms:
+              only: [x86_64]
+          - name: ant
+            platforms:
+              not: [x86_64]
+        """
+    with patch("builtins.open", mock_open(read_data=contents)):
+        assert utils.read_packages_from_container_yaml(arch) == expected
+
+
+@pytest.mark.parametrize(
+    "arch,expected",
+    [
+        pytest.param("x86_64", {"glibc", "openssl", "fzf", "bash"}, id="x86_64"),
+        pytest.param("s390x", {"glibc", "openssl", "fzf", "zsh"}, id="s390x"),
+    ],
+)
+def test_read_from_treefile(tmp_path, arch, expected):
+    treefiles = {
+        "toplevel.yaml": {
+            "packages": ["glibc"],
+            "repo-packages": [{"packages": ["openssl"], "repo": "custom"}],
+            "include": ["child.yaml"],
+            "arch-include": {"x86_64": "x86_64.yaml", "s390x": "s390x.yaml"},
+        },
+        "child.yaml": {"packages": ["fzf"]},
+        "s390x.yaml": {"packages": ["zsh"]},
+        "x86_64.yaml": {"packages": ["bash"]},
+    }
+
+    for filename, content in treefiles.items():
+        with (tmp_path / filename).open("w") as f:
+            yaml.dump(content, f)
+
+    assert (
+        utils.read_packages_from_treefile(arch, tmp_path / "toplevel.yaml") == expected
     )
