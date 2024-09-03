@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Obtaining labels from base image now works even if the image is specified
+  using both tag and digest. The tag is ignored in such case.
+
 ## [0.7.1] - 2024-09-02
 
 ### Added
