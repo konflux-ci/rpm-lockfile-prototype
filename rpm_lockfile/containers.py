@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 import tarfile
 import tempfile
 from pathlib import Path
@@ -25,7 +24,7 @@ def _copy_image(baseimage, arch, destdir):
         "skopeo",
         f"--override-arch={arch}",
         "copy",
-        f"docker://{strip_tag(baseimage)}",
+        f"docker://{utils.strip_tag(baseimage)}",
         f"dir:{destdir}",
     ]
     utils.logged_run(cmd, check=True)

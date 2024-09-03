@@ -40,6 +40,18 @@ def test_find_containerfile(tmpdir, files, expected):
 
 
 @pytest.mark.parametrize(
+    "image_spec,expected",
+    [
+        ("example.com/image:latest", "example.com/image:latest"),
+        ("example.com/image@sha256:abcdef", "example.com/image@sha256:abcdef"),
+        ("example.com/image:latest@sha256:0123456", "example.com/image@sha256:0123456"),
+    ],
+)
+def test_strip_tag(image_spec, expected):
+    assert utils.strip_tag(image_spec) == expected
+
+
+@pytest.mark.parametrize(
     "file,expected",
     [
         ("""FROM registry.io/repository/base
@@ -80,16 +92,30 @@ INSPECT_OUTPUT = {
 }
 
 
-def test_get_labels_from_image():
-    image = "registry.example.com/image:latest"
-
+@pytest.mark.parametrize(
+    "image_spec,image_url",
+    [
+        ("registry.example.com/image:latest", "registry.example.com/image:latest"),
+        (
+            "registry.example.com/image@sha256:abcdef",
+            "registry.example.com/image@sha256:abcdef",
+        ),
+        (
+            "registry.example.com/image:latest@sha256:abcdef",
+            "registry.example.com/image@sha256:abcdef",
+        ),
+    ],
+)
+def test_get_labels_from_image(image_spec, image_url):
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
-        labels = utils.get_labels({"varsFromImage": image}, "/top")
+        labels = utils.get_labels({"varsFromImage": image_spec}, "/top")
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+        ["skopeo", "inspect", f"docker://{image_url}"],
+        check=True,
+        stdout=subprocess.PIPE,
     )
 
 
