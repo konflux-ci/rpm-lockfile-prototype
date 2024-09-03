@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from rpm_lockfile import containers
+from rpm_lockfile import containers, utils
 
 
 @pytest.mark.parametrize(
@@ -21,7 +21,7 @@ from rpm_lockfile import containers
     ],
 )
 def test_strip_tag(image_spec, expected):
-    assert containers._strip_tag(image_spec) == expected
+    assert utils.strip_tag(image_spec) == expected
 
 
 @pytest.fixture

@@ -95,7 +95,7 @@ def subst_vars(template, vars):
 def _get_image_labels(image_spec):
     """Given an image specification, return a dict with labels from the image."""
     cp = logged_run(
-        ["skopeo", "inspect", f"docker://{image_spec}"],
+        ["skopeo", "inspect", f"docker://{strip_tag(image_spec)}"],
         stdout=subprocess.PIPE,
         check=True,
     )
@@ -117,6 +117,23 @@ def _get_containerfile_labels(containerfile, config_dir):
         filters = {}
 
     return _get_image_labels(extract_image(os.path.join(config_dir, fp), **filters))
+
+
+def strip_tag(image_spec):
+    """
+    If the image specification contains both a tag and a digest, remove the
+    tag. Skopeo rejects such images. The behaviour is chosen to match podman
+    4.9.4, which silently ignores the tag if digest is available.
+
+    https://github.com/containers/image/issues/1736
+    """
+    # De don't want to validate the digest here in any way, so even wrong
+    # length should be accepted.
+    m = re.match(r'([^:]+)(:[^@]+)(@sha\d+:[a-f0-9]+)$', image_spec)
+    if m:
+        logging.info("Digest was provided, ignoring tag %s", m.group(2)[1:])
+        return f"{m.group(1)}{m.group(3)}"
+    return image_spec
 
 
 def get_labels(obj, config_dir):
