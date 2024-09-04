@@ -104,6 +104,7 @@ def resolver(
 ):
     packages = set()
     sources = set()
+    module_metadata = []
 
     with tempfile.TemporaryDirectory() as cache_dir:
         with dnf.Base() as base:
@@ -136,8 +137,19 @@ def resolver(
                     raise RuntimeError(f"No match found for {solvable}")
             # And resolve the transaction
             base.resolve(allow_erasing=allow_erasing)
+
+            module_base = dnf.module.module_base.ModuleBase(base)
+            modular_packages = set(
+                nevra
+                for module in module_base.get_modules("*")[0]
+                for nevra in module.getArtifacts()
+            )
+            modular_repos = set()
+
             # These packages would be installed
             for pkg in base.transaction.install_set:
+                if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
+                    modular_repos.add(pkg.repoid)
                 packages.add(PackageItem.from_dnf(pkg))
                 # Find the corresponding source package
                 n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
@@ -150,7 +162,25 @@ def resolver(
                     src = results[0]
                     sources.add(PackageItem.from_dnf(src))
 
-    return packages, sources
+            for repoid in modular_repos:
+                repo = base.repos[repoid]
+                modulemd_path = repo.get_metadata_path("modules")
+                if not modulemd_path:
+                    raise RuntimeError(
+                        "Modular package is coming from a repo with no modular metadata"
+                    )
+                module_metadata.append(
+                    {
+                        "url": repo.remote_location(
+                            "repodata/" + os.path.basename(modulemd_path)
+                        ),
+                        "repoid": repo.id,
+                        "size": os.stat(modulemd_path).st_size,
+                        "checksum": f"sha256:{utils.hash_file(modulemd_path)}",
+                    }
+                )
+
+    return packages, sources, module_metadata
 
 
 def rpmdb_preparer(func=None):
@@ -184,7 +214,7 @@ def process_arch(
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
-        packages, sources = resolver(
+        packages, sources, module_metadata = resolver(
             arch, root_dir, repos, packages, allow_erasing, reinstall_packages
         )
 
@@ -192,6 +222,7 @@ def process_arch(
         "arch": arch,
         "packages": [p.as_dict() for p in sorted(packages)],
         "source": [s.as_dict() for s in sorted(sources)],
+        "module_metadata": list(sorted(module_metadata, key=lambda x: x["url"])),
     }
 
 

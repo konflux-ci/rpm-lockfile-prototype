@@ -170,3 +170,16 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
     mock_run.assert_called_once_with(
         ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
     )
+
+
+@pytest.mark.parametrize(
+    "content,hash",
+    [
+        ("", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+        ("hello\n", "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"),
+    ],
+)
+def test_hash_file(content, hash, tmp_path):
+    fn = tmp_path / "something"
+    fn.write_text(content, encoding="utf-8")
+    assert utils.hash_file(fn) == hash

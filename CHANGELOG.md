@@ -1,11 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- When a modular package is included in the resolved set, the lockfile will now
+  contain references to modulemd metadata files from respective repos. These
+  can then be prefetched together with the RPMs and included in the build
+  repository to make dnf happy.
+
+
 ## [0.7.2] - 2024-09-03
 
 ### Fixed
 
 - Obtaining labels from base image now works even if the image is specified
   using both tag and digest. The tag is ignored in such case.
+
 
 ## [0.7.1] - 2024-09-02
 
