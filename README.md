@@ -21,7 +21,7 @@ $ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archiv
 Or latest released version:
 
 ```
-$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.7.2.tar.gz
+$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.8.0.tar.gz
 ```
 
 
