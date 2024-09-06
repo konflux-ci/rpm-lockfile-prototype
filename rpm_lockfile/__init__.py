@@ -89,6 +89,18 @@ class PackageItem:
         return d
 
 
+def filter_for_arch(arch, pkgs):
+    """Given an iterator with packages, keep only those that should be included
+    on the given architecture.
+    """
+    for pkg in pkgs:
+        if isinstance(pkg, str):
+            yield pkg
+        else:
+            if _arch_matches(pkg.get("arches", {}), arch):
+                yield pkg["name"]
+
+
 def mkdir(dir):
     os.mkdir(dir)
     return dir
@@ -273,6 +285,20 @@ def read_packages_from_treefile(arch, treefile):
     return packages
 
 
+def _arch_matches(spec, arch):
+    only = spec.get("only", [])
+    if isinstance(only, str):
+        only = [only]
+    not_ = spec.get("not", [])
+    if isinstance(not_, str):
+        not_ = [not_]
+
+    return (
+        (not only or arch in only) and
+        (not not_ or arch not in not_)
+    )
+
+
 def read_packages_from_container_yaml(arch):
     packages = set()
 
@@ -282,18 +308,7 @@ def read_packages_from_container_yaml(arch):
             if isinstance(package, str):
                 packages.add(package)
             else:
-                platforms = package.get('platforms', {})
-                only = platforms.get('only', [])
-                if isinstance(only, str):
-                    only = [only]
-                not_ = platforms.get('not', [])
-                if isinstance(not_, str):
-                    not_ = [not_]
-
-                if (
-                    (not only or arch in only) and
-                    (not not_ or arch not in not_)
-                ):
+                if _arch_matches(package.get("platforms", {}), arch):
                     packages.add(package['name'])
 
     return packages
@@ -402,9 +417,11 @@ def main():
                 arch,
                 rpmdb,
                 repos,
-                set(config.get("packages", [])) | packages,
+                set(filter_for_arch(arch, config.get("packages", []))) | packages,
                 allow_erasing=args.allowerasing,
-                reinstall_packages=set(config.get("reinstallPackages", [])),
+                reinstall_packages=set(
+                    filter_for_arch(arch, config.get("reinstallPackages", []))
+                ),
             )
         )
 
