@@ -18,21 +18,63 @@ STRINGS = {
 def get_schema():
     return {
         "$schema": "http://json-schema.org/draft-04/schema#",
+        "$defs": {
+            # Either a single string or a list of strings
+            "strings": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "array", "items": {"type": "string"}},
+                ],
+            },
+            # Either just a string with name, or an object with arch specification
+            "pkg": {
+                "oneOf": [
+                    {"type": "string"},
+                    {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "arches": {
+                                "oneOf": [
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "only": {"$ref": "#/$defs/strings"},
+                                        },
+                                        "additionalProperties": False,
+                                        "required": ["only"],
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "not": {"$ref": "#/$defs/strings"},
+                                        },
+                                        "additionalProperties": False,
+                                        "required": ["not"],
+                                    },
+                                ],
+                            }
+                        },
+                        "required": ["name"],
+                    }
+                ],
+            }
+        },
         "type": "object",
         "properties": {
-            # TODO Packages should not be required. If possible, they should be
-            # extracted from other input files.
+
             "packages": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": {"$ref": "#/$defs/pkg"},
             },
+
             "arches": {
                 "type": "array",
                 "items": {"type": "string"},
             },
             "reinstallPackages": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": {"$ref": "#/$defs/pkg"},
             },
             "contentOrigin": {
                 "type": "object",

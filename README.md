@@ -120,10 +120,20 @@ contentOrigin:
 packages:
   # list of rpm names to resolve
   - vim-enhanced
+  # Either a simple string as above, or an object with specification of
+  # architectures. Either specify allow list (`only`) or deny list (`not`). The
+  # value is either a single string or a list of strings.
+  - name: librtas
+    arches:
+      only: ppc64le
+  - name: grub2
+    arches:
+      not:
+      - s390x
 
 reinstallPackages: []
-  # list of rpms already provided in the base image, but which should be
-  # reinstalled
+  # List of rpms already provided in the base image, but which should be
+  # reinstalled. Same specification as `packages` above.
 
 arches:
   # The list of architectures can be set in the config file. Any `--arch` option set

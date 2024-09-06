@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The input file can now specify packages as objects, which can be used to add
+  the package only to a subset of architectures.
+
+
 ## [0.8.0] - 2024-09-05
 
 ### Changed
