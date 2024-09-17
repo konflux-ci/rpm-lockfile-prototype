@@ -334,6 +334,26 @@ def _get_containerfile_filters(context):
     return {}
 
 
+def logging_setup(debug=False):
+
+    class ExcludeErrorsFilter(logging.Filter):
+        def filter(self, record):
+            """Only lets through log messages with log level below ERROR."""
+            return record.levelno < logging.ERROR
+
+    console_stdout = logging.StreamHandler(stream=sys.stdout)
+    console_stdout.addFilter(ExcludeErrorsFilter())
+    console_stdout.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    console_stderr = logging.StreamHandler(stream=sys.stderr)
+    console_stderr.setLevel(logging.ERROR)
+
+    logging.basicConfig(
+        level=logging.DEBUG if debug else logging.INFO,
+        handlers=[console_stdout, console_stderr],
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -361,7 +381,7 @@ def main():
     )
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    logging_setup(args.debug)
 
     config_dir = os.path.dirname(os.path.realpath(args.infile))
     with open(args.infile) as f:
