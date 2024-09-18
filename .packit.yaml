@@ -1,0 +1,14 @@
+# See the documentation for more information:
+# https://packit.dev/docs/configuration/
+
+---
+upstream_tag_template: v{version}
+jobs:
+  - <<: &pr_build
+      job: copr_build
+      trigger: pull_request
+      targets:
+        - fedora-all
+
+  - <<: *pr_build
+    trigger: commit
