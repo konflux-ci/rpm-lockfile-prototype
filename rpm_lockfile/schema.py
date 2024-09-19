@@ -76,6 +76,14 @@ def get_schema():
                 "type": "array",
                 "items": {"$ref": "#/$defs/pkg"},
             },
+            "moduleEnable": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/pkg"},
+            },
+            "moduleDisable": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/pkg"},
+            },
             "contentOrigin": {
                 "type": "object",
                 "properties": {
