@@ -21,9 +21,12 @@ $ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archiv
 Or latest released version:
 
 ```
-$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.8.1.tar.gz
+$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.9.0.tar.gz
 ```
 
+You can also use COPR repo created by Packit, which tracks the latest main branch:
+
+https://copr.fedorainfracloud.org/coprs/packit/konflux-ci-rpm-lockfile-prototype-main/
 
 # How to run this from git
 
