@@ -7,6 +7,8 @@
 - Module streams can be explicitly enabled or disabled by adding
   `moduleEnable`/`moduleDisable` directive to the input file.
 
+- The `allowerasing` option can be specified at top level of the input file.
+
 ### Changed
 
 - The list of packages in input file can now specify groups or modules (e.g.

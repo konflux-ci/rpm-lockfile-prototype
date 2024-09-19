@@ -395,6 +395,7 @@ def main():
     arches = args.arch or config.get("arches") or [platform.machine()]
 
     context = config.get("context", {})
+    allowerasing = args.allowerasing or config.get("allowerasing", False)
 
     local = args.local_system or context.get("localSystem")
     if local and arches != [platform.machine()]:
@@ -440,7 +441,7 @@ def main():
                 rpmdb,
                 repos,
                 set(filter_for_arch(arch, config.get("packages", []))) | packages,
-                allow_erasing=args.allowerasing,
+                allow_erasing=allowerasing,
                 reinstall_packages=set(
                     filter_for_arch(arch, config.get("reinstallPackages", []))
                 ),

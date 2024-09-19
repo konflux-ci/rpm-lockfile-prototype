@@ -125,6 +125,7 @@ def get_schema():
                     },
                 ],
             },
+            "allowerasing": {"type": "boolean"},
         },
         "required": ["contentOrigin"],
         "additionalProperties": False,
