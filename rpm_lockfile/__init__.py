@@ -142,11 +142,11 @@ def resolver(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
                     )
             # Mark packages for installation
-            for solvable in solvables:
-                try:
-                    base.install(solvable)
-                except dnf.exceptions.PackageNotFoundError:
-                    raise RuntimeError(f"No match found for {solvable}")
+            try:
+                base.install_specs(solvables)
+            except dnf.exceptions.MarkingErrors as exc:
+                logging.error(exc.value)
+                raise RuntimeError(f"DNF error: {exc}")
             # And resolve the transaction
             base.resolve(allow_erasing=allow_erasing)
 
