@@ -4,7 +4,7 @@ Version:        0.7.2
 Release:        1
 Summary:        Build manual page from python's ArgumentParser object.
 
-License:        TODO
+License:        GPL-3.0-or-later
 URL:            https://github.com/konflux-ci/rpm-lockfile-prototype
 Source0:        https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v%version.tar.gz
 
