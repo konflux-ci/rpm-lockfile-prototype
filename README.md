@@ -155,6 +155,10 @@ context:
     bare: true
     localSystem: true
     rpmOstreeTreefile: centos-bootc/centos-bootc.yaml
+
+# Tell DNF it may erase already installed packages when resolving the
+# transaction. Defaults to false.
+allowerasing: true
 ```
 
 The configuration file can specify a containerfile to extract a base image from
