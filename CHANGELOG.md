@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Module streams can be explicitly enabled or disabled by adding
+  `moduleEnable`/`moduleDisable` directive to the input file.
+
+### Changed
+
+- The list of packages in input file can now specify groups or modules (e.g.
+  `@core` or `@container-tools:rhel8`; don't forget quotes for the yaml file to
+  be valid). Anything accepted by `dnf install` should be acceptable in there.
+  The `reinstallPackages` section still needs RPM names.
+
+
 ## [0.8.1] - 2024-09-06
 
 ### Changed

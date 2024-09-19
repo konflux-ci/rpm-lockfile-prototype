@@ -135,6 +135,10 @@ reinstallPackages: []
   # List of rpms already provided in the base image, but which should be
   # reinstalled. Same specification as `packages` above.
 
+moduleEnable: []
+  # List of module streams that should be enabled during the dependency
+  # resolution. The specification uses the same format as `packages` above.
+
 arches:
   # The list of architectures can be set in the config file. Any `--arch` option set
   # on the command line will override this list.
@@ -196,6 +200,19 @@ There are three options for how the installed packages can be handled.
 3. Extract installed packages from a container image. This would be used for
    layered images. The base image can be explicitly provided, or discovered
    from `Containerfile`.
+
+
+# Dealing with modularity and groups
+
+Creating lockfiles involving modules should work. Here's a guide on how to
+specify the input:
+
+| Dockerfile command | Input file | Comment |
+| ------------------ | ---------- | ------- |
+| `dnf module install foo:bar` | `packages: ["@foo:bar"]` | Installs all packages from default profile from the module stream |
+| `dnf module enable foo:bar` | `moduleEnable: ["foo:bar"]` | Makes the module stream available for installation |
+| `dnf module disable nodejs` | `moduleDisable: ["nodejs"]` | Added for completeness, but may not really be needed |
+| `dnf groupinstall core` | `packages: ["@core]` | Install comps group `core` |
 
 
 # Implementation details and notes

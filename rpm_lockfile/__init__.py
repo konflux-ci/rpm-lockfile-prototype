@@ -113,6 +113,8 @@ def resolver(
     solvables,
     allow_erasing: bool,
     reinstall_packages: set[str],
+    module_enable: set[str],
+    module_disable: set[str],
 ):
     packages = set()
     sources = set()
@@ -131,6 +133,13 @@ def resolver(
             for repo in repos:
                 base.repos.add_new_repo(repo.repoid, conf, baseurl=[repo.baseurl], **repo.kwargs)
             base.fill_sack(load_system_repo=True)
+
+            module_base = dnf.module.module_base.ModuleBase(base)
+
+            # Enable and disable modules as requested
+            module_base.disable(module_disable)
+            module_base.enable(module_enable)
+
             # Mark packages to remove
             for pkg in reinstall_packages:
                 try:
@@ -142,15 +151,14 @@ def resolver(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
                     )
             # Mark packages for installation
-            for solvable in solvables:
-                try:
-                    base.install(solvable)
-                except dnf.exceptions.PackageNotFoundError:
-                    raise RuntimeError(f"No match found for {solvable}")
+            try:
+                base.install_specs(solvables)
+            except dnf.exceptions.MarkingErrors as exc:
+                logging.error(exc.value)
+                raise RuntimeError(f"DNF error: {exc}")
             # And resolve the transaction
             base.resolve(allow_erasing=allow_erasing)
 
-            module_base = dnf.module.module_base.ModuleBase(base)
             modular_packages = set(
                 nevra
                 for module in module_base.get_modules("*")[0]
@@ -221,13 +229,27 @@ def image_rpmdb(baseimage):
 
 
 def process_arch(
-    arch, rpmdb, repos, packages, allow_erasing, reinstall_packages: set[str]
+    arch,
+    rpmdb,
+    repos,
+    packages,
+    allow_erasing,
+    reinstall_packages: set[str],
+    module_enable: set[str],
+    module_disable: set[str],
 ):
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
         packages, sources, module_metadata = resolver(
-            arch, root_dir, repos, packages, allow_erasing, reinstall_packages
+            arch,
+            root_dir,
+            repos,
+            packages,
+            allow_erasing,
+            reinstall_packages,
+            module_enable,
+            module_disable,
         )
 
     return {
@@ -421,6 +443,12 @@ def main():
                 allow_erasing=args.allowerasing,
                 reinstall_packages=set(
                     filter_for_arch(arch, config.get("reinstallPackages", []))
+                ),
+                module_enable=set(
+                    filter_for_arch(arch, config.get("moduleEnable", []))
+                ),
+                module_disable=set(
+                    filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
             )
         )
