@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 try:
     import dnf
     import hawkey
+    import libdnf.conf
 except ImportError:
     print(
         "Python bindings for DNF are missing.",
@@ -131,7 +132,13 @@ def resolver(
             conf.substitutions["arch"] = conf.substitutions["basearch"] = arch
             # Configure repos
             for repo in repos:
-                base.repos.add_new_repo(repo.repoid, conf, **repo.kwargs)
+                base.repos.add_new_repo(
+                    libdnf.conf.ConfigParser.substitute(
+                        repo.repoid, conf.substitutions
+                    ),
+                    conf,
+                    **repo.kwargs
+                )
             base.fill_sack(load_system_repo=True)
 
             module_base = dnf.module.module_base.ModuleBase(base)

@@ -6,6 +6,12 @@
 
 - Repositories can now use `mirrorlist` or `metalink` instead of just `baseurl`.
 
+### Fixed
+
+- Variable substition in repoid is now supported. Only `arch` and `basearch`
+  variables really make sense though, as anything else is taken from the host
+  system where the tool is running.
+
 
 ## [0.9.0] - 2024-09-19
 
