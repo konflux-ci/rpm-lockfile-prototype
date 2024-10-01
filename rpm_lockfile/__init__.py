@@ -129,7 +129,8 @@ def resolver(
             conf.cachedir = os.path.join(cache_dir, "cache")
             conf.logdir = mkdir(os.path.join(cache_dir, "log"))
             conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
-            conf.substitutions["arch"] = conf.substitutions["basearch"] = arch
+            conf.substitutions["arch"] = arch
+            conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
             # Configure repos
             for repo in repos:
                 base.repos.add_new_repo(

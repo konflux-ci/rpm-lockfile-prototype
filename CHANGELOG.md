@@ -12,6 +12,8 @@
   variables really make sense though, as anything else is taken from the host
   system where the tool is running.
 
+- `$basearch` is now set correctly in cases it's not equal to `$arch`.
+
 
 ## [0.9.0] - 2024-09-19
 
