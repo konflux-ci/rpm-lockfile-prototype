@@ -131,7 +131,7 @@ def resolver(
             conf.substitutions["arch"] = conf.substitutions["basearch"] = arch
             # Configure repos
             for repo in repos:
-                base.repos.add_new_repo(repo.repoid, conf, baseurl=[repo.baseurl], **repo.kwargs)
+                base.repos.add_new_repo(repo.repoid, conf, **repo.kwargs)
             base.fill_sack(load_system_repo=True)
 
             module_base = dnf.module.module_base.ModuleBase(base)

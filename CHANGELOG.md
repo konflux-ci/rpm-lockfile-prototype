@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Repositories can now use `mirrorlist` or `metalink` instead of just `baseurl`.
+
+
 ## [0.9.0] - 2024-09-19
 
 ### Added

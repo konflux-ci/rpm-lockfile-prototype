@@ -67,7 +67,7 @@ class ComposeOrigin:
                 raise RuntimeError("Unexpected compose metadata")
             yield Repo(
                 repoid=f"{compose.info.compose.id}-{variant.uid}-rpms",
-                baseurl=f"{compose.compose_path}/{paths.pop()}",
+                kwargs={"baseurl": [f"{compose.compose_path}/{paths.pop()}"]},
             )
 
     def collect_by_id(self, compose_id):
