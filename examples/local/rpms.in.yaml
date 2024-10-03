@@ -1,0 +1,11 @@
+---
+contentOrigin:
+  repofiles:
+    - /etc/yum.repos.d/fedora.repo
+    - /etc/yum.repos.d/fedora-updates.repo
+
+packages:
+  - 0ad
+
+context:
+  localSystem: true
