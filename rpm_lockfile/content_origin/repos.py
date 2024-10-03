@@ -11,7 +11,12 @@ class RepoOrigin:
             "varsFromImage": {"type": "string"},
             "varsFromContainerfile": utils.CONTAINERFILE_SCHEMA,
         },
-        "required": ["repoid", "baseurl"],
+        "required": ["repoid"],
+        "anyOf": [
+            {"required": ["baseurl"]},
+            {"required": ["metalink"]},
+            {"required": ["mirrorlist"]},
+        ],
     }
 
     def __init__(self, config_dir):
@@ -20,5 +25,6 @@ class RepoOrigin:
     def collect(self, sources):
         for source in sources:
             vars = utils.get_labels(source, self.config_dir)
-            source["baseurl"] = utils.subst_vars(source["baseurl"], vars)
+            if "baseurl" in source:
+                source["baseurl"] = utils.subst_vars(source["baseurl"], vars)
             yield Repo.from_dict(source)

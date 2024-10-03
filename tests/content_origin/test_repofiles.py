@@ -1,5 +1,3 @@
-import json
-import subprocess
 from unittest.mock import patch, mock_open, Mock, ANY
 
 from rpm_lockfile.content_origin import Repo, repofiles
@@ -9,7 +7,7 @@ REPOFILE = """
 [repo-0]
 baseurl = https://example.com/repo
 """
-REPO = Repo(repoid="repo-0", baseurl="https://example.com/repo")
+REPO = Repo(repoid="repo-0", kwargs={"baseurl": ["https://example.com/repo"]})
 
 
 def test_collect_local():
