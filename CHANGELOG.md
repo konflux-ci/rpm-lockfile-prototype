@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Caching for extracted rpm databases has been added. This avoids the need to
+  repeatedly download the same image if resolving runs multiple times on the
+  same base image. The cached data is stored in
+  `~/.cache/rpm-lockfile-prototype/rpmdbs`, and there is no automatic cleanup.
+
 ### Changed
 
 - Repositories can now use `mirrorlist` or `metalink` instead of just `baseurl`.

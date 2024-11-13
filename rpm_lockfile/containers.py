@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 import tarfile
 import tempfile
 from pathlib import Path
@@ -10,12 +11,7 @@ from . import utils
 # Known locations for rpmdb inside the image.
 RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
 
-
-def _translate_arch(arch):
-    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
-    # amd64. The same goes for aarch64 -> arm64.
-    ARCHES = {"aarch64": "arm64", "x86_64": "amd64"}
-    return ARCHES.get(arch, arch)
+CACHE_PATH = Path.home() / ".cache" / "rpm-lockfile-prototype" / "rpmdbs"
 
 
 def _copy_image(baseimage, arch, destdir):
@@ -24,14 +20,45 @@ def _copy_image(baseimage, arch, destdir):
         "skopeo",
         f"--override-arch={arch}",
         "copy",
-        f"docker://{utils.strip_tag(baseimage)}",
+        f"docker://{baseimage}",
         f"dir:{destdir}",
     ]
     utils.logged_run(cmd, check=True)
 
 
-def setup_rpmdb(cache_dir, baseimage, arch):
-    arch = _translate_arch(arch)
+def setup_rpmdb(dest_dir, baseimage, arch):
+    """
+    Extract rpmdb from `baseimage` for `arch` to `dest_dir`.
+    """
+    image, _, digest = utils.split_image(baseimage)
+
+    if not digest:
+        # We don't have a digest yet, so find the correct one from the
+        # registry.
+        digest = utils.inspect_image(baseimage, arch)["Digest"]
+
+    # Construct a new image pull spec with the digest (we no longer need the
+    # tag). We need to pull the image by the digest used in the cache.
+    # Otherwise we would risk a race condition if the image got updated between
+    # calls to `skopeo inspect` and `skopeo copy`.
+    image = utils.make_image_spec(image, None, digest)
+
+    # The images need to be cached per-architecture. The same digest is used
+    # reference the same image.
+    cache = CACHE_PATH / arch / digest
+    if not cache.exists():
+        # If we don't have anything cached, extract the rpmdb from the image
+        # into the cache.
+        _online_setup_rpmdb(cache, image, arch)
+    else:
+        logging.info("Using already downloaded rpmdb")
+
+    # Copy the cache to the correct destination directory.
+    shutil.copytree(cache, dest_dir, dirs_exist_ok=True)
+
+
+def _online_setup_rpmdb(dest_dir, baseimage, arch):
+    arch = utils.translate_arch(arch)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
@@ -59,7 +86,7 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             # ...find all files in interesting locations and extract them to
             # the destination cache.
             archive = tarfile.open(tmpdir / digest)
-            archive.extractall(path=cache_dir, filter=filter_rpmdb)
+            archive.extractall(path=dest_dir, filter=filter_rpmdb)
 
         if dbpaths and utils.RPMDB_PATH not in dbpaths:
             # If we have at least one possible rpmdb location populated by the
@@ -73,10 +100,10 @@ def setup_rpmdb(cache_dir, baseimage, arch):
             dbpath = dbpaths.pop()
             logging.debug("Creating rpmdb symlink %s -> %s", utils.RPMDB_PATH, dbpath)
             os.makedirs(
-                os.path.dirname(os.path.join(cache_dir, utils.RPMDB_PATH)),
+                os.path.dirname(os.path.join(dest_dir, utils.RPMDB_PATH)),
                 exist_ok=True,
             )
             os.symlink(
-                os.path.join(cache_dir, dbpath),
-                os.path.join(cache_dir, utils.RPMDB_PATH),
+                os.path.join(dest_dir, dbpath),
+                os.path.join(dest_dir, utils.RPMDB_PATH),
             )

@@ -52,6 +52,18 @@ def test_strip_tag(image_spec, expected):
 
 
 @pytest.mark.parametrize(
+    "repo,tag,digest,expected",
+    [
+        ("example.com/img", "tag", "sha256:abc", "example.com/img:tag@sha256:abc"),
+        ("example.com/img", None, "sha256:abc", "example.com/img@sha256:abc"),
+        ("example.com/img", "tag", None, "example.com/img:tag"),
+    ],
+)
+def test_make_image_spec(repo, tag, digest, expected):
+    assert utils.make_image_spec(repo, tag, digest) == expected
+
+
+@pytest.mark.parametrize(
     "file,expected",
     [
         ("""FROM registry.io/repository/base
