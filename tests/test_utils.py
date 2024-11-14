@@ -7,6 +7,11 @@ import pytest
 from rpm_lockfile import utils
 
 
+@pytest.fixture(autouse=True)
+def reset_label_cache():
+    utils.inspect_image.cache_clear()
+
+
 @pytest.mark.parametrize(
     "dir,path,expected",
     [

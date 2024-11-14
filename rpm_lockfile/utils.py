@@ -1,3 +1,4 @@
+import functools
 import hashlib
 import json
 import logging
@@ -100,6 +101,7 @@ def translate_arch(arch):
     return ARCHES.get(arch, arch)
 
 
+@functools.lru_cache
 def inspect_image(image_spec, arch=None):
     cmd = ["skopeo"]
     if arch:
