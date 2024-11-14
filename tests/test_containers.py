@@ -17,6 +17,20 @@ def baseimage():
     return "registry.example.com/image:latest"
 
 
+@pytest.fixture
+def disk_is_free():
+    with mock.patch("rpm_lockfile.containers._get_storage_usage") as f:
+        f.return_value = 10
+        yield
+
+
+@pytest.fixture
+def disk_is_full():
+    with mock.patch("rpm_lockfile.containers._get_storage_usage") as f:
+        f.return_value = 95
+        yield
+
+
 class FakeImage:
     """
     This class allows creating container images on the local filesystem. Each
@@ -121,7 +135,9 @@ class Symlink(FSObject):
         ),
     ],
 )
-def test_extraction(tmp_path, rpmdb, image_spec, expected_content, caplog):
+def test_extraction(
+    tmp_path, rpmdb, image_spec, expected_content, caplog, disk_is_free
+):
     """
     The tests exercise different locations in the image, and different setting
     on the local system.
@@ -157,7 +173,7 @@ def test_extraction(tmp_path, rpmdb, image_spec, expected_content, caplog):
 
 
 @pytest.mark.parametrize("rpmdb", containers.RPMDB_PATHS)
-def test_caching(tmp_path, rpmdb, baseimage, caplog):
+def test_caching(tmp_path, rpmdb, baseimage, caplog, disk_is_free):
     """
     Verify that extracting the same image twice only downloads once.
     """
@@ -211,7 +227,7 @@ def test_caching(tmp_path, rpmdb, baseimage, caplog):
         ),
     ]
 )
-def test_resolving_image(tmp_path, input_image, digest, resolved_image):
+def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_free):
     cache_dir = tmp_path / "cache"
     arch = "x86_64"
     default_digest = "sha256:abcdef"
@@ -243,3 +259,35 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image):
         mock.call(img_cache, tmp_path / "d1", dirs_exist_ok=True),
         mock.call(img_cache, tmp_path / "d2", dirs_exist_ok=True),
     ]
+
+
+@pytest.mark.parametrize("rpmdb", containers.RPMDB_PATHS)
+def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
+    """
+    Verify that extracting the same image twice only downloads once.
+    """
+    expected_content = "foo"
+    image_spec = FakeImage([{"var/lib/rpm/foo": File(expected_content)}])
+    digest = f"sha256:{'a' * 64}"
+    baseimage = "registry.example.com/image:latest"
+    resolved_image = f"registry.example.com/image@{digest}"
+
+    cache_dir = tmp_path / "cache"
+
+    def fake_copy(image, arch, destdir):
+        image_spec.write_to(destdir)
+        assert image == resolved_image
+        assert arch == "amd64"
+
+    def fake_inspect(image, arch=None):
+        return {"Digest": digest}
+
+    with mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
+            mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy), \
+            mock.patch("rpm_lockfile.containers.CACHE_PATH", new=cache_dir), \
+            mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
+        containers.setup_rpmdb(tmp_path / "dest1", baseimage, "x86_64")
+
+    assert (tmp_path / "dest1" / rpmdb / "foo").read_text().strip() == expected_content
+
+    assert list((cache_dir / "x86_64").iterdir()) == []

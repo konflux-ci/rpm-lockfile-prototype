@@ -9,6 +9,9 @@
   same base image. The cached data is stored in
   `~/.cache/rpm-lockfile-prototype/rpmdbs`, and there is no automatic cleanup.
 
+  When the filesystem with the cache gets over 80 % full, no new data will be
+  cached anymore.
+
 ### Changed
 
 - Repositories can now use `mirrorlist` or `metalink` instead of just `baseurl`.

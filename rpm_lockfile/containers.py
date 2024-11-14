@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
@@ -12,6 +14,11 @@ from . import utils
 RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
 
 CACHE_PATH = Path.home() / ".cache" / "rpm-lockfile-prototype" / "rpmdbs"
+
+# Storage usage limit. If the filesystem with the cache fills up over this
+# limit, nothing new will be added into the cache.
+# Value in percent.
+USAGE_THRESHOLD = 80
 
 
 def _copy_image(baseimage, arch, destdir):
@@ -55,6 +62,8 @@ def setup_rpmdb(dest_dir, baseimage, arch):
 
     # Copy the cache to the correct destination directory.
     shutil.copytree(cache, dest_dir, dirs_exist_ok=True)
+
+    _maybe_cleanup(cache)
 
 
 def _online_setup_rpmdb(dest_dir, baseimage, arch):
@@ -107,3 +116,29 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
                 os.path.join(dest_dir, dbpath),
                 os.path.join(dest_dir, utils.RPMDB_PATH),
             )
+
+
+def _maybe_cleanup(directory):
+    """Check if there's enough free space on the filesystem with given
+    directory. If not, delete the directory.
+    """
+    usage = _get_storage_usage(directory)
+    if usage and usage >= USAGE_THRESHOLD:
+        logging.info("Storage is %d % full. Cleaning up cached rpmdb.", usage)
+        shutil.rmtree(directory)
+
+
+def _get_storage_usage(directory):
+    """Return disk usage of filesystem with given directory as an integer
+    representing percentage. Returns None on failure.
+    """
+    cp = subprocess.run(
+        ["df", "--output=pcent", directory], stdout=subprocess.PIPE, text=True
+    )
+    if cp.returncode != 0:
+        logging.debug("Failed to check free storage size...")
+    else:
+        m = re.search(r"\b(\d+)%", cp.stdout)
+        if m:
+            return int(m.group(1))
+    return None
