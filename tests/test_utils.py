@@ -7,6 +7,11 @@ import pytest
 from rpm_lockfile import utils
 
 
+@pytest.fixture(autouse=True)
+def reset_label_cache():
+    utils.inspect_image.cache_clear()
+
+
 @pytest.mark.parametrize(
     "dir,path,expected",
     [
@@ -49,6 +54,18 @@ def test_find_containerfile(tmpdir, files, expected):
 )
 def test_strip_tag(image_spec, expected):
     assert utils.strip_tag(image_spec) == expected
+
+
+@pytest.mark.parametrize(
+    "repo,tag,digest,expected",
+    [
+        ("example.com/img", "tag", "sha256:abc", "example.com/img:tag@sha256:abc"),
+        ("example.com/img", None, "sha256:abc", "example.com/img@sha256:abc"),
+        ("example.com/img", "tag", None, "example.com/img:tag"),
+    ],
+)
+def test_make_image_spec(repo, tag, digest, expected):
+    assert utils.make_image_spec(repo, tag, digest) == expected
 
 
 @pytest.mark.parametrize(
