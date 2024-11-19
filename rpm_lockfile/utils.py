@@ -1,3 +1,4 @@
+import functools
 import hashlib
 import json
 import logging
@@ -93,15 +94,26 @@ def subst_vars(template, vars):
     return template
 
 
+def translate_arch(arch):
+    # This is a horrible hack. Skopeo will reject x86_64, but is happy with
+    # amd64. The same goes for aarch64 -> arm64.
+    ARCHES = {"aarch64": "arm64", "x86_64": "amd64"}
+    return ARCHES.get(arch, arch)
+
+
+@functools.lru_cache
+def inspect_image(image_spec, arch=None):
+    cmd = ["skopeo"]
+    if arch:
+        cmd.append(f"--override-arch={translate_arch(arch)}")
+    cmd.extend(["inspect", f"docker://{strip_tag(image_spec)}"])
+    cp = logged_run(cmd, stdout=subprocess.PIPE, check=True)
+    return json.loads(cp.stdout)
+
+
 def _get_image_labels(image_spec):
     """Given an image specification, return a dict with labels from the image."""
-    cp = logged_run(
-        ["skopeo", "inspect", f"docker://{strip_tag(image_spec)}"],
-        stdout=subprocess.PIPE,
-        check=True,
-    )
-    data = json.loads(cp.stdout)
-    return data["Labels"]
+    return inspect_image(image_spec)["Labels"]
 
 
 def _get_containerfile_labels(containerfile, config_dir):
@@ -120,6 +132,28 @@ def _get_containerfile_labels(containerfile, config_dir):
     return _get_image_labels(extract_image(os.path.join(config_dir, fp), **filters))
 
 
+def split_image(image_spec):
+    # De don't want to validate the digest here in any way, so even wrong
+    # length should be accepted.
+    m = re.match(r'([^:@]+)(:[^@]+)?(@sha\d+:[a-f0-9]+)?$', image_spec)
+    if m:
+        repo = m.group(1)
+        tag = m.group(2)
+        digest_suffix = m.group(3)
+        digest = digest_suffix[1:] if digest_suffix else None
+        return repo, tag, digest
+    raise RuntimeError(f"Unknown format for image specification: {image_spec}")
+
+
+def make_image_spec(repo, tag, digest):
+    spec = repo
+    if tag:
+        spec += f":{tag}"
+    if digest:
+        spec += f"@{digest}"
+    return spec
+
+
 def strip_tag(image_spec):
     """
     If the image specification contains both a tag and a digest, remove the
@@ -128,12 +162,11 @@ def strip_tag(image_spec):
 
     https://github.com/containers/image/issues/1736
     """
-    # De don't want to validate the digest here in any way, so even wrong
-    # length should be accepted.
-    m = re.match(r'([^:]+)(:[^@]+)(@sha\d+:[a-f0-9]+)$', image_spec)
-    if m:
-        logging.info("Digest was provided, ignoring tag %s", m.group(2)[1:])
-        return f"{m.group(1)}{m.group(3)}"
+    repo, tag, digest = split_image(image_spec)
+    if tag and digest:
+        logging.info(f"Digest was provided, ignoring tag {tag}")
+    if digest:
+        return f"{repo}@{digest}"
     return image_spec
 
 
