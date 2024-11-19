@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A warning is printed when the base image specification doesn't include a
+  registry. Not specifying a registry can cause confusing errors if skopeo
+  (used by this tool) uses a different default than the build process later on.
+
+
 ## [0.10.0] - 2024-11-19
 
 ### Added
