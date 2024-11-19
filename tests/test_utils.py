@@ -69,6 +69,33 @@ def test_make_image_spec(repo, tag, digest, expected):
 
 
 @pytest.mark.parametrize(
+    "image_spec",
+    [
+        "example.com/image:latest",
+        "example.com/image@sha256:abcdef",
+        "example.com/image:latest@sha256:0123456",
+        "registry.example.com/image:latest@sha256:0123456",
+        "registry.example.com/namespace/image:stable",
+    ],
+)
+def test_check_image_spec_correct(image_spec):
+    assert utils.check_image_spec(image_spec)
+
+
+@pytest.mark.parametrize(
+    "image_spec",
+    [
+        "fedora",
+        "image@sha256:abcdef",
+        "image:latest@sha256:0123456",
+        "namespace/image:stable",
+    ],
+)
+def test_check_image_spec_wrong(image_spec):
+    assert not utils.check_image_spec(image_spec)
+
+
+@pytest.mark.parametrize(
     "file,expected",
     [
         ("""FROM registry.io/repository/base

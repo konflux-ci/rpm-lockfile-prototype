@@ -170,6 +170,14 @@ def strip_tag(image_spec):
     return image_spec
 
 
+def check_image_spec(image_spec):
+    """Check if the image is fully qualified with a registry."""
+    # We only check that there's a slash in the image name, and the part before
+    # slash contains at least one dot.
+    m = re.match(r'.+\..+/.+', image_spec)
+    return bool(m)
+
+
 def get_labels(obj, config_dir):
     """Find labels from an image or the base image used in the containerfile
     from given configuration object. The given configuration dict is modified

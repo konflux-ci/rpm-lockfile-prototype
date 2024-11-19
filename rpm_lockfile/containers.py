@@ -23,6 +23,15 @@ USAGE_THRESHOLD = 80
 
 def _copy_image(baseimage, arch, destdir):
     """Download image into given location."""
+    if not utils.check_image_spec(baseimage):
+        logging.warning(
+            """
+            Image specification is missing registry. Skopeo will use some
+            registry as a default. If the build system uses a different one,
+            you will see strange errors during the prefetch and build steps.
+            """
+        )
+
     cmd = [
         "skopeo",
         f"--override-arch={arch}",
