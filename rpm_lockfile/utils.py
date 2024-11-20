@@ -7,12 +7,15 @@ import re
 import shlex
 import subprocess
 import tempfile
+from pathlib import Path
 
 
 # Path to where local dnf expects to find rpmdb. This is relative to /.
 RPMDB_PATH = subprocess.run(
     ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
 ).stdout.strip()[1:]
+
+CACHE_PATH = Path.home() / ".cache" / "rpm-lockfile-prototype"
 
 
 def relative_to(directory, path):

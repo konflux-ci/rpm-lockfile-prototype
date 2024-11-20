@@ -13,8 +13,6 @@ from . import utils
 # Known locations for rpmdb inside the image.
 RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm"]
 
-CACHE_PATH = Path.home() / ".cache" / "rpm-lockfile-prototype" / "rpmdbs"
-
 # Storage usage limit. If the filesystem with the cache fills up over this
 # limit, nothing new will be added into the cache.
 # Value in percent.
@@ -61,7 +59,7 @@ def setup_rpmdb(dest_dir, baseimage, arch):
 
     # The images need to be cached per-architecture. The same digest is used
     # reference the same image.
-    cache = CACHE_PATH / arch / digest
+    cache = utils.CACHE_PATH / "rpmdbs" / arch / digest
     if not cache.exists():
         # If we don't have anything cached, extract the rpmdb from the image
         # into the cache.

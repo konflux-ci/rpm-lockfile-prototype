@@ -50,6 +50,7 @@ Summary: RPM lockfile generator
 %license COPYING
 %doc README.md
 %_bindir/rpm-lockfile-prototype
+%_bindir/caching-rpm-lockfile-prototype
 %python3_sitelib/rpm_lockfile/*.py
 %python3_sitelib/rpm_lockfile/__pycache__/*.pyc
 %python3_sitelib/rpm_lockfile/content_origin/*.py
