@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased
+## [0.11.0] - 2024-11-20
 
 ### Added
 
 - A warning is printed when the base image specification doesn't include a
   registry. Not specifying a registry can cause confusing errors if skopeo
   (used by this tool) uses a different default than the build process later on.
+
+- A separate executable is added which caches the result. This is only useful
+  if for whatever reason the code has to be regenerated repeatedly with
+  identical results.
 
 
 ## [0.10.0] - 2024-11-19
