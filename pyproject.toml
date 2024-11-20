@@ -21,6 +21,7 @@ packages = ['rpm_lockfile', 'rpm_lockfile.content_origin']
 
 [project.scripts]
 rpm-lockfile-prototype = "rpm_lockfile:main"
+caching-rpm-lockfile-prototype = "rpm_lockfile.caching_wrapper:main"
 
 
 [build-system]

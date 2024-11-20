@@ -160,7 +160,7 @@ def test_extraction(
     with caplog.at_level(logging.DEBUG), \
             mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
             mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy), \
-            mock.patch("rpm_lockfile.containers.CACHE_PATH", new=cache_dir), \
+            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
             mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
         containers.setup_rpmdb(dest_dir, baseimage, "x86_64")
 
@@ -195,7 +195,7 @@ def test_caching(tmp_path, rpmdb, baseimage, caplog, disk_is_free):
 
     with mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
             mock.patch("rpm_lockfile.containers._copy_image") as copy, \
-            mock.patch("rpm_lockfile.containers.CACHE_PATH", new=cache_dir), \
+            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
             mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
         copy.side_effect = fake_copy
         containers.setup_rpmdb(tmp_path / "dest1", baseimage, "x86_64")
@@ -242,14 +242,14 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
         return {"Digest": default_digest}
 
     with mock.patch("rpm_lockfile.containers._online_setup_rpmdb") as _online_setup, \
-            mock.patch("rpm_lockfile.containers.CACHE_PATH", new=cache_dir), \
+            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
             mock.patch("shutil.copytree") as copytree, \
             mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
         _online_setup.side_effect = fake_setup
         containers.setup_rpmdb(tmp_path / "d1", input_image, arch)
         containers.setup_rpmdb(tmp_path / "d2", input_image, arch)
 
-    img_cache = cache_dir / arch / (digest or default_digest)
+    img_cache = cache_dir / "rpmdbs" / arch / (digest or default_digest)
 
     assert _online_setup.mock_calls == [
         mock.call(img_cache, resolved_image, arch)
@@ -284,10 +284,10 @@ def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
 
     with mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
             mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy), \
-            mock.patch("rpm_lockfile.containers.CACHE_PATH", new=cache_dir), \
+            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
             mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
         containers.setup_rpmdb(tmp_path / "dest1", baseimage, "x86_64")
 
     assert (tmp_path / "dest1" / rpmdb / "foo").read_text().strip() == expected_content
 
-    assert list((cache_dir / "x86_64").iterdir()) == []
+    assert list((cache_dir / "rpmdbs" / "x86_64").iterdir()) == []
