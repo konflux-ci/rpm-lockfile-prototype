@@ -116,6 +116,7 @@ def resolver(
     reinstall_packages: set[str],
     module_enable: set[str],
     module_disable: set[str],
+    no_sources: bool,
 ):
     packages = set()
     sources = set()
@@ -180,15 +181,16 @@ def resolver(
                     modular_repos.add(pkg.repoid)
                 packages.add(PackageItem.from_dnf(pkg))
                 # Find the corresponding source package
-                n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
-                results = base.sack.query().filter(
-                    name=n, version=v, release=r, arch="src"
-                )
-                if len(results) == 0:
-                    logging.warning("No sources found for %s", pkg)
-                else:
-                    src = results[0]
-                    sources.add(PackageItem.from_dnf(src))
+                if not no_sources:
+                    n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
+                    results = base.sack.query().filter(
+                        name=n, version=v, release=r, arch="src"
+                    )
+                    if len(results) == 0:
+                        logging.warning("No sources found for %s", pkg)
+                    else:
+                        src = results[0]
+                        sources.add(PackageItem.from_dnf(src))
 
             for repoid in modular_repos:
                 repo = base.repos[repoid]
@@ -245,6 +247,7 @@ def process_arch(
     reinstall_packages: set[str],
     module_enable: set[str],
     module_disable: set[str],
+    no_sources: bool,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -258,6 +261,7 @@ def process_arch(
             reinstall_packages,
             module_enable,
             module_disable,
+            no_sources,
         )
 
     return {
@@ -404,6 +408,7 @@ def main():
 
     context = config.get("context", {})
     allowerasing = args.allowerasing or config.get("allowerasing", False)
+    no_sources = config.get("noSources", False)
 
     local = args.local_system or context.get("localSystem")
     if local and arches != [platform.machine()]:
@@ -459,6 +464,7 @@ def main():
                 module_disable=set(
                     filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
+                no_sources=no_sources,
             )
         )
 
