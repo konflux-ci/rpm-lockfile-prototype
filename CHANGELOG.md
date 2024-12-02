@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Inclusion of source packages in the final manifest can now be disabled with a
+  toplevel config option `noSources: true`. This is mostly useful for cases
+  where there are no source repos available to silence the many warnings.
+
 ## [0.11.0] - 2024-11-20
 
 ### Added
