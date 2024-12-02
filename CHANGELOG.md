@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0] - 2024-12-02
+
+### Fixed
+
+- RPMDB can now be extracted from flatpak runtime images, which uses
+  `files/lib` for it.
+
+
 ## [0.12.0] - 2024-12-02
 
 ### Added
