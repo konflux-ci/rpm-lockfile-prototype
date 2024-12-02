@@ -1,12 +1,17 @@
 # Changelog
 
-## Unreleased
+## [0.12.0] - 2024-12-02
 
 ### Added
 
 - Inclusion of source packages in the final manifest can now be disabled with a
   toplevel config option `noSources: true`. This is mostly useful for cases
   where there are no source repos available to silence the many warnings.
+
+### Changed
+
+- Only errors are now printed to stderr. Everything else goes to stdout.
+
 
 ## [0.11.0] - 2024-11-20
 
