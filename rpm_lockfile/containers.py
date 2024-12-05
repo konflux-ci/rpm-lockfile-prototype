@@ -132,7 +132,7 @@ def _maybe_cleanup(directory):
     """
     usage = _get_storage_usage(directory)
     if usage and usage >= USAGE_THRESHOLD:
-        logging.info("Storage is %d % full. Cleaning up cached rpmdb.", usage)
+        logging.info("Storage is %d%% full. Cleaning up cached rpmdb.", usage)
         shutil.rmtree(directory)
 
 
