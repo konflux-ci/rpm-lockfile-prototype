@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1] - 2024-12-05
+
+### Fixed
+
+- Fixed formatting of log message about storage being full.
+
+
 ## [0.13.0] - 2024-12-02
 
 ### Fixed
