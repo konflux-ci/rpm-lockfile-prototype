@@ -85,6 +85,17 @@ options:
 (venv) $
 ```
 
+# Running in a container
+
+```
+$ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
+$ podman run --rm -v ${PWD}:/app localhost/rpm-lockfile-prototype:latest [args...]
+```
+
+Caveats:
+ * caching base images will not work, as there will be no persistent cache directory
+ * any server with certificate untrusted on Fedora 41 by default will not work
+
 # What's the `INPUT_FILE`
 
 The input file tells this tool where to look for RPMs and what packages to
