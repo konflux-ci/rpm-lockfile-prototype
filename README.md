@@ -17,16 +17,25 @@ source.
 
 ## Installation
 
+First install system dependencies that are difficult to obtain via `pip`.
+
+```
+$ sudo dnf install python3 python3-pip python3-dnf
+```
+
+Note that for the following commands you need to use default system version of
+Python. Any other version will fail to find the DNF bindings.
+
 Install with pip directly from Git:
 
 ```
-$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
+$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
 ```
 
 Or latest released version:
 
 ```
-$ pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.13.1.tar.gz
+$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.13.1.tar.gz
 ```
 
 You can also use COPR repo created by Packit, which tracks the latest main branch:
@@ -75,6 +84,17 @@ options:
   --allowerasing        Allow erasing of installed packages to resolve dependencies.
 (venv) $
 ```
+
+# Running in a container
+
+```
+$ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
+$ podman run --rm -v ${PWD}:/app localhost/rpm-lockfile-prototype:latest [args...]
+```
+
+Caveats:
+ * caching base images will not work, as there will be no persistent cache directory
+ * any server with certificate untrusted on Fedora 41 by default will not work
 
 # What's the `INPUT_FILE`
 
