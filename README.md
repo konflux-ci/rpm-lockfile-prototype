@@ -87,10 +87,39 @@ options:
 
 # Running in a container
 
-```
-$ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
-$ podman run --rm -v ${PWD}:/app localhost/rpm-lockfile-prototype:latest [args...]
-```
+In case `dnf` is not available, such as on Mac and Windows, `rpm-lockfile-prototype` can be run 
+from a local container image using the [`Containerfile`](./Containerfile) at the base of this repo:
+
+1. Build the image (this only needs to be done once or if updates are needed):
+
+   ```bash
+   $ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
+   ```
+
+   or, to skip cloning the repo and install the latest commit from `main`:
+
+   ```bash
+   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+      | podman build -t localhost/rpm-lockfile-prototype -
+   ```
+
+   Alternatively, to use a different base image that has `dnf` or specify a tag other than `main` 
+   to install:
+
+   ```bash
+   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+      | podman build -t localhost/rpm-lockfile-prototype \
+        --build-arg BASE_IMAGE=other-base-image:latest \
+        --build-arg GIT_REF=tags/v0.13.1 -
+   ```
+
+2. Run the image from the directory containing the `rpms.in.yaml` to generate the `rpms.lock.yaml`
+   file:
+
+   ```bash
+   container_dir=/work
+   $ podman run --rm -v ${PWD}:${container_dir} localhost/rpm-lockfile-prototype:latest [args...] --outfile=${container_dir}/rpms.lock.yaml ${container_dir}/rpms.in.yaml
+   ```
 
 Caveats:
  * caching base images will not work, as there will be no persistent cache directory
