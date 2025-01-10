@@ -96,6 +96,22 @@ from a local container image using the [`Containerfile`](./Containerfile) at the
    $ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
    ```
 
+   or, to skip cloning the repo and install the latest commit from `main`:
+
+   ```bash
+   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+      | podman build -t localhost/rpm-lockfile-prototype -
+   ```
+
+   Alternatively, to use a different base image that has `dnf` or specify a tag other than `main` 
+   to install:
+
+   ```bash
+   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+      | podman build -t localhost/rpm-lockfile-prototype \
+        --build-arg BASE_IMAGE=other-base-image:latest \
+        --build-arg GIT_REF=tags/v0.13.1 -
+   ```
 
 2. Run the image from the directory containing the `rpms.in.yaml` to generate the `rpms.lock.yaml`
    file:
