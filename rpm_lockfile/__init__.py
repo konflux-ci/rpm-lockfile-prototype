@@ -146,8 +146,10 @@ def resolver(
             module_base = dnf.module.module_base.ModuleBase(base)
 
             # Enable and disable modules as requested
-            module_base.disable(module_disable)
-            module_base.enable(module_enable)
+            if module_disable:
+                module_base.disable(module_disable)
+            if module_enable:
+                module_base.enable(module_enable)
 
             # Mark packages to remove
             for pkg in reinstall_packages:
