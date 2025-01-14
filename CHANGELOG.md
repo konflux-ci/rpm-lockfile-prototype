@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The `$releasever` variable is now defined if it can be discovered from the
+  base image.
+
 ## [0.13.1] - 2024-12-05
 
 ### Fixed
