@@ -116,7 +116,9 @@ def inspect_image(image_spec, arch=None):
 
 def _get_image_labels(image_spec):
     """Given an image specification, return a dict with labels from the image."""
-    return inspect_image(image_spec)["Labels"]
+    if image_spec.lower() != "scratch":
+        return inspect_image(image_spec)["Labels"]
+    return {}
 
 
 def _get_containerfile_labels(containerfile, config_dir):

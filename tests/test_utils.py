@@ -163,6 +163,15 @@ def test_get_labels_from_image(image_spec, image_url):
     )
 
 
+def test_get_labels_from_scratch():
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = RuntimeError("This should not happen")
+        labels = utils.get_labels({"varsFromImage": "scratch"}, "/top")
+
+    assert labels == {}
+    mock_run.assert_not_called()
+
+
 def test_get_labels_from_containerfile(tmpdir):
     image = "registry.example.com/image:latest"
     containerfile = tmpdir / "Containerfile"

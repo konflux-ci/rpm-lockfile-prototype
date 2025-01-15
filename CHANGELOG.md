@@ -7,6 +7,11 @@
 - The `$releasever` variable is now defined if it can be discovered from the
   base image.
 
+### Fixed
+
+- The tool will no longer try to inspect `scratch` "base image".
+
+
 ## [0.13.1] - 2024-12-05
 
 ### Fixed
