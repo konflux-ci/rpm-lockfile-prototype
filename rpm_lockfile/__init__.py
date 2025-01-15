@@ -132,6 +132,15 @@ def resolver(
             conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
             conf.substitutions["arch"] = arch
             conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
+            try:
+                releasever = dnf.rpm.detect_releasever(root_dir)
+                if releasever:
+                    logging.debug("Setting releasever to %s", releasever)
+                    conf.substitutions["releasever"] = releasever
+                else:
+                    logging.warning("Failed to detect $releasever")
+            except dnf.exceptions.Error as exc:
+                logging.warning("Failed to detect $releasever: %s", exc)
             # Configure repos
             for repo in repos:
                 base.repos.add_new_repo(
