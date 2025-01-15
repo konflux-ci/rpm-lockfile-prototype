@@ -1,6 +1,6 @@
 [project]
 name = "rpm-lockfile-prototype"
-version = "0.13.1"
+version = "0.13.2"
 description = ""
 authors = [
     {name = "Lubomír Sedlář", email = "lsedlar@redhat.com"},
