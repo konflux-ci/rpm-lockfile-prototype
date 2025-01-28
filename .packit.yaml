@@ -12,3 +12,4 @@ jobs:
 
   - <<: *pr_build
     trigger: commit
+    preserve_project: true
