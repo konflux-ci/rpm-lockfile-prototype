@@ -131,6 +131,12 @@ The input file tells this tool where to look for RPMs and what packages to
 install. If not specified, `rpms.in.yaml` from current working directory will
 be used. It's a yaml file with following structure.
 
+**NOTE:** `dnf` variables are available to use in the input file:
+
+- `${arch}`: The system's CPU architecture as specified by (in order of precedence): 
+  the `arch` argument, the input file, or returned by Python's `os.uname()`.
+- `${basearch}`: The base architecture of the system following from the `arch` input.
+
 ```yaml
 contentOrigin:
   # Define at least one source of packages, but you can have as many as you want.
