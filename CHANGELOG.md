@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added new configuration key to enable or disable installation of weak
+  dependencies.
+
+
 ## [0.13.2] - 2025-01-15
 
 ### Added

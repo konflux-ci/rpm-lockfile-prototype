@@ -222,6 +222,11 @@ context:
 # Tell DNF it may erase already installed packages when resolving the
 # transaction. Defaults to false.
 allowerasing: true
+
+# Enable or disable installation of weak dependencies (Recommends,
+# Supplements). The default is to use whatever is configured for the system
+# DNF.
+installWeakDeps: false
 ```
 
 The configuration file can specify a containerfile to extract a base image from
