@@ -117,6 +117,7 @@ def resolver(
     module_enable: set[str],
     module_disable: set[str],
     no_sources: bool,
+    install_weak_deps: bool,
 ):
     packages = set()
     sources = set()
@@ -126,6 +127,10 @@ def resolver(
         with dnf.Base() as base:
             # Configure base
             conf = base.conf
+
+            if install_weak_deps is not None:
+                conf.install_weak_deps = install_weak_deps
+
             conf.installroot = str(root_dir)
             conf.cachedir = os.path.join(cache_dir, "cache")
             conf.logdir = mkdir(os.path.join(cache_dir, "log"))
@@ -257,6 +262,7 @@ def process_arch(
     module_enable: set[str],
     module_disable: set[str],
     no_sources: bool,
+    install_weak_deps: bool,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -271,6 +277,7 @@ def process_arch(
             module_enable,
             module_disable,
             no_sources,
+            install_weak_deps,
         )
 
     return {
@@ -494,6 +501,7 @@ def main():
                     filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
                 no_sources=no_sources,
+                install_weak_deps=config.get("installWeakDeps"),
             )
         )
 
