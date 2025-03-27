@@ -24,6 +24,12 @@ class Repo:
 
         return cls(repoid=repoid, kwargs=data)
 
+    def as_dict(self):
+        data = self.kwargs | {"repoid": self.repoid}
+        if isinstance(data["baseurl"], list):
+            data["baseurl"] = data["baseurl"][0]
+        return {k: v for k, v in data.items() if v}
+
 
 def load():
     group = "rpm_lockfile.content_origins"

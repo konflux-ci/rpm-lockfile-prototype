@@ -10,19 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 from dataclasses import asdict, dataclass
+import subprocess
 
-try:
-    import dnf
-    import hawkey
-    import libdnf.conf
-except ImportError:
-    print(
-        "Python bindings for DNF are missing.",
-        "Please install python3-dnf (or equivalent) with system package manager.",
-        sep="\n",
-        file=sys.stderr
-    )
-    sys.exit(127)
 import yaml
 
 from . import containers, content_origin, schema, utils
@@ -55,41 +44,6 @@ def copy_local_rpmdb(cache_dir):
     shutil.copytree("/" + utils.RPMDB_PATH, os.path.join(cache_dir, utils.RPMDB_PATH))
 
 
-def strip_suffix(s, suf):
-    if s.endswith(suf):
-        return s[: -len(suf)]
-    return s
-
-
-@dataclass(frozen=True, order=True)
-class PackageItem:
-    url: str
-    repoid: str
-    size: int
-    checksum: str = None
-    name: str = None
-    evr: str = None
-    sourcerpm: str = None
-
-    @classmethod
-    def from_dnf(cls, pkg):
-        return cls(
-            pkg.remote_location(),
-            pkg.repoid,
-            pkg.downloadsize,
-            f"{hawkey.chksum_name(pkg.chksum[0])}:{pkg.chksum[1].hex()}",
-            pkg.name,
-            pkg.evr,
-            pkg.sourcerpm,
-        )
-
-    def as_dict(self):
-        d = asdict(self)
-        if not self.sourcerpm:
-            del d["sourcerpm"]
-        return d
-
-
 def filter_for_arch(arch, pkgs):
     """Given an iterator with packages, keep only those that should be included
     on the given architecture.
@@ -100,11 +54,6 @@ def filter_for_arch(arch, pkgs):
         else:
             if _arch_matches(pkg.get("arches", {}), arch):
                 yield pkg["name"]
-
-
-def mkdir(dir):
-    os.mkdir(dir)
-    return dir
 
 
 def resolver(
@@ -119,112 +68,41 @@ def resolver(
     no_sources: bool,
     install_weak_deps: bool,
 ):
-    packages = set()
-    sources = set()
-    module_metadata = []
+    input_file = {
+        "contentOrigin": {
+            "repos": [r.as_dict() for r in repos],
+        },
+        "packages": list(solvables),
+        "reinstallPackages": list(reinstall_packages),
+        "moduleEnable": list(module_enable),
+        "moduleDisable": list(module_disable),
+        "allowerasing": allow_erasing,
+        "arches": [arch],
+    }
 
-    with tempfile.TemporaryDirectory() as cache_dir:
-        with dnf.Base() as base:
-            # Configure base
-            conf = base.conf
+    # Without the directory the plugin will fail on writing history database.
+    os.makedirs(Path(root_dir) / "var/lib/dnf")
 
-            if install_weak_deps is not None:
-                conf.install_weak_deps = install_weak_deps
+    with tempfile.NamedTemporaryFile("w+") as input_f:
+        yaml.dump(input_file, input_f)
+        input_f.flush()
 
-            conf.installroot = str(root_dir)
-            conf.cachedir = os.path.join(cache_dir, "cache")
-            conf.logdir = mkdir(os.path.join(cache_dir, "log"))
-            conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
-            conf.substitutions["arch"] = arch
-            conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
-            try:
-                releasever = dnf.rpm.detect_releasever(root_dir)
-                if releasever:
-                    logging.debug("Setting releasever to %s", releasever)
-                    conf.substitutions["releasever"] = releasever
-                else:
-                    logging.warning("Failed to detect $releasever")
-            except dnf.exceptions.Error as exc:
-                logging.warning("Failed to detect $releasever: %s", exc)
-            # Configure repos
-            for repo in repos:
-                base.repos.add_new_repo(
-                    libdnf.conf.ConfigParser.substitute(
-                        repo.repoid, conf.substitutions
-                    ),
-                    conf,
-                    **repo.kwargs
-                )
-            base.fill_sack(load_system_repo=True)
+        cmd = [
+            "dnf4", "--verbose", f"--installroot={root_dir}", f"--forcearch={arch}",
+        ]
+        if install_weak_deps is not None:
+            cmd.append(f"--setopt=install_weak_deps={install_weak_deps}")
 
-            module_base = dnf.module.module_base.ModuleBase(base)
-
-            # Enable and disable modules as requested
-            module_base.disable(module_disable)
-            module_base.enable(module_enable)
-
-            # Mark packages to remove
-            for pkg in reinstall_packages:
-                try:
-                    base.reinstall(pkg)
-                except dnf.exceptions.PackagesNotInstalledError:
-                    raise RuntimeError(f"Can not reinstall {pkg}: it is not installed")
-                except dnf.exceptions.PackageNotFoundError:
-                    raise RuntimeError(
-                        f"Can not reinstall {pkg}: no package matched in configured repo"
-                    )
-            # Mark packages for installation
-            try:
-                base.install_specs(solvables)
-            except dnf.exceptions.MarkingErrors as exc:
-                logging.error(exc.value)
-                raise RuntimeError(f"DNF error: {exc}")
-            # And resolve the transaction
-            base.resolve(allow_erasing=allow_erasing)
-
-            modular_packages = set(
-                nevra
-                for module in module_base.get_modules("*")[0]
-                for nevra in module.getArtifacts()
-            )
-            modular_repos = set()
-
-            # These packages would be installed
-            for pkg in base.transaction.install_set:
-                if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
-                    modular_repos.add(pkg.repoid)
-                packages.add(PackageItem.from_dnf(pkg))
-                # Find the corresponding source package
-                if not no_sources:
-                    n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
-                    results = base.sack.query().filter(
-                        name=n, version=v, release=r, arch="src"
-                    )
-                    if len(results) == 0:
-                        logging.warning("No sources found for %s", pkg)
-                    else:
-                        src = results[0]
-                        sources.add(PackageItem.from_dnf(src))
-
-            for repoid in modular_repos:
-                repo = base.repos[repoid]
-                modulemd_path = repo.get_metadata_path("modules")
-                if not modulemd_path:
-                    raise RuntimeError(
-                        "Modular package is coming from a repo with no modular metadata"
-                    )
-                module_metadata.append(
-                    {
-                        "url": repo.remote_location(
-                            "repodata/" + os.path.basename(modulemd_path)
-                        ),
-                        "repoid": repo.id,
-                        "size": os.stat(modulemd_path).st_size,
-                        "checksum": f"sha256:{utils.hash_file(modulemd_path)}",
-                    }
-                )
-
-    return packages, sources, module_metadata
+        subprocess.run(
+            cmd + [
+                "manifest",
+                "new",
+                "--use-system",
+                f"--input={input_f.name}",
+                f"--manifest=packages.manifest.{arch}.yaml",
+            ],
+            check=True,
+        )
 
 
 def rpmdb_preparer(func=None):
@@ -267,7 +145,7 @@ def process_arch(
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
-        packages, sources, module_metadata = resolver(
+        resolver(
             arch,
             root_dir,
             repos,
@@ -279,13 +157,6 @@ def process_arch(
             no_sources,
             install_weak_deps,
         )
-
-    return {
-        "arch": arch,
-        "packages": [p.as_dict() for p in sorted(packages)],
-        "source": [s.as_dict() for s in sorted(sources)],
-        "module_metadata": list(sorted(module_metadata, key=lambda x: x["url"])),
-    }
 
 
 def collect_content_origins(config_dir, origins):
@@ -439,7 +310,6 @@ def main():
 
     schema.validate(config)
 
-    data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or config.get("arches") or [platform.machine()]
 
     context = config.get("context", {})
@@ -484,30 +354,24 @@ def main():
             )
         elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
-        data["arches"].append(
-            process_arch(
-                arch,
-                rpmdb,
-                repos,
-                set(filter_for_arch(arch, config.get("packages", []))) | packages,
-                allow_erasing=allowerasing,
-                reinstall_packages=set(
-                    filter_for_arch(arch, config.get("reinstallPackages", []))
-                ),
-                module_enable=set(
-                    filter_for_arch(arch, config.get("moduleEnable", []))
-                ),
-                module_disable=set(
-                    filter_for_arch(arch, config.get("moduleDisable", []))
-                ),
-                no_sources=no_sources,
-                install_weak_deps=config.get("installWeakDeps"),
-            )
+        process_arch(
+            arch,
+            rpmdb,
+            repos,
+            set(filter_for_arch(arch, config.get("packages", []))) | packages,
+            allow_erasing=allowerasing,
+            reinstall_packages=set(
+                filter_for_arch(arch, config.get("reinstallPackages", []))
+            ),
+            module_enable=set(
+                filter_for_arch(arch, config.get("moduleEnable", []))
+            ),
+            module_disable=set(
+                filter_for_arch(arch, config.get("moduleDisable", []))
+            ),
+            no_sources=no_sources,
+            install_weak_deps=config.get("installWeakDeps"),
         )
-
-    with open(args.outfile, "w") as f:
-        # Sorting by keys would put the version info at the end...
-        yaml.dump(data, f, sort_keys=False, explicit_start=True)
 
 
 if __name__ == "__main__":
