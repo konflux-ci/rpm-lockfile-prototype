@@ -168,7 +168,7 @@ def resolver(
                 try:
                     base.reinstall(pkg)
                 except dnf.exceptions.PackagesNotInstalledError:
-                    raise RuntimeError(f"Can not reinstall {pkg}: it is not installed")
+                    logging.warning("Can not reinstall %s: it is not installed", pkg)
                 except dnf.exceptions.PackageNotFoundError:
                     raise RuntimeError(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
