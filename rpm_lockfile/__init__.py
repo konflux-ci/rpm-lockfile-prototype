@@ -50,6 +50,12 @@ VALIDATE_HELP = "Run schema validation on the input file."
 PRINT_SCHEMA_HELP = "Print schema for the input file to stdout."
 ALLOWERASING_HELP = "Allow  erasing  of  installed  packages to resolve dependencies."
 
+UPDATE_HELP = """
+Update only packages produced by SRPMs with specified names. Caveat: the update
+may be blocked by version-constrained dependencies on other builds. This option
+may be specified multiple times.
+"""
+
 
 def copy_local_rpmdb(cache_dir):
     shutil.copytree("/" + utils.RPMDB_PATH, os.path.join(cache_dir, utils.RPMDB_PATH))
@@ -118,6 +124,8 @@ def resolver(
     module_disable: set[str],
     no_sources: bool,
     install_weak_deps: bool,
+    update: set[str],
+    lockfile: dict,
 ):
     packages = set()
     sources = set()
@@ -163,7 +171,32 @@ def resolver(
             module_base.disable(module_disable)
             module_base.enable(module_enable)
 
-            # Mark packages to remove
+            if update:
+                # Updating subset of packages in existing lockfile. The
+                # packages and reinstallPackages sections are ignored in this
+                # code path.
+                solvables = []
+                reinstall_packages = []
+                for arch_data in lockfile["arches"]:
+                    if arch_data["arch"] != arch:
+                        # Not the correct arch, skip this.
+                        continue
+                    # Iterate over the packages in the lockfile ...
+                    for pkg in arch_data["packages"]:
+                        srpm = pkg["sourcerpm"].rsplit("-", 2)[0]
+                        # ... if the package belongs to an updated build ...
+                        if srpm in update:
+                            # ... install it just by name but require higher
+                            # version than we had before.
+                            logging.debug("Will update %s", pkg["name"])
+                            solvables.append(f"{pkg['name']} > {pkg['evr']}")
+                        else:
+                            # Otherwise require exactly the original NVR.
+                            orig_nvr = f"{pkg['name']}-{pkg['evr']}"
+                            logging.debug("Locking to %s", orig_nvr)
+                            solvables.append(orig_nvr)
+
+            # Mark packages to reinstall
             for pkg in reinstall_packages:
                 try:
                     base.reinstall(pkg)
@@ -179,6 +212,7 @@ def resolver(
             except dnf.exceptions.MarkingErrors as exc:
                 logging.error(exc.value)
                 raise RuntimeError(f"DNF error: {exc}")
+
             # And resolve the transaction
             base.resolve(allow_erasing=allow_erasing)
 
@@ -263,6 +297,8 @@ def process_arch(
     module_disable: set[str],
     no_sources: bool,
     install_weak_deps: bool,
+    update: set[str],
+    locked_packages: dict,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -278,6 +314,8 @@ def process_arch(
             module_disable,
             no_sources,
             install_weak_deps,
+            update,
+            locked_packages,
         )
 
     return {
@@ -429,6 +467,7 @@ def main():
     parser.add_argument(
         "--allowerasing", action="store_true", help=ALLOWERASING_HELP
     )
+    parser.add_argument("--update", action="append", help=UPDATE_HELP, default=[])
     args = parser.parse_args()
 
     logging_setup(args.debug)
@@ -473,6 +512,11 @@ def main():
             )
         )
 
+    locked_packages = None
+    if args.update:
+        with open(args.outfile) as f:
+            locked_packages = yaml.safe_load(f)
+
     # TODO maybe try extracting packages from Containerfile?
     for arch in sorted(arches):
         packages = set()
@@ -502,6 +546,8 @@ def main():
                 ),
                 no_sources=no_sources,
                 install_weak_deps=config.get("installWeakDeps"),
+                update=set(args.update),
+                locked_packages=locked_packages,
             )
         )
 
