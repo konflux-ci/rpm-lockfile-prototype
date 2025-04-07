@@ -118,6 +118,7 @@ def resolver(
     module_disable: set[str],
     no_sources: bool,
     install_weak_deps: bool,
+    upgrade_packages: set[str],
 ):
     packages = set()
     sources = set()
@@ -163,6 +164,9 @@ def resolver(
             module_base.disable(module_disable)
             module_base.enable(module_enable)
 
+            # Mark packages to upgrade
+            for pkg in upgrade_packages:
+                base.upgrade(pkg)
             # Mark packages to remove
             for pkg in reinstall_packages:
                 try:
@@ -173,6 +177,14 @@ def resolver(
                     raise RuntimeError(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
                     )
+                except dnf.exceptions.PackagesNotAvailableError:
+                    # The package is not available in the same version as in
+                    # base image. If we are supposed to update it, it's
+                    # probably okay and we don't need to reinstall as a new
+                    # copy will be used for the upgrade. Otherwise report an
+                    # error.
+                    if pkg not in upgrade_packages:
+                        raise
             # Mark packages for installation
             try:
                 base.install_specs(solvables)
@@ -263,6 +275,7 @@ def process_arch(
     module_disable: set[str],
     no_sources: bool,
     install_weak_deps: bool,
+    upgrade_packages: set[str],
 ):
     logging.info("Running solver for %s", arch)
 
@@ -278,6 +291,7 @@ def process_arch(
             module_disable,
             no_sources,
             install_weak_deps,
+            upgrade_packages,
         )
 
     return {
@@ -502,6 +516,9 @@ def main():
                 ),
                 no_sources=no_sources,
                 install_weak_deps=config.get("installWeakDeps"),
+                upgrade_packages=set(
+                    filter_for_arch(arch, config.get("upgradePackages", []))
+                ),
             )
         )
 
