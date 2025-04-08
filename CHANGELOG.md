@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## [0.15.0] - 2025-04-08
 
 ### Added
 
 - Added `upgradePackages` directive for the configuration file. This allows to
   update packages in the base image.
+
 
 ## [0.14.0] - 2025-03-21
 
