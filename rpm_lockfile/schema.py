@@ -76,6 +76,10 @@ def get_schema():
                 "type": "array",
                 "items": {"$ref": "#/$defs/pkg"},
             },
+            "upgradePackages": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/pkg"},
+            },
             "moduleEnable": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/pkg"},

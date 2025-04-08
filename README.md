@@ -198,6 +198,9 @@ reinstallPackages: []
   # List of rpms already provided in the base image, but which should be
   # reinstalled. Same specification as `packages` above.
 
+upgradePackages: []
+  # List of rpms to update. Same specification as `packages` above.
+
 moduleEnable: []
   # List of module streams that should be enabled during the dependency
   # resolution. The specification uses the same format as `packages` above.
