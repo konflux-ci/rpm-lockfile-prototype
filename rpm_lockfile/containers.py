@@ -77,6 +77,11 @@ def setup_rpmdb(dest_dir, baseimage, arch):
 def _online_setup_rpmdb(dest_dir, baseimage, arch):
     arch = utils.translate_arch(arch)
 
+    # Ensure the top destination directory exists. The base image may not
+    # contain any rpmdb, in which case we would repeatedly have to download the
+    # image instead of caching the empty data.
+    dest_dir.mkdir(parents=True)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         _copy_image(baseimage, arch, tmpdir)
