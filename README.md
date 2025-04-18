@@ -118,7 +118,7 @@ from a local container image using the [`Containerfile`](./Containerfile) at the
 
    ```bash
    container_dir=/work
-   $ podman run --rm -v ${PWD}:${container_dir} localhost/rpm-lockfile-prototype:latest [args...] --outfile=${container_dir}/rpms.lock.yaml ${container_dir}/rpms.in.yaml
+   $ podman run --rm -v ${PWD}:${container_dir} localhost/rpm-lockfile-prototype:latest --outfile=${container_dir}/rpms.lock.yaml ${container_dir}/rpms.in.yaml
    ```
 
 Caveats:
