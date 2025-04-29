@@ -290,6 +290,21 @@ specify the input:
 | `dnf groupinstall core` | `packages: ["@core]` | Install comps group `core` |
 
 
+# Variables in repo files
+
+The `.repo` file referenced from the input configuration can take advantage of
+variables. Some are predefined: `arch`, `basearch`, `releasever` (if it can be
+detected the base image).
+
+Any environment variable starting with `DNF_VAR_` prefix will be available in
+the repo file without the prefix. For example,
+`DNF_VAR_SSL_CLIENT_CERT=/etc/my.crt` in the environment will be available as
+`$SSL_CLIENT_CERT` in the `.repo` file.
+
+See [DNF documentation for more details about the
+variables](https://dnf.readthedocs.io/en/latest/conf_ref.html#repo-variables).
+
+
 # Implementation details and notes
 
 Getting package information from the container is tricky, and went through a
