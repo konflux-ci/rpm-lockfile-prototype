@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added `dnfVars` directive for the configuration file. This allows setting
+  arbitrary variables for DNF for use in repo files.
+
+
 ## [0.15.0] - 2025-04-08
 
 ### Added

@@ -132,6 +132,12 @@ def get_schema():
             "allowerasing": {"type": "boolean"},
             "noSources": {"type": "boolean"},
             "installWeakDeps": {"type": "boolean"},
+            "dnfVars": {
+                "type": "object",
+                "patternProperties": {
+                    "[a-zA-Z0-9_]+": {"type": "string"},
+                },
+            },
         },
         "required": ["contentOrigin"],
         "additionalProperties": False,

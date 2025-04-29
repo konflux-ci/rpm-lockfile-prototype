@@ -230,6 +230,11 @@ allowerasing: true
 # Supplements). The default is to use whatever is configured for the system
 # DNF.
 installWeakDeps: false
+
+# Set arbitrary variables for DNF. By default `arch` and `basearch` are set,
+# and also `releasever` if it can be detected.
+dnfVars:
+  foo: bar
 ```
 
 The configuration file can specify a containerfile to extract a base image from

@@ -119,6 +119,7 @@ def resolver(
     no_sources: bool,
     install_weak_deps: bool,
     upgrade_packages: set[str],
+    subst_vars: dict[str, str],
 ):
     packages = set()
     sources = set()
@@ -147,6 +148,8 @@ def resolver(
                     logging.warning("Failed to detect $releasever")
             except dnf.exceptions.Error as exc:
                 logging.warning("Failed to detect $releasever: %s", exc)
+            for k, v in subst_vars.items():
+                conf.substitutions[k] = v
             # Configure repos
             for repo in repos:
                 base.repos.add_new_repo(
@@ -276,6 +279,7 @@ def process_arch(
     no_sources: bool,
     install_weak_deps: bool,
     upgrade_packages: set[str],
+    subst_vars: dict[str, str],
 ):
     logging.info("Running solver for %s", arch)
 
@@ -292,6 +296,7 @@ def process_arch(
             no_sources,
             install_weak_deps,
             upgrade_packages,
+            subst_vars,
         )
 
     return {
@@ -523,6 +528,7 @@ def main():
                 upgrade_packages=set(
                     filter_for_arch(arch, config.get("upgradePackages", []))
                 ),
+                subst_vars=config.get("dnfVars", {}),
             )
         )
 
