@@ -294,7 +294,7 @@ specify the input:
 
 The `.repo` file referenced from the input configuration can take advantage of
 variables. Some are predefined: `arch`, `basearch`, `releasever` (if it can be
-detected the base image).
+detected from the base image).
 
 Any environment variable starting with `DNF_VAR_` prefix will be available in
 the repo file without the prefix. For example,
