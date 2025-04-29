@@ -320,7 +320,11 @@ def read_packages_from_treefile(arch, treefile):
     packages = set()
     with open(treefile) as f:
         data = yaml.safe_load(f)
-        for path in data.get("include", []):
+
+        include_raw_value = data.get("include", [])
+        treefiles_to_include = [include_raw_value] if isinstance(include_raw_value, str) else include_raw_value
+
+        for path in treefiles_to_include:
             packages.update(
                 read_packages_from_treefile(
                     arch, os.path.join(os.path.dirname(treefile), path)
