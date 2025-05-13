@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import contextlib
 import logging
 import os
@@ -492,39 +493,48 @@ def main():
         )
 
     # TODO maybe try extracting packages from Containerfile?
-    for arch in sorted(arches):
-        packages = set()
-        if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
-            packages = read_packages_from_treefile(
-                arch,
-                args.rpm_ostree_treefile
-                or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
+    data["arches"] = []
+
+    with ThreadPoolExecutor(max_workers=len(arches)) as executor:
+        futures = []
+        for arch in sorted(arches):
+            packages = set()
+            if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
+                packages = read_packages_from_treefile(
+                    arch,
+                    args.rpm_ostree_treefile
+                    or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
+                )
+            elif args.flatpak or context.get("flatpak"):
+                packages = read_packages_from_container_yaml(arch)
+
+            filtered_packages = set(filter_for_arch(arch, config.get("packages", []))) | packages
+            reinstall_packages = set(filter_for_arch(arch, config.get("reinstallPackages", [])))
+            module_enable = set(filter_for_arch(arch, config.get("moduleEnable", [])))
+            module_disable = set(filter_for_arch(arch, config.get("moduleDisable", [])))
+            upgrade_packages = set(filter_for_arch(arch, config.get("upgradePackages", [])))
+
+            # Submit each task to the thread pool
+            futures.append(
+                executor.submit(
+                    process_arch,
+                    arch,
+                    rpmdb,
+                    repos,
+                    filtered_packages,
+                    allowerasing,
+                    reinstall_packages,
+                    module_enable,
+                    module_disable,
+                    no_sources,
+                    config.get("installWeakDeps"),
+                    upgrade_packages,
+                )
             )
-        elif args.flatpak or context.get("flatpak"):
-            packages = read_packages_from_container_yaml(arch)
-        data["arches"].append(
-            process_arch(
-                arch,
-                rpmdb,
-                repos,
-                set(filter_for_arch(arch, config.get("packages", []))) | packages,
-                allow_erasing=allowerasing,
-                reinstall_packages=set(
-                    filter_for_arch(arch, config.get("reinstallPackages", []))
-                ),
-                module_enable=set(
-                    filter_for_arch(arch, config.get("moduleEnable", []))
-                ),
-                module_disable=set(
-                    filter_for_arch(arch, config.get("moduleDisable", []))
-                ),
-                no_sources=no_sources,
-                install_weak_deps=config.get("installWeakDeps"),
-                upgrade_packages=set(
-                    filter_for_arch(arch, config.get("upgradePackages", []))
-                ),
-            )
-        )
+
+        # Collect results
+        for future in as_completed(futures):
+            data["arches"].append(future.result())
 
     with open(args.outfile, "w") as f:
         # Sorting by keys would put the version info at the end...
