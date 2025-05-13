@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import logging
 import os
@@ -533,7 +533,7 @@ def main():
             )
 
         # Collect results
-        for future in as_completed(futures):
+        for future in futures:
             data["arches"].append(future.result())
 
     with open(args.outfile, "w") as f:
