@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fixed a possible race condition in caching rpmdb from an image if two
+  processes tried to use the same image at the same time.
+
 ## [0.30.0] - 2026-08-11
 
 ### Added
