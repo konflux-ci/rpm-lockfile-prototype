@@ -295,7 +295,9 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
 
     img_cache = cache_dir / "rpmdbs" / arch / (digest or default_digest)
 
-    assert _online_setup.mock_calls == [mock.call(img_cache, resolved_image, arch)]
+    assert _online_setup.mock_calls == [
+        mock.call(img_cache.with_suffix(f".{os.getpid()}"), resolved_image, arch)
+    ]
 
     assert copytree.mock_calls == [
         mock.call(img_cache, tmp_path / "d1", symlinks=True, dirs_exist_ok=True),
@@ -335,3 +337,37 @@ def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
     assert (tmp_path / "dest1" / rpmdb / "foo").read_text().strip() == expected_content
 
     assert list((cache_dir / "rpmdbs" / "x86_64").iterdir()) == []
+
+
+def test_skopeo_failure_does_not_create_dest_dir(tmp_path, disk_is_free):
+    """
+    When skopeo fails to download the image, dest_dir must not be created.
+
+    _online_setup_rpmdb creates the cache directory before calling skopeo. If
+    skopeo fails, that empty cache directory must be removed so that a
+    subsequent run doesn't mistake it for a valid cached rpmdb and skip the
+    download entirely (which would result in an empty dest_dir being used).
+    """
+    dest_dir = tmp_path / "dest"
+    cache_dir = tmp_path / "cache"
+    digest = f"sha256:{'a' * 64}"
+    baseimage = "registry.example.com/image:latest"
+
+    def fake_inspect(image, arch=None):
+        return {"Digest": digest}
+
+    with (
+        mock.patch("rpm_lockfile.utils.logged_run") as logged_run,
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect),
+    ):
+        logged_run.side_effect = subprocess.CalledProcessError(1, "skopeo")
+        with pytest.raises(subprocess.CalledProcessError):
+            containers.setup_rpmdb(dest_dir, baseimage, "x86_64")
+
+    assert not dest_dir.exists()
+    # The empty cache directory left by _online_setup_rpmdb before the failed
+    # download must also be cleaned up, otherwise a subsequent call would skip
+    # the download and copy an empty directory into dest_dir.
+    expected_cache = cache_dir / "rpmdbs" / "x86_64" / digest
+    assert not expected_cache.exists()
