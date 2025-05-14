@@ -254,6 +254,17 @@ containerfile:
 If multiple filters for selecting stage are set, the first one to match is
 used.
 
+# Environment variables
+
+It is possible to configure persistent cache location for downloaded repodata
+using environment variable `RPM_LOCKFILE_PROTOTYPE_DNF_CACHE`. This can
+increase performance if the tool repeatedly runs on the same repository
+configuration.
+
+However, it is not safe to use the cache by two processes running at the same
+time.
+
+
 # What does this do
 
 High-level overview: given a list of packages, repo urls and installed
