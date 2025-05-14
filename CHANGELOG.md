@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fixed a stale empty cache directory being left behind when skopeo fails to
+  download an image, which caused subsequent runs to skip the download and
+  produce an empty rpmdb.
+- Fixed a possible race condition in caching rpmdb from an image if two
+  processes tried to use the same image at the same time.
+
 ## [0.30.0] - 2026-08-11
 
 ### Added
