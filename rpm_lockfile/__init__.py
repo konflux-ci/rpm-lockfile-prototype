@@ -133,7 +133,9 @@ def resolver(
                 conf.install_weak_deps = install_weak_deps
 
             conf.installroot = str(root_dir)
-            conf.cachedir = os.path.join(cache_dir, "cache")
+            conf.cachedir = os.getenv(
+                "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
+            )
             conf.logdir = mkdir(os.path.join(cache_dir, "log"))
             conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
             conf.substitutions["arch"] = arch
