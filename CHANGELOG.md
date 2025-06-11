@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- When a depsolving error indicates missing filelists, the tool will now retry
+  the transaction with filelists explicitly requested.
+
+
 ## [0.15.0] - 2025-04-08
 
 ### Added

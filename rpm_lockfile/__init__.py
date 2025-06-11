@@ -107,6 +107,10 @@ def mkdir(dir):
     return dir
 
 
+class MissingFilelists(Exception):
+    pass
+
+
 def resolver(
     arch: str,
     root_dir,
@@ -119,6 +123,7 @@ def resolver(
     no_sources: bool,
     install_weak_deps: bool,
     upgrade_packages: set[str],
+    download_filelists: bool = False,
 ):
     packages = set()
     sources = set()
@@ -132,6 +137,8 @@ def resolver(
             if install_weak_deps is not None:
                 conf.install_weak_deps = install_weak_deps
 
+            if download_filelists:
+                conf.optional_metadata_types = ["filelists"]
             conf.installroot = str(root_dir)
             conf.cachedir = os.path.join(cache_dir, "cache")
             conf.logdir = mkdir(os.path.join(cache_dir, "log"))
@@ -192,7 +199,14 @@ def resolver(
                 logging.error(exc.value)
                 raise RuntimeError(f"DNF error: {exc}")
             # And resolve the transaction
-            base.resolve(allow_erasing=allow_erasing)
+            try:
+                base.resolve(allow_erasing=allow_erasing)
+            except dnf.exceptions.DepsolveError as exc:
+                if not download_filelists and "nothing provides /" in exc.value:
+                    # If we did not download filelists and the error indicates
+                    # they may be needed, signal that with a custom exception.
+                    raise MissingFilelists()
+                raise
 
             modular_packages = set(
                 nevra
@@ -280,19 +294,28 @@ def process_arch(
     logging.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
-        packages, sources, module_metadata = resolver(
-            arch,
-            root_dir,
-            repos,
-            packages,
-            allow_erasing,
-            reinstall_packages,
-            module_enable,
-            module_disable,
-            no_sources,
-            install_weak_deps,
-            upgrade_packages,
-        )
+        for download_filelists in [False, True]:
+            try:
+                packages, sources, module_metadata = resolver(
+                    arch,
+                    root_dir,
+                    repos,
+                    packages,
+                    allow_erasing,
+                    reinstall_packages,
+                    module_enable,
+                    module_disable,
+                    no_sources,
+                    install_weak_deps,
+                    upgrade_packages,
+                    download_filelists=download_filelists,
+                )
+                break
+            except MissingFilelists:
+                logging.error(
+                    "Dependency error indicates we may be missing filelists. Let's try "
+                    "again with filelists."
+                )
 
     return {
         "arch": arch,
