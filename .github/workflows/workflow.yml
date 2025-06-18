@@ -26,7 +26,7 @@ jobs:
       run: |
         {
           echo 'FROM registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}'
-          echo 'RUN dnf install -y python3-pip python3-dnf'
+          echo 'RUN dnf install -y python3-pip python3-dnf gcc'
           echo 'WORKDIR /src'
           echo 'RUN python3 -m pip install . pytest'
           echo 'RUN pytest -v'
