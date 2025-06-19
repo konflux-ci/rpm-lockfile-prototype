@@ -1,0 +1,2 @@
+FROM registry.fedoraproject.org/fedora:rawhide
+RUN dnf install -y vim-enhanced
