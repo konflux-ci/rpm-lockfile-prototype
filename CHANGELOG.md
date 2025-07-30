@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0] - 2025-07-30
+
+### Fixed
+
+- Specifying a package by path to installed file will now work as it will
+  trigger download of the filelist repodata.
+
 ## [0.16.0] - 2025-06-11
 
 ### Added
