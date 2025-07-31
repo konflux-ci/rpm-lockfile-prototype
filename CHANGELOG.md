@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Multiple baseurls in a repofile are now accepted.
+
 ## [0.17.0] - 2025-07-30
 
 ### Fixed

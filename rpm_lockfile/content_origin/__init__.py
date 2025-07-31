@@ -11,7 +11,11 @@ class Repo:
     def from_dict(cls, data):
         repoid = data.pop("repoid")
         if not isinstance(data.get("baseurl", []), list):
-            data["baseurl"] = [data["baseurl"]]
+            # If baseurl is not a list already, convert it to a list by
+            # splitting on whitespace. If there's only one URL, this will
+            # produce a list with a single item. But there may be multiple
+            # baseurls.
+            data["baseurl"] = data["baseurl"].split()
 
         if (
             "baseurl" not in data
