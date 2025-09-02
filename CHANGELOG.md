@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.18.0] - 2025-09-02
 
 ### Added
 
@@ -12,6 +12,9 @@
 ### Fixed
 
 - Multiple baseurls in a repofile are now accepted.
+
+- `git-core` package is now installed into the application container
+
 
 ## [0.17.0] - 2025-07-30
 

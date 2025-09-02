@@ -35,7 +35,7 @@ $ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-proto
 Or latest released version:
 
 ```
-$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.17.0.tar.gz
+$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.18.0.tar.gz
 ```
 
 You can also use COPR repo created by Packit, which tracks the latest main branch:
