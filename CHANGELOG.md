@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- `RPM_LOCKFILE_PROTOTYPE_DNF_CACHE` environment variable can be set to a local
+  path, which will be used to cache downloaded repodata. This could greatly
+  speed up processing, but is not safe to do if there are multiple instances of
+  the tool using the same cache location at the same time.
+
 ### Fixed
 
 - Multiple baseurls in a repofile are now accepted.
