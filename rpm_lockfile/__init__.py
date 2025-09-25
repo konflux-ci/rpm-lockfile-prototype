@@ -147,6 +147,7 @@ def resolver(
             conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
             conf.substitutions["arch"] = arch
             conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
+            conf.substitutions["releasever"] = "unknown"
             try:
                 releasever = dnf.rpm.detect_releasever(root_dir)
                 if releasever:
