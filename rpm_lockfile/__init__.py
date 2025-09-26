@@ -130,32 +130,30 @@ def resolver(
     module_metadata = []
 
     with tempfile.TemporaryDirectory() as cache_dir:
-        with dnf.Base() as base:
-            # Configure base
-            conf = base.conf
+        conf = dnf.conf.Conf()
+        conf.logdir = mkdir(os.path.join(cache_dir, "log"))
+        conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
+        conf.substitutions["arch"] = arch
+        conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
+        conf.install_weak_deps = install_weak_deps or False
 
-            if install_weak_deps is not None:
-                conf.install_weak_deps = install_weak_deps
+        if download_filelists:
+            conf.optional_metadata_types = ["filelists"]
+        conf.installroot = str(root_dir)
+        conf.cachedir = os.getenv(
+            "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
+        )
+        try:
+            releasever = dnf.rpm.detect_releasever(root_dir)
+            if releasever:
+                logging.debug("Setting releasever to %s", releasever)
+                conf.substitutions["releasever"] = releasever
+            else:
+                logging.warning("Failed to detect $releasever")
+        except dnf.exceptions.Error as exc:
+            logging.warning("Failed to detect $releasever: %s", exc)
 
-            if download_filelists:
-                conf.optional_metadata_types = ["filelists"]
-            conf.installroot = str(root_dir)
-            conf.cachedir = os.getenv(
-                "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
-            )
-            conf.logdir = mkdir(os.path.join(cache_dir, "log"))
-            conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
-            conf.substitutions["arch"] = arch
-            conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
-            try:
-                releasever = dnf.rpm.detect_releasever(root_dir)
-                if releasever:
-                    logging.debug("Setting releasever to %s", releasever)
-                    conf.substitutions["releasever"] = releasever
-                else:
-                    logging.warning("Failed to detect $releasever")
-            except dnf.exceptions.Error as exc:
-                logging.warning("Failed to detect $releasever: %s", exc)
+        with dnf.Base(conf=conf) as base:
             # Configure repos
             for repo in repos:
                 base.repos.add_new_repo(
