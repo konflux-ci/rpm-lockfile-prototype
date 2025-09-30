@@ -47,6 +47,14 @@ def setup_rpmdb(dest_dir, baseimage, arch):
     """
     image, _, digest = utils.split_image(baseimage)
 
+    if image.lower() == "scratch":
+        # Nothing to do for scratch image. It doesn't have any RPMs.
+        logging.warning(
+            "Image with rpmdb was expected, but got `scratch` instead. "
+            "Did you want to enable context.bare or use a different base image?"
+        )
+        return
+
     if not digest:
         # We don't have a digest yet, so find the correct one from the
         # registry.
