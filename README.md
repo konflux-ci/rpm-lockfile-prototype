@@ -1,19 +1,19 @@
 # What is this?
 
 This repo contains a proof-of-concept tool that implements lockfile generation
-as expected by [cachi2]. The whole point is to make it possible to run a build
+as expected by [Hermeto]. The whole point is to make it possible to run a build
 process without network connection. This tool will first resolve an RPM
-transaction. [cachi2] can download all of those packages and provide a local
+transaction. [Hermeto] can download all of those packages and provide a local
 repository, which can be consumed in the build process.
 
 **There are no stability guarantees.**
 
 The output should generally be compatible with what is being implemented in
-[cachi2], but there are some differences, like adding additional `sourcerpm` key
+[Hermeto], but there are some differences, like adding additional `sourcerpm` key
 for binary packages to make it easier to map the package to corresponding
 source.
 
-[cachi2]: https://github.com/containerbuildsystem/cachi2
+[Hermeto]: https://hermetoproject.github.io/hermeto/
 
 ## Installation
 
