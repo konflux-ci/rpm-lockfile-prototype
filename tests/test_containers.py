@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import os
 import subprocess
 import tempfile
 from abc import ABC
@@ -252,7 +253,7 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
     img_cache = cache_dir / "rpmdbs" / arch / (digest or default_digest)
 
     assert _online_setup.mock_calls == [
-        mock.call(img_cache, resolved_image, arch)
+        mock.call(img_cache.with_suffix(f".{os.getpid()}"), resolved_image, arch)
     ]
 
     assert copytree.mock_calls == [

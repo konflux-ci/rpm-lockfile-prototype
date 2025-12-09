@@ -64,7 +64,17 @@ def setup_rpmdb(dest_dir, baseimage, arch):
     if not cache.exists():
         # If we don't have anything cached, extract the rpmdb from the image
         # into the cache.
-        _online_setup_rpmdb(cache, image, arch)
+        # First it goes into a temporary location...
+        tmp_cache = cache.with_suffix(f".{os.getpid()}")
+        _online_setup_rpmdb(tmp_cache, image, arch)
+        try:
+            # ...and then atomically moves into the proper one.
+            tmp_cache.rename(cache)
+        except OSError:
+            # The target directory exists and is not empty. This means another
+            # process managed to cache this particular image in the meantime.
+            # The data is available, nothing to do for us here.
+            pass
     else:
         logging.info("Using already downloaded rpmdb")
 
@@ -125,9 +135,14 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
                 os.path.dirname(os.path.join(dest_dir, utils.RPMDB_PATH)),
                 exist_ok=True,
             )
+            # This code needs to make sure the symlink is not using an absolute
+            # path. That would break when the extracted files move from the
+            # temporary to the final location.
+            actual_dbpath = os.path.join(dest_dir, dbpath)
+            compat_dbpath = os.path.join(dest_dir, utils.RPMDB_PATH)
             os.symlink(
-                os.path.join(dest_dir, dbpath),
-                os.path.join(dest_dir, utils.RPMDB_PATH),
+                os.path.relpath(actual_dbpath, os.path.dirname(compat_dbpath)),
+                compat_dbpath,
             )
 
 
