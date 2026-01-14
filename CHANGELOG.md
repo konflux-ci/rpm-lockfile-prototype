@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- ARG variable expansion is now supported in Containerfiles. Build arguments
+  defined with `ARG` instructions are now correctly expanded in `FROM`
+  instructions using both `${VAR}` and `$VAR` syntax.
+
 ## [0.18.0] - 2025-09-02
 
 ### Added

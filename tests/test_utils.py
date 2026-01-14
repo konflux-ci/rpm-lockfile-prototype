@@ -114,6 +114,145 @@ def test_extract_image(file, expected):
 
 
 @pytest.mark.parametrize(
+    "file,expected",
+    [
+        # Simple ARG with default value using ${VAR} syntax
+        ("""ARG BASE_IMAGE=registry.io/repository/base
+FROM ${BASE_IMAGE}
+RUN something
+""", "registry.io/repository/base"),
+        # Simple ARG with default value using $VAR syntax
+        ("""ARG BASE_IMAGE=registry.io/repository/base
+FROM $BASE_IMAGE
+RUN something
+""", "registry.io/repository/base"),
+        # ARG with partial expansion
+        ("""ARG REGISTRY=registry.io
+ARG NAMESPACE=repository
+FROM ${REGISTRY}/${NAMESPACE}/base:latest
+""", "registry.io/repository/base:latest"),
+        # Multiple ARGs with the last one being used
+        ("""ARG BASE_IMAGE=registry.io/first
+ARG BASE_IMAGE=registry.io/second
+FROM ${BASE_IMAGE}
+""", "registry.io/second"),
+        # Multi-stage build - should get last stage
+        ("""ARG BUILD_IMAGE=registry.io/build:latest
+FROM ${BUILD_IMAGE} as builder
+RUN build
+ARG BASE_IMAGE=registry.io/base:latest
+FROM ${BASE_IMAGE}
+COPY --from=builder /artifact /
+""", "registry.io/base:latest"),
+        # ARG before first FROM is global
+        ("""ARG BASE_IMAGE=registry.io/base:latest
+FROM ${BASE_IMAGE} as stage1
+RUN something
+FROM ${BASE_IMAGE}
+RUN other
+""", "registry.io/base:latest"),
+        # Mixed literal and variable in FROM
+        ("""ARG TAG=v1.0
+FROM registry.io/repository/base:${TAG}
+""", "registry.io/repository/base:v1.0"),
+        # ARG with complex image spec including digest
+        ("""ARG BASE=registry.io/repo/image:tag@sha256:abcdef123456
+FROM ${BASE}
+""", "registry.io/repo/image:tag@sha256:abcdef123456"),
+        # ARG with --platform flag
+        ("""ARG BASE_IMAGE=registry.io/repository/base
+FROM --platform=linux/amd64 ${BASE_IMAGE}
+""", "registry.io/repository/base"),
+        # Multiple ARGs on a single line
+        ("""ARG REGISTRY=registry.io NAMESPACE=repository
+FROM ${REGISTRY}/${NAMESPACE}/base:latest
+""", "registry.io/repository/base:latest"),
+        # Multiple ARGs on one line with partial defaults
+        ("""ARG BASE=registry.io/repo TAG=v1.0
+FROM ${BASE}:${TAG}
+""", "registry.io/repo:v1.0"),
+        # Multiple ARGs on one line, some without defaults
+        ("""ARG REGISTRY NAMESPACE=myapp
+FROM ${REGISTRY}/${NAMESPACE}/image
+""", "/myapp/image"),
+        # Quoted ARG values with double quotes - quotes should be stripped
+        ("""ARG BASE="registry.io/repository/base"
+FROM ${BASE}
+""", "registry.io/repository/base"),
+        # Quoted ARG values with single quotes - quotes should be stripped
+        ("""ARG BASE='registry.io/repository/base'
+FROM ${BASE}
+""", "registry.io/repository/base"),
+        # Mixed quoted and unquoted ARGs
+        ("""ARG REGISTRY="registry.io" NAMESPACE=repository
+FROM ${REGISTRY}/${NAMESPACE}/base
+""", "registry.io/repository/base"),
+        # Quoted value in FROM instruction
+        ("""ARG TAG="v1.0"
+FROM registry.io/repository/base:${TAG}
+""", "registry.io/repository/base:v1.0"),
+    ]
+)
+def test_extract_image_with_build_args(file, expected):
+    with patch("builtins.open", mock_open(read_data=file)):
+        assert utils.extract_image(file) == expected
+
+
+@pytest.mark.parametrize(
+    "file,stage_num,stage_name,image_pattern,expected",
+    [
+        # Extract specific stage by number with ARGs
+        ("""ARG BUILD_IMG=registry.io/builder:latest
+ARG BASE_IMG=registry.io/base:latest
+FROM ${BUILD_IMG} as builder
+RUN build
+FROM ${BASE_IMG} as runtime
+COPY --from=builder /artifact /
+""", 1, None, None, "registry.io/builder:latest"),
+        # Extract specific stage by name with ARGs
+        ("""ARG BUILD_IMG=registry.io/builder:latest
+ARG BASE_IMG=registry.io/base:latest
+FROM ${BUILD_IMG} as builder
+RUN build
+FROM ${BASE_IMG} as runtime
+COPY --from=builder /artifact /
+""", None, "builder", None, "registry.io/builder:latest"),
+        # Extract by image pattern with ARGs
+        ("""ARG BUILD_IMG=registry.io/builder:latest
+ARG BASE_IMG=example.com/base:latest
+FROM ${BUILD_IMG} as builder
+RUN build
+FROM ${BASE_IMG} as runtime
+COPY --from=builder /artifact /
+""", None, None, "example.com", "example.com/base:latest"),
+        # Stage-specific ARG (ARG after FROM)
+        ("""ARG GLOBAL_IMG=registry.io/global:latest
+FROM registry.io/build:latest as builder
+ARG BUILDER_TAG=v1.0
+RUN echo ${BUILDER_TAG}
+FROM ${GLOBAL_IMG} as runtime
+RUN something
+""", None, "runtime", None, "registry.io/global:latest"),
+        # ARG overridden in stage
+        ("""ARG BASE_IMG=registry.io/base:latest
+FROM ${BASE_IMG} as stage1
+ARG BASE_IMG=registry.io/override:latest
+RUN something
+FROM ${BASE_IMG} as stage2
+""", None, "stage2", None, "registry.io/override:latest"),
+    ]
+)
+def test_extract_image_with_build_args_and_filters(file, stage_num, stage_name, image_pattern, expected):
+    with patch("builtins.open", mock_open(read_data=file)):
+        assert utils.extract_image(
+            file,
+            stage_num=stage_num,
+            stage_name=stage_name,
+            image_pattern=image_pattern
+        ) == expected
+
+
+@pytest.mark.parametrize(
     "template,vars,expected",
     [
         ("foo{x}bar", {"x": "X"}, "fooXbar"),
