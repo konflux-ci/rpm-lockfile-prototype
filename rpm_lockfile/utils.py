@@ -67,18 +67,27 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
     arg_declaration_re = re.compile(r'(\w+)(?:=(?:"([^"]*)"|\'([^\']*)\'|([^\s]+)))?')
 
     def expand_vars(text, args):
-        """Expand both ${VAR} and $VAR syntax in text using provided args dict."""
+        """Expand both ${VAR} and $VAR syntax in text using provided args dict.
+
+        Raises RuntimeError if a referenced variable has no default value.
+        """
         # First expand ${VAR} syntax
         def replace_braced(match):
             var_name = match.group(1)
-            return args.get(var_name, "")
+            value = args.get(var_name)
+            if value is None:
+                raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
+            return value
 
         text = re.sub(r'\$\{(\w+)\}', replace_braced, text)
 
         # Then expand $VAR syntax (without braces)
         def replace_unbraced(match):
             var_name = match.group(1)
-            return args.get(var_name, "")
+            value = args.get(var_name)
+            if value is None:
+                raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
+            return value
 
         text = re.sub(r'\$(\w+)', replace_unbraced, text)
 
@@ -96,8 +105,14 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
                 args_text = arg_match.group(1)
                 for decl_match in arg_declaration_re.finditer(args_text):
                     arg_name = decl_match.group(1)
-                    # Value can be in group 2 (double-quoted), 3 (single-quoted), or 4 (unquoted)
-                    arg_value = decl_match.group(2) or decl_match.group(3) or decl_match.group(4) or ""
+                    if decl_match.group(2) is not None:
+                        arg_value = decl_match.group(2)  # Double-quoted
+                    elif decl_match.group(3) is not None:
+                        arg_value = decl_match.group(3)  # Single-quoted
+                    elif decl_match.group(4) is not None:
+                        arg_value = decl_match.group(4)  # Unquoted
+                    else:
+                        arg_value = None  # No default value provided
 
                     if not in_stage:
                         # Global ARG (before first FROM)

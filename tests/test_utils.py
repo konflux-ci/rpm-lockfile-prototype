@@ -171,10 +171,6 @@ FROM ${REGISTRY}/${NAMESPACE}/base:latest
         ("""ARG BASE=registry.io/repo TAG=v1.0
 FROM ${BASE}:${TAG}
 """, "registry.io/repo:v1.0"),
-        # Multiple ARGs on one line, some without defaults
-        ("""ARG REGISTRY NAMESPACE=myapp
-FROM ${REGISTRY}/${NAMESPACE}/image
-""", "/myapp/image"),
         # Quoted ARG values with double quotes - quotes should be stripped
         ("""ARG BASE="registry.io/repository/base"
 FROM ${BASE}
@@ -196,6 +192,55 @@ FROM registry.io/repository/base:${TAG}
 def test_extract_image_with_build_args(file, expected):
     with patch("builtins.open", mock_open(read_data=file)):
         assert utils.extract_image(file) == expected
+
+
+def test_extract_image_with_undefined_build_arg():
+    """ARG without default value should raise clear error when referenced."""
+    file = """ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        with pytest.raises(
+            RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
+        ):
+            utils.extract_image(file)
+
+
+def test_extract_image_with_partial_undefined_build_args():
+    """Multiple undefined ARGs should fail on first undefined variable."""
+    file = """ARG REGISTRY
+ARG NAMESPACE
+FROM ${REGISTRY}/${NAMESPACE}/image
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        with pytest.raises(
+            RuntimeError, match="ARG 'REGISTRY' is used but has no default value"
+        ):
+            utils.extract_image(file)
+
+
+def test_extract_image_with_mixed_defined_undefined_args():
+    """Should fail when any referenced ARG is undefined."""
+    file = """ARG REGISTRY=registry.io
+ARG NAMESPACE
+FROM ${REGISTRY}/${NAMESPACE}/image
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        with pytest.raises(
+            RuntimeError, match="ARG 'NAMESPACE' is used but has no default value"
+        ):
+            utils.extract_image(file)
+
+
+def test_extract_image_with_unused_undefined_args():
+    """ARGs without defaults are OK if they're not referenced in FROM."""
+    file = """ARG UNUSED_VAR
+ARG BASE_IMAGE=registry.io/base:latest
+FROM ${BASE_IMAGE}
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        result = utils.extract_image(file)
+        assert result == "registry.io/base:latest"
 
 
 @pytest.mark.parametrize(
@@ -242,7 +287,9 @@ FROM ${BASE_IMG} as stage2
 """, None, "stage2", None, "registry.io/override:latest"),
     ]
 )
-def test_extract_image_with_build_args_and_filters(file, stage_num, stage_name, image_pattern, expected):
+def test_extract_image_with_build_args_and_filters(
+    file, stage_num, stage_name, image_pattern, expected
+):
     with patch("builtins.open", mock_open(read_data=file)):
         assert utils.extract_image(
             file,
