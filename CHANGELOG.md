@@ -1,12 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [0.19.0] - 2026-01-19
 
 ### Added
 
 - ARG variable expansion is now supported in Containerfiles. Build arguments
   defined with `ARG` instructions are now correctly expanded in `FROM`
   instructions using both `${VAR}` and `$VAR` syntax.
+
+### Changed
+
+- Set default releasever to 'unknown' if no value can be detected successfully.
+  The previous behaviour would use 'None' in such case, which caused DNF to
+  crash.
 
 ## [0.18.0] - 2025-09-02
 
