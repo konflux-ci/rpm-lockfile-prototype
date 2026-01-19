@@ -48,16 +48,95 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
     logging.debug("Looking for base image in %s", containerfile)
     baseimg = ""
     stages = 0
+
+    # Track ARG variables - global args are available to all stages
+    global_args = {}
+    stage_args = {}
+    in_stage = False
+
     from_line_re = re.compile(
         r"^\s*FROM\s+(--platform=\S+\s+)?(?P<img>\S+)(\s+AS\s+(?P<name>\S+))?\s*$",
         re.IGNORECASE,
     )
+    arg_line_re = re.compile(
+        r"^\s*ARG\s+(.+)$",
+        re.IGNORECASE,
+    )
+    # Pattern to match individual ARG declarations: NAME or NAME=VALUE
+    # VALUE can be quoted with " or ' or unquoted (non-whitespace)
+    arg_declaration_re = re.compile(r'(\w+)(?:=(?:"([^"]*)"|\'([^\']*)\'|([^\s]+)))?')
+
+    def expand_vars(text, args):
+        """Expand both ${VAR} and $VAR syntax in text using provided args dict.
+
+        Raises RuntimeError if a referenced variable has no default value.
+        """
+        # First expand ${VAR} syntax
+        def replace_braced(match):
+            var_name = match.group(1)
+            value = args.get(var_name)
+            if value is None:
+                raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
+            return value
+
+        text = re.sub(r'\$\{(\w+)\}', replace_braced, text)
+
+        # Then expand $VAR syntax (without braces)
+        def replace_unbraced(match):
+            var_name = match.group(1)
+            value = args.get(var_name)
+            if value is None:
+                raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
+            return value
+
+        text = re.sub(r'\$(\w+)', replace_unbraced, text)
+
+        return text
+
     with open(containerfile) as f:
         for line in f:
-            m = from_line_re.match(line.strip())
-            if m:
-                baseimg = m.group("img")
-                if stage_name and stage_name == m.group("name"):
+            line_stripped = line.strip()
+
+            # Check for ARG instruction
+            arg_match = arg_line_re.match(line_stripped)
+            if arg_match:
+                # Parse all ARG declarations on this line
+                # Format: ARG NAME[=VALUE] [NAME[=VALUE]...]
+                args_text = arg_match.group(1)
+                for decl_match in arg_declaration_re.finditer(args_text):
+                    arg_name = decl_match.group(1)
+                    if decl_match.group(2) is not None:
+                        arg_value = decl_match.group(2)  # Double-quoted
+                    elif decl_match.group(3) is not None:
+                        arg_value = decl_match.group(3)  # Single-quoted
+                    elif decl_match.group(4) is not None:
+                        arg_value = decl_match.group(4)  # Unquoted
+                    else:
+                        arg_value = None  # No default value provided
+
+                    if not in_stage:
+                        # Global ARG (before first FROM)
+                        global_args[arg_name] = arg_value
+                    else:
+                        # Stage-specific ARG (after FROM)
+                        stage_args[arg_name] = arg_value
+                continue
+
+            # Check for FROM instruction
+            from_match = from_line_re.match(line_stripped)
+            if from_match:
+                in_stage = True
+                raw_img = from_match.group("img")
+
+                # Expand variables using both global and stage args
+                # Stage args override global args
+                all_args = {**global_args, **stage_args}
+                baseimg = expand_vars(raw_img, all_args)
+
+                # Reset stage args for next stage
+                stage_args = {}
+
+                if stage_name and stage_name == from_match.group("name"):
                     return baseimg
                 stages += 1
 
