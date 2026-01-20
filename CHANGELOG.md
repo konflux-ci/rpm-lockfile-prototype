@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Added a better error message when no context is configured.
+
+
 ## [0.19.0] - 2026-01-19
 
 ### Added

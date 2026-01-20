@@ -117,9 +117,11 @@ from a local container image using the [`Containerfile`](./Containerfile) at the
    file:
 
    ```bash
-   container_dir=/work
-   $ podman run --rm -v ${PWD}:${container_dir} localhost/rpm-lockfile-prototype:latest --outfile=${container_dir}/rpms.lock.yaml ${container_dir}/rpms.in.yaml
+   $ podman run --rm -v ${PWD}:/work localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
    ```
+
+   The container uses `/work` as current working directory, so the command will
+   work as if the tool ran in your current directory.
 
 Caveats:
  * caching base images will not work, as there will be no persistent cache directory
