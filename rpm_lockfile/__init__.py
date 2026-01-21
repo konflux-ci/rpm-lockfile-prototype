@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import logging
 import os
@@ -25,7 +26,7 @@ except ImportError:
     sys.exit(127)
 import yaml
 
-from . import containers, content_origin, schema, utils
+from . import containers, content_origin, log, schema, utils
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -298,7 +299,7 @@ def process_arch(
     install_weak_deps: bool,
     upgrade_packages: set[str],
 ):
-    logging.info("Running solver for %s", arch)
+    log.set_thread_arch(arch)
 
     with rpmdb(arch) as root_dir:
         for download_filelists in [False, True]:
@@ -432,24 +433,6 @@ def _get_containerfile_filters(context):
     return {}
 
 
-def logging_setup(debug=False):
-
-    class ExcludeErrorsFilter(logging.Filter):
-        def filter(self, record):
-            """Only lets through log messages with log level below ERROR."""
-            return record.levelno < logging.ERROR
-
-    console_stdout = logging.StreamHandler(stream=sys.stdout)
-    console_stdout.addFilter(ExcludeErrorsFilter())
-    console_stdout.setLevel(logging.DEBUG if debug else logging.INFO)
-
-    console_stderr = logging.StreamHandler(stream=sys.stderr)
-    console_stderr.setLevel(logging.ERROR)
-
-    logging.basicConfig(
-        level=logging.DEBUG if debug else logging.INFO,
-        handlers=[console_stdout, console_stderr],
-    )
 
 
 def main():
@@ -479,7 +462,7 @@ def main():
     )
     args = parser.parse_args()
 
-    logging_setup(args.debug)
+    log.setup(args.debug)
 
     config_dir = os.path.dirname(os.path.realpath(args.infile))
     with open(args.infile) as f:
@@ -522,39 +505,48 @@ def main():
         )
 
     # TODO maybe try extracting packages from Containerfile?
-    for arch in sorted(arches):
-        packages = set()
-        if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
-            packages = read_packages_from_treefile(
-                arch,
-                args.rpm_ostree_treefile
-                or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
+    data["arches"] = []
+
+    with ThreadPoolExecutor(max_workers=len(arches)) as executor:
+        futures = []
+        for arch in sorted(arches):
+            packages = set()
+            if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
+                packages = read_packages_from_treefile(
+                    arch,
+                    args.rpm_ostree_treefile
+                    or utils.relative_to(config_dir, context.get("rpmOstreeTreefile")),
+                )
+            elif args.flatpak or context.get("flatpak"):
+                packages = read_packages_from_container_yaml(arch)
+
+            filtered_packages = set(filter_for_arch(arch, config.get("packages", []))) | packages
+            reinstall_packages = set(filter_for_arch(arch, config.get("reinstallPackages", [])))
+            module_enable = set(filter_for_arch(arch, config.get("moduleEnable", [])))
+            module_disable = set(filter_for_arch(arch, config.get("moduleDisable", [])))
+            upgrade_packages = set(filter_for_arch(arch, config.get("upgradePackages", [])))
+
+            # Submit each task to the thread pool
+            futures.append(
+                executor.submit(
+                    process_arch,
+                    arch,
+                    rpmdb,
+                    repos,
+                    filtered_packages,
+                    allowerasing,
+                    reinstall_packages,
+                    module_enable,
+                    module_disable,
+                    no_sources,
+                    config.get("installWeakDeps"),
+                    upgrade_packages,
+                )
             )
-        elif args.flatpak or context.get("flatpak"):
-            packages = read_packages_from_container_yaml(arch)
-        data["arches"].append(
-            process_arch(
-                arch,
-                rpmdb,
-                repos,
-                set(filter_for_arch(arch, config.get("packages", []))) | packages,
-                allow_erasing=allowerasing,
-                reinstall_packages=set(
-                    filter_for_arch(arch, config.get("reinstallPackages", []))
-                ),
-                module_enable=set(
-                    filter_for_arch(arch, config.get("moduleEnable", []))
-                ),
-                module_disable=set(
-                    filter_for_arch(arch, config.get("moduleDisable", []))
-                ),
-                no_sources=no_sources,
-                install_weak_deps=config.get("installWeakDeps"),
-                upgrade_packages=set(
-                    filter_for_arch(arch, config.get("upgradePackages", []))
-                ),
-            )
-        )
+
+        # Collect results
+        for future in futures:
+            data["arches"].append(future.result())
 
     with open(args.outfile, "w") as f:
         # Sorting by keys would put the version info at the end...
