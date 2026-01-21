@@ -35,6 +35,7 @@ def _copy_image(baseimage, arch, destdir):
         "skopeo",
         f"--override-arch={arch}",
         "copy",
+        "--remove-signatures",
         f"docker://{baseimage}",
         f"dir:{destdir}",
     ]
