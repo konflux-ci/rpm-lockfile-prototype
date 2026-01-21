@@ -291,3 +291,9 @@ def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
     assert (tmp_path / "dest1" / rpmdb / "foo").read_text().strip() == expected_content
 
     assert list((cache_dir / "rpmdbs" / "x86_64").iterdir()) == []
+
+
+@pytest.mark.parametrize("arch", ["aarch64", "ppc64le", "s390x", "x86_64"])
+def test_extracting_scratch_image_is_no_op(tmp_path, arch):
+    containers.setup_rpmdb(tmp_path, "scratch", arch)
+    assert list(tmp_path.iterdir()) == []
