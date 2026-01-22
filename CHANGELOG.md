@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added new configuration key `zchunk` to enable or disable zchunk downloads.
+  Setting `zchunk: false` can improve performance when using a caching proxy by
+  avoiding thousands of small HTTP requests.
+
 ## [0.19.0] - 2026-01-19
 
 ### Added
