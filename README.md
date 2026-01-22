@@ -230,6 +230,11 @@ allowerasing: true
 # Supplements). The default is to use whatever is configured for the system
 # DNF.
 installWeakDeps: false
+
+# Enable or disable zchunk downloads. Set to false to disable zchunk and use
+# standard downloads instead. This can improve performance when using a caching
+# proxy. The default is to use whatever is configured for the system DNF.
+zchunk: false
 ```
 
 The configuration file can specify a containerfile to extract a base image from

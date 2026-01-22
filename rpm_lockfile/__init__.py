@@ -124,6 +124,7 @@ def resolver(
     install_weak_deps: bool,
     upgrade_packages: set[str],
     download_filelists: bool = False,
+    zchunk: bool = None,
 ):
     packages = set()
     sources = set()
@@ -136,6 +137,9 @@ def resolver(
 
             if install_weak_deps is not None:
                 conf.install_weak_deps = install_weak_deps
+
+            if zchunk is not None:
+                conf.zchunk = zchunk
 
             if download_filelists:
                 conf.optional_metadata_types = ["filelists"]
@@ -297,6 +301,7 @@ def process_arch(
     no_sources: bool,
     install_weak_deps: bool,
     upgrade_packages: set[str],
+    zchunk: bool = None,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -316,6 +321,7 @@ def process_arch(
                     install_weak_deps,
                     upgrade_packages,
                     download_filelists=download_filelists,
+                    zchunk=zchunk,
                 )
                 break
             except MissingFilelists:
@@ -553,6 +559,7 @@ def main():
                 upgrade_packages=set(
                     filter_for_arch(arch, config.get("upgradePackages", []))
                 ),
+                zchunk=config.get("zchunk"),
             )
         )
 
