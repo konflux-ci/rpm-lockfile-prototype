@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fedora-version: [39, 40, 41, rawhide]
+        fedora-version: [40, 41, 42, 43, rawhide]
 
     steps:
     - name: Set up podman
