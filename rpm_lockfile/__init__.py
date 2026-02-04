@@ -521,6 +521,16 @@ def main():
             or _get_containerfile_path(config_dir, context)
             or utils.find_containerfile(Path.cwd())
         )
+        if not image and not containerfile:
+            parser.error(
+                "No base image source found. Please provide one of:\n"
+                "  --image <image-name>\n"
+                "  --containerfile <path>\n"
+                "  --local-system\n"
+                "  --bare\n"
+                "Or set 'context'in the configuration file,\n"
+                "or ensure a Containerfile/Dockerfile exists in the current directory."
+            )
         rpmdb = image_rpmdb(
             image or utils.extract_image(
                 containerfile, **_get_containerfile_filters(context)
