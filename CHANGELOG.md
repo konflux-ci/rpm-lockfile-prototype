@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Added a better error message when no context is configured.
+
+
 ## [0.20.0] - 2026-01-22
 
 ### Added
@@ -7,6 +14,7 @@
 - Added new configuration key `zchunk` to enable or disable zchunk downloads.
   Setting `zchunk: false` can improve performance when using a caching proxy by
   avoiding thousands of small HTTP requests.
+
 
 ## [0.19.0] - 2026-01-19
 
