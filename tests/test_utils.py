@@ -106,6 +106,18 @@ RUN build
 FROM registry.io/repository/base
 COPY --from=build /artifact /
 """, "registry.io/repository/base"),
+        ("""FROM registry.io/repository/base AS build
+RUN build
+FROM build AS runtime
+COPY --from=build /artifact /
+""", "registry.io/repository/base"),
+        ("""FROM registry.io/repository/base AS build
+RUN build
+FROM registry.io/repository/tester AS test
+RUN test
+FROM build AS runtime
+COPY --from=build /artifact /
+""", "registry.io/repository/base"),
     ]
 )
 def test_extract_image(file, expected):

@@ -6,6 +6,10 @@
 
 - Added a better error message when no context is configured.
 
+- Fixed extraction of base image from multi-stage Dockerfiles where a stage
+  references another stage (e.g., `FROM build AS runtime`). The tool now
+  correctly resolves stage references to find the actual external base image.
+
 
 ## [0.20.0] - 2026-01-22
 
