@@ -54,6 +54,10 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
     stage_args = {}
     in_stage = False
 
+    # Track stage names and their base images
+    # Maps stage_name -> external base image
+    stage_bases = {}
+
     from_line_re = re.compile(
         r"^\s*FROM\s+(--platform=\S+\s+)?(?P<img>\S+)(\s+AS\s+(?P<name>\S+))?\s*$",
         re.IGNORECASE,
@@ -131,13 +135,27 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
                 # Expand variables using both global and stage args
                 # Stage args override global args
                 all_args = {**global_args, **stage_args}
-                baseimg = expand_vars(raw_img, all_args)
+                expanded_img = expand_vars(raw_img, all_args)
+
+                # Resolve to external base image
+                # If this FROM references a previous stage, look up that stage's base
+                if expanded_img.lower() in stage_bases:
+                    baseimg = stage_bases[expanded_img.lower()]
+                else:
+                    # This is an external image
+                    baseimg = expanded_img
+
+                # Track this stage's base image
+                stage_name_value = from_match.group("name")
+                if stage_name_value:
+                    stage_bases[stage_name_value.lower()] = baseimg
 
                 # Reset stage args for next stage
                 stage_args = {}
 
-                if stage_name and stage_name == from_match.group("name"):
+                if stage_name and stage_name == stage_name_value:
                     return baseimg
+
                 stages += 1
 
                 if stage_num == stages:
