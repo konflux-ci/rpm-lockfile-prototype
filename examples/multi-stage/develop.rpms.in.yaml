@@ -1,0 +1,9 @@
+contentOrigin:
+  repofiles:
+    - ubi.repo
+packages:
+  - python38
+context:
+  containerfile:
+    file: Containerfile
+    stageName: develop
