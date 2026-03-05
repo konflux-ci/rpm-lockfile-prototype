@@ -127,6 +127,29 @@ Caveats:
  * caching base images will not work, as there will be no persistent cache directory
  * any server with certificate untrusted on Fedora 41 by default will not work
 
+# HOWTO: use `--local-system`
+
+Use `--local-system` when you want dependency resolution to treat your current
+machine as the installed base (instead of reading installed packages from an
+image or from an empty root).
+
+1. Prepare an input file, for example `rpms.in.yaml`.
+2. Run:
+
+   ```bash
+   $ rpm-lockfile-prototype --local-system --outfile rpms.lock.yaml rpms.in.yaml
+   ```
+
+3. The generated lockfile reflects resolution against packages installed on your
+   local host.
+
+Notes:
+- `--local-system` is mutually exclusive with `--image`, `--containerfile`,
+  `--bare`, and `--rpm-ostree-treefile`.
+- Local-system resolution only supports the current host architecture.
+  Do not combine it with `--arch` set to a different architecture.
+- You can also set this in config as `context.localSystem: true`.
+
 # What's the `INPUT_FILE`
 
 The input file tells this tool where to look for RPMs and what packages to
@@ -281,6 +304,12 @@ There are three options for how the installed packages can be handled.
 
 1. Resolve in the current system (`--local-system`). This is probably not
    useful for anything.
+
+   Example:
+
+   ```bash
+   $ rpm-lockfile-prototype --local-system rpms.in.yaml
+   ```
 
 2. Resolve in empty root (`--bare`, `--rpm-ostree-treefile`). This is useful
    when the final image is starting from scratch, like a base image or ostree.
