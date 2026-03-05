@@ -47,3 +47,37 @@ def test_read_container_yaml(arch, expected):
 )
 def test_filter_for_arch(input, expected):
     assert sorted(rpm_lockfile.filter_for_arch("ppc64le", input)) == sorted(expected)
+
+
+def test_format_marking_error_prefers_value():
+    class FakeError(Exception):
+        value = "package foo not found"
+
+        def __str__(self):
+            return "Problems in request:"
+
+    assert rpm_lockfile._format_marking_error(FakeError()) == "package foo not found"
+
+
+def test_format_marking_error_falls_back_to_str():
+    class FakeError(Exception):
+        def __str__(self):
+            return "Problems in request:"
+
+    assert rpm_lockfile._format_marking_error(FakeError()) == "Problems in request:"
+
+
+def test_format_marking_error_includes_no_match_specs():
+    class FakeError(Exception):
+        value = ""
+        no_match_pkg_specs = ["foo", "bar"]
+        no_match_group_specs = ["core"]
+
+        def __str__(self):
+            return "Problems in request:"
+
+    message = rpm_lockfile._format_marking_error(FakeError())
+    assert (
+        message
+        == "No package matched: bar, foo; No group matched: core; Check package/group names and configured repositories"
+    )

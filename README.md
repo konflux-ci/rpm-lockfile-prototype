@@ -279,8 +279,8 @@ packages, resolve all dependencies for the packages.
 
 There are three options for how the installed packages can be handled.
 
-1. Resolve in the current system (`--local-system`). This is probably not
-   useful for anything.
+1. Resolve in the current system (`--local-system`). This can be useful when
+   avoiding extraction of RPMDB from a base image.
 
 2. Resolve in empty root (`--bare`, `--rpm-ostree-treefile`). This is useful
    when the final image is starting from scratch, like a base image or ostree.
