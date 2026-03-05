@@ -111,6 +111,77 @@ class MissingFilelists(Exception):
     pass
 
 
+def _split_solvables(solvables):
+    """Split specs into regular solvables and comps group requests.
+
+    Group requests use @group-name. Specs such as @module:stream are not groups
+    and are kept as regular solvables.
+    """
+    regular = set()
+    groups = set()
+    for spec in solvables:
+        if isinstance(spec, str) and spec.startswith("@") and ":" not in spec:
+            groups.add(spec[1:])
+        else:
+            regular.add(spec)
+    return regular, groups
+
+
+def _find_comps_group(comps, group_spec):
+    if hasattr(comps, "group_by_pattern"):
+        group = comps.group_by_pattern(group_spec)
+        if isinstance(group, (list, tuple)):
+            return group[0] if group else None
+        if group:
+            return group
+
+    if hasattr(comps, "groups_iter"):
+        iterator = comps.groups_iter()
+    else:
+        iterator = getattr(comps, "groups", [])
+
+    for group in iterator:
+        if group_spec in {
+            getattr(group, "id", None),
+            getattr(group, "name", None),
+            getattr(group, "ui_name", None),
+        }:
+            return group
+    return None
+
+
+def _mark_comps_groups(base, group_specs):
+    if not group_specs:
+        return
+
+    try:
+        base.read_comps()
+    except dnf.exceptions.Error as exc:
+        raise RuntimeError(f"Failed to load comps metadata: {exc}")
+
+    missing = []
+    for group_spec in sorted(group_specs):
+        group = _find_comps_group(base.comps, group_spec)
+        if not group:
+            missing.append(group_spec)
+            continue
+
+        group_id = getattr(group, "id", group_spec)
+        try:
+            # Install only mandatory and default packages from the group.
+            base.group_install(group_id, ("mandatory", "default"), strict=True)
+        except TypeError:
+            # Older dnf variants may not accept strict= kwarg.
+            base.group_install(group_id, ("mandatory", "default"))
+        except dnf.exceptions.Error as exc:
+            raise RuntimeError(f"Can not install group @{group_spec}: {exc}")
+
+    if missing:
+        raise RuntimeError(
+            "No comps group matched: " + ", ".join(f"@{group}" for group in missing)
+        )
+
+
 def resolver(
     arch: str,
     root_dir,
@@ -201,7 +272,10 @@ def resolver(
                         raise
             # Mark packages for installation
             try:
-                base.install_specs(solvables)
+                package_specs, group_specs = _split_solvables(solvables)
+                _mark_comps_groups(base, group_specs)
+                if package_specs:
+                    base.install_specs(package_specs)
             except dnf.exceptions.MarkingErrors as exc:
                 if any(spec.startswith("/") for spec in exc.no_match_pkg_specs):
                     # User specified a package by absolute path, and we did not

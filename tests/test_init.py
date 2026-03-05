@@ -47,3 +47,43 @@ def test_read_container_yaml(arch, expected):
 )
 def test_filter_for_arch(input, expected):
     assert sorted(rpm_lockfile.filter_for_arch("ppc64le", input)) == sorted(expected)
+
+
+def test_split_solvables_separates_comps_groups():
+    regular, groups = rpm_lockfile._split_solvables(
+        {"bash", "@core", "@standard", "@nodejs:20"}
+    )
+    assert regular == {"bash", "@nodejs:20"}
+    assert groups == {"core", "standard"}
+
+
+def test_find_comps_group_matches_by_id():
+    class Group:
+        def __init__(self, id_, name):
+            self.id = id_
+            self.name = name
+            self.ui_name = name
+
+    class Comps:
+        def __init__(self):
+            self.groups = [Group("core", "Core"), Group("standard", "Standard")]
+
+    group = rpm_lockfile._find_comps_group(Comps(), "core")
+    assert group is not None
+    assert group.id == "core"
+
+
+def test_find_comps_group_matches_by_name():
+    class Group:
+        def __init__(self, id_, name):
+            self.id = id_
+            self.name = name
+            self.ui_name = name
+
+    class Comps:
+        def __init__(self):
+            self.groups = [Group("core", "Core"), Group("standard", "Standard")]
+
+    group = rpm_lockfile._find_comps_group(Comps(), "Standard")
+    assert group is not None
+    assert group.id == "standard"
