@@ -120,13 +120,7 @@ def _format_marking_error(exc):
         details.append(str(detailed).strip())
 
     no_match_pkgs = sorted(set(getattr(exc, "no_match_pkg_specs", []) or []))
-    if no_match_pkgs:
-        details.append(f"No package matched: {', '.join(no_match_pkgs)}")
-
     no_match_groups = sorted(set(getattr(exc, "no_match_group_specs", []) or []))
-    if no_match_groups:
-        details.append(f"No group matched: {', '.join(no_match_groups)}")
-
     if no_match_pkgs or no_match_groups:
         details.append("Check package/group names and configured repositories")
 

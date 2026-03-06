@@ -77,7 +77,4 @@ def test_format_marking_error_includes_no_match_specs():
             return "Problems in request:"
 
     message = rpm_lockfile._format_marking_error(FakeError())
-    assert (
-        message
-        == "No package matched: bar, foo; No group matched: core; Check package/group names and configured repositories"
-    )
+    assert message == "Check package/group names and configured repositories"
