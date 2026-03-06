@@ -111,25 +111,6 @@ class MissingFilelists(Exception):
     pass
 
 
-def _format_marking_error(exc):
-    # dnf MarkingErrors often stringify to a generic "Problems in request:".
-    # Prefer the detailed payload if available.
-    details = []
-    detailed = getattr(exc, "value", None)
-    if detailed:
-        details.append(str(detailed).strip())
-
-    no_match_pkgs = sorted(set(getattr(exc, "no_match_pkg_specs", []) or []))
-    no_match_groups = sorted(set(getattr(exc, "no_match_group_specs", []) or []))
-    if no_match_pkgs or no_match_groups:
-        details.append("Check package/group names and configured repositories")
-
-    details = [d for d in details if d]
-    if details:
-        return "; ".join(details)
-    return str(exc).strip()
-
-
 def resolver(
     arch: str,
     root_dir,
@@ -226,7 +207,13 @@ def resolver(
                     # User specified a package by absolute path, and we did not
                     # download filelists. Let's try again.
                     raise MissingFilelists()
-                message = _format_marking_error(exc)
+                message = str(exc).strip()
+                no_match_pkgs = getattr(exc, "no_match_pkg_specs", []) or []
+                no_match_groups = getattr(exc, "no_match_group_specs", []) or []
+                if no_match_pkgs or no_match_groups:
+                    message = (
+                        f"{message}; Check package/group names and configured repositories"
+                    )
                 logging.error(message)
                 raise RuntimeError(f"DNF error: {message}")
             # And resolve the transaction
