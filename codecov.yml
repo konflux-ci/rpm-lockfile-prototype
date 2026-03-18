@@ -1,0 +1,15 @@
+# https://docs.codecov.com/docs/codecov-yaml
+codecov:
+  require_ci_to_pass: yes
+
+coverage:
+  precision: 2
+  round: down
+
+flags:
+  unit-tests:
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default

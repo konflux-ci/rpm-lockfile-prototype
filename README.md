@@ -271,6 +271,18 @@ configuration.
 However, it is not safe to use the cache by two processes running at the same
 time.
 
+# Test coverage (Codecov)
+
+CI uploads Python coverage from Fedora 43 builds to [Codecov](https://codecov.io)
+(flag `unit-tests`). To reproduce locally (in a venv with system-site-packages, as above):
+
+```bash
+pip install pytest pytest-cov
+pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml
+```
+
+Maintainers: add the repo at [app.codecov.io](https://app.codecov.io) and ensure **GitHub OIDC** is enabled under the repo’s Codecov settings so uploads from GitHub Actions work without a token.
+
 
 # What does this do
 
