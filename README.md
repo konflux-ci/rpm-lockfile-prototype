@@ -281,8 +281,7 @@ pip install pytest pytest-cov
 pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml
 ```
 
-Maintainers: add the repo at [app.codecov.io](https://app.codecov.io) and ensure **GitHub OIDC** is enabled under the repo’s Codecov settings so uploads from GitHub Actions work without a token.
-
+Use **`pip install -e .`** in your checkout when generating coverage; a plain **`pip install .`** puts the package in `site-packages`, so pytest runs that copy while the report points at `./rpm_lockfile` and you get **0%** (no line hits).
 
 # What does this do
 
