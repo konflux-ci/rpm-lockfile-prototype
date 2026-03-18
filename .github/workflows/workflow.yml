@@ -31,7 +31,7 @@ jobs:
           echo 'FROM registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}'
           echo 'RUN dnf install -y python3-pip python3-dnf gcc'
           echo 'WORKDIR /src'
-          echo 'RUN python3 -m pip install . pytest pytest-cov'
+          echo 'RUN python3 -m pip install -e . pytest pytest-cov'
           echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'
         } > podmanfile
         podman build -v $(pwd):/src --tag test -f ./podmanfile
