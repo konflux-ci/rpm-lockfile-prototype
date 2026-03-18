@@ -10,6 +10,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -28,8 +31,17 @@ jobs:
           echo 'FROM registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}'
           echo 'RUN dnf install -y python3-pip python3-dnf gcc'
           echo 'WORKDIR /src'
-          echo 'RUN python3 -m pip install . pytest'
-          echo 'RUN pytest -v'
+          echo 'RUN python3 -m pip install . pytest pytest-cov'
+          echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'
         } > podmanfile
         podman build -v $(pwd):/src --tag test -f ./podmanfile
+    # One upload per workflow (matrix runs 5 Fedoras; avoid duplicate uploads)
+    - name: Upload coverage to Codecov
+      if: matrix.fedora-version == 43
+      uses: codecov/codecov-action@v5
+      with:
+        use_oidc: true
+        flags: unit-tests
+        files: coverage.xml
+        fail_ci_if_error: false
 
