@@ -537,7 +537,45 @@ def main():
             )
         )
 
-    # TODO maybe try extracting packages from Containerfile?
+    # Extract packages from Containerfile RUN commands when -f is used
+    containerfile_common_packages: set[str] = set()
+    containerfile_arch_packages: dict[str, set[str]] = {}
+    containerfile_upgrade_packages: set[str] = set()
+    containerfile_builddep_packages: set[str] = set()
+    containerfile_module_enable: set[str] = set()
+
+    containerfile = (
+        args.containerfile
+        or _get_containerfile_path(config_dir, context)
+    )
+    if containerfile:
+        try:
+            from .containerfile_packages import analyze_containerfile_stages
+        except ImportError:
+            logging.warning(
+                "bashlex and dockerfile-parse are required to extract packages "
+                "from Containerfile RUN commands. Install them with: "
+                "pip install bashlex dockerfile-parse"
+            )
+            analyze_containerfile_stages = None
+    if containerfile and analyze_containerfile_stages:
+        cf_path = Path(containerfile)
+        source_dir = cf_path.parent
+        stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
+        for stage in stages:
+            containerfile_common_packages.update(stage.packages)
+            for arch, pkgs in stage.arch_packages.items():
+                containerfile_arch_packages.setdefault(arch, set()).update(pkgs)
+            containerfile_upgrade_packages.update(stage.update_targets)
+            containerfile_builddep_packages.update(stage.builddep_packages)
+            containerfile_module_enable.update(stage.module_specs)
+        if containerfile_common_packages or containerfile_arch_packages:
+            logging.info(
+                "Extracted %d common and %d arch-specific packages from Containerfile",
+                len(containerfile_common_packages),
+                sum(len(v) for v in containerfile_arch_packages.values()),
+            )
+
     for arch in sorted(arches):
         packages = set()
         if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
@@ -548,6 +586,11 @@ def main():
             )
         elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
+
+        # Merge Containerfile-extracted packages
+        packages |= containerfile_common_packages
+        packages |= containerfile_arch_packages.get(arch, set())
+
         data["arches"].append(
             process_arch(
                 arch,
@@ -560,7 +603,7 @@ def main():
                 ),
                 module_enable=set(
                     filter_for_arch(arch, config.get("moduleEnable", []))
-                ),
+                ) | containerfile_module_enable,
                 module_disable=set(
                     filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
@@ -568,7 +611,7 @@ def main():
                 install_weak_deps=config.get("installWeakDeps"),
                 upgrade_packages=set(
                     filter_for_arch(arch, config.get("upgradePackages", []))
-                ),
+                ) | containerfile_upgrade_packages,
                 zchunk=config.get("zchunk"),
             )
         )
