@@ -7,11 +7,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from rpm_lockfile.containerfile_packages import (
+    StagePackages,
     analyze_containerfile_stages,
     build_copy_map,
     collect_stage_vars,
     extract_packages_from_file_installs,
     extract_packages_from_scripts,
+    select_stage,
 )
 
 
@@ -211,7 +213,11 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
             path = self._write_containerfile(tmpdir, content)
             stages = analyze_containerfile_stages(path)
             self.assertEqual(len(stages), 2)
+            self.assertEqual(stages[0].base_image, "builder")
+            self.assertEqual(stages[0].stage_name, "build")
             self.assertEqual(stages[0].packages, ["gcc", "git", "nmstate-devel"])
+            self.assertEqual(stages[1].base_image, "base-rhel9")
+            self.assertEqual(stages[1].stage_name, "")
             self.assertEqual(stages[1].packages, ["postgresql-server", "skopeo"])
 
     def test_shell_variable_expansion(self):
@@ -327,3 +333,55 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
             stages = analyze_containerfile_stages(path, source_dir=source_dir)
             self.assertFalse(stages[0].has_update)
             self.assertTrue(stages[1].has_update)
+
+
+class TestSelectStage(unittest.TestCase):
+    def _make_stages(self) -> list[StagePackages]:
+        return [
+            StagePackages(base_image="builder", stage_name="build", packages=["gcc", "make"]),
+            StagePackages(base_image="registry.redhat.io/ubi9/ubi:latest", stage_name="runtime", packages=["httpd"]),
+            StagePackages(base_image="base-rhel9", stage_name="", packages=["skopeo"]),
+        ]
+
+    def test_default_returns_last_stage(self):
+        stages = self._make_stages()
+        result = select_stage(stages)
+        self.assertEqual(result.packages, ["skopeo"])
+
+    def test_stage_num_selects_correct_stage(self):
+        stages = self._make_stages()
+        result = select_stage(stages, stage_num=1)
+        self.assertEqual(result.packages, ["gcc", "make"])
+        result = select_stage(stages, stage_num=2)
+        self.assertEqual(result.packages, ["httpd"])
+
+    def test_stage_num_out_of_range_returns_none(self):
+        stages = self._make_stages()
+        result = select_stage(stages, stage_num=5)
+        self.assertIsNone(result)
+
+    def test_stage_name_selects_correct_stage(self):
+        stages = self._make_stages()
+        result = select_stage(stages, stage_name="build")
+        self.assertEqual(result.packages, ["gcc", "make"])
+        result = select_stage(stages, stage_name="runtime")
+        self.assertEqual(result.packages, ["httpd"])
+
+    def test_stage_name_no_match_returns_none(self):
+        stages = self._make_stages()
+        result = select_stage(stages, stage_name="nonexistent")
+        self.assertIsNone(result)
+
+    def test_image_pattern_selects_correct_stage(self):
+        stages = self._make_stages()
+        result = select_stage(stages, image_pattern=r"ubi9")
+        self.assertEqual(result.packages, ["httpd"])
+
+    def test_image_pattern_no_match_returns_none(self):
+        stages = self._make_stages()
+        result = select_stage(stages, image_pattern=r"centos")
+        self.assertIsNone(result)
+
+    def test_empty_stages_returns_none(self):
+        result = select_stage([])
+        self.assertIsNone(result)

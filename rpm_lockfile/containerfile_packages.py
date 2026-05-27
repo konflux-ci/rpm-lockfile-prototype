@@ -34,6 +34,8 @@ class StagePackages:
     Analysis results for a single Containerfile stage.
     """
 
+    base_image: str = ""
+    stage_name: str = ""
     packages: list[str] = field(default_factory=list)
     has_update: bool = False
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
@@ -52,6 +54,8 @@ class StagePackages:
             existing.update(pkgs)
             merged_arch[arch] = sorted(existing)
         return StagePackages(
+            base_image=self.base_image or other.base_image,
+            stage_name=self.stage_name or other.stage_name,
             packages=sorted(set(self.packages + other.packages)),
             has_update=self.has_update or other.has_update,
             arch_packages=merged_arch,
@@ -494,14 +498,29 @@ def analyze_containerfile_stages(
     global_args = collect_stage_vars(pre_from_entries)
     stages: list[StagePackages] = []
 
+    from_re = re.compile(
+        r"^(--platform=\S+\s+)?(?P<img>\S+)(\s+[Aa][Ss]\s+(?P<name>\S+))?\s*$"
+    )
+
     for stage_entries in stage_entry_lists:
         stage_vars = collect_stage_vars(stage_entries, inherited_vars=global_args)
         run_values = [e["value"] for e in stage_entries if e["instruction"] == "RUN"]
+
+        base_image = ""
+        stage_name = ""
+        from_entries = [e for e in stage_entries if e["instruction"] == "FROM"]
+        if from_entries:
+            m = from_re.match(from_entries[0]["value"])
+            if m:
+                base_image = resolve_bash_expansion(m.group("img"), stage_vars)
+                stage_name = m.group("name") or ""
 
         common, arch_specific, update_targets, has_update, builddep, modules = analyze_run_commands(
             run_values, env_vars=stage_vars
         )
         stage = StagePackages(
+            base_image=base_image,
+            stage_name=stage_name,
             packages=common,
             has_update=has_update,
             arch_packages=arch_specific,
@@ -524,3 +543,45 @@ def analyze_containerfile_stages(
         stages.append(stage)
 
     return stages
+
+
+def select_stage(
+    stages: list[StagePackages],
+    stage_num: int | None = None,
+    stage_name: str | None = None,
+    image_pattern: str | None = None,
+) -> StagePackages | None:
+    """
+    Select a single stage from analysis results, using the same matching
+    logic as extract_image(): stage number (1-indexed), stage name (AS alias),
+    image pattern (regex on base image), or default to last stage.
+
+    Arg(s):
+        stages (list[StagePackages]): Per-stage analysis results.
+        stage_num (int | None): 1-indexed stage number to select.
+        stage_name (str | None): Stage alias (FROM ... AS name) to match.
+        image_pattern (str | None): Regex to match against base image.
+    Return Value(s):
+        StagePackages | None: Matching stage, or None if no match.
+    """
+    if not stages:
+        return None
+
+    if stage_num is not None:
+        if 1 <= stage_num <= len(stages):
+            return stages[stage_num - 1]
+        return None
+
+    if stage_name is not None:
+        for stage in stages:
+            if stage.stage_name == stage_name:
+                return stage
+        return None
+
+    if image_pattern is not None:
+        for stage in stages:
+            if re.search(image_pattern, stage.base_image):
+                return stage
+        return None
+
+    return stages[-1]

@@ -550,7 +550,7 @@ def main():
     )
     if containerfile:
         try:
-            from .containerfile_packages import analyze_containerfile_stages
+            from .containerfile_packages import analyze_containerfile_stages, select_stage
         except ImportError:
             logging.warning(
                 "bashlex and dockerfile-parse are required to extract packages "
@@ -562,13 +562,20 @@ def main():
         cf_path = Path(containerfile)
         source_dir = cf_path.parent
         stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
-        for stage in stages:
-            containerfile_common_packages.update(stage.packages)
-            for arch, pkgs in stage.arch_packages.items():
+        cf_filters = _get_containerfile_filters(context)
+        selected = select_stage(
+            stages,
+            stage_num=cf_filters.get("stage_num"),
+            stage_name=cf_filters.get("stage_name"),
+            image_pattern=cf_filters.get("image_pattern"),
+        )
+        if selected:
+            containerfile_common_packages.update(selected.packages)
+            for arch, pkgs in selected.arch_packages.items():
                 containerfile_arch_packages.setdefault(arch, set()).update(pkgs)
-            containerfile_upgrade_packages.update(stage.update_targets)
-            containerfile_builddep_packages.update(stage.builddep_packages)
-            containerfile_module_enable.update(stage.module_specs)
+            containerfile_upgrade_packages.update(selected.update_targets)
+            containerfile_builddep_packages.update(selected.builddep_packages)
+            containerfile_module_enable.update(selected.module_specs)
         if containerfile_common_packages or containerfile_arch_packages:
             logging.info(
                 "Extracted %d common and %d arch-specific packages from Containerfile",
