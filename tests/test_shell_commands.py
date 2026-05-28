@@ -159,6 +159,25 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         self.assertNotIn("realtime-tests", common)
         self.assertEqual(arch.get("x86_64"), ["realtime-tests"])
 
+    def test_glob_package_pattern_with_resolved_var(self):
+        """
+        Glob patterns like golang-*$VERSION* should be included after
+        variable resolution (e.g. golang-*1.26*). DNF supports globs.
+        """
+        run_values = ['dnf install -y "golang-*$VERSION*"']
+        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={"VERSION": "1.26"})
+        self.assertIn("golang-*1.26*", common)
+        self.assertEqual(arch, {})
+
+    def test_glob_package_pattern_without_var(self):
+        """
+        Bare glob patterns like python3* should also be included.
+        """
+        run_values = ["dnf install -y python3*"]
+        common, arch, _, _, _, _ = analyze_run_commands(run_values)
+        self.assertIn("python3*", common)
+        self.assertEqual(arch, {})
+
     def test_double_bracket_conditional_with_quoted_var_install(self):
         run_values = [
             'if [[ "$ARCH" == "x86_64" ]]; then '

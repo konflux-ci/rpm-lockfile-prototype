@@ -114,11 +114,12 @@ def _preprocess_for_bashlex(text: str) -> str:
 
 def _is_valid_package_token(token: str) -> bool:
     """
-    Return True if token looks like a package name or file path provide.
+    Return True if token looks like a package name, file path provide,
+    or glob pattern (e.g. golang-*1.23*).
     """
     if not token or token.startswith("-") or token.endswith("-"):
         return False
-    if "$" in token or "*" in token:
+    if "$" in token:
         return False
     if token in (">=", "<=", "==", ">", "<", "!="):
         return False

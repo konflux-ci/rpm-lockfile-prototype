@@ -172,7 +172,7 @@ def _read_packages_from_file(source_file: Path) -> list[str]:
         if not line or line.startswith("#"):
             continue
         pkg_name = line.split()[0]
-        if not pkg_name.startswith("-") and "*" not in pkg_name:
+        if not pkg_name.startswith("-"):
             packages.append(pkg_name)
     return packages
 
