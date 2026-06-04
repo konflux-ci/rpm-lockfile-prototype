@@ -27,6 +27,12 @@ import yaml
 
 from . import containers, content_origin, schema, utils
 
+try:
+    from .containerfile_packages import analyze_containerfile_stages, select_stage
+except ImportError:
+    analyze_containerfile_stages = None
+    select_stage = None
+
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
 them available during dependency resolution.
@@ -458,6 +464,50 @@ def logging_setup(debug=False):
     )
 
 
+def _extract_containerfile_packages(
+    containerfile: str,
+    context: dict,
+) -> tuple[set[str], dict[str, set[str]], set[str], set[str], set[str]]:
+    """
+    Extract RPM package names from Containerfile RUN commands.
+
+    Parses the Containerfile to find dnf/yum/microdnf install invocations
+    and returns the discovered packages grouped by type.
+
+    Arg(s):
+        containerfile (str): Path to the Containerfile.
+        context (dict): Configuration context with optional stage filters.
+    Return Value(s):
+        tuple: (common_packages, arch_packages, upgrade_packages,
+                builddep_packages, module_enable) — all empty on failure.
+    """
+    common_packages: set[str] = set()
+    arch_packages: dict[str, set[str]] = {}
+    upgrade_packages: set[str] = set()
+    builddep_packages: set[str] = set()
+    module_enable: set[str] = set()
+
+    cf_path = Path(containerfile)
+    source_dir = cf_path.parent
+    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
+    selected = select_stage(stages, **_get_containerfile_filters(context))
+    if selected:
+        common_packages.update(selected.packages)
+        for arch, pkgs in selected.arch_packages.items():
+            arch_packages.setdefault(arch, set()).update(pkgs)
+        upgrade_packages.update(selected.update_targets)
+        builddep_packages.update(selected.builddep_packages)
+        module_enable.update(selected.module_specs)
+    if common_packages or arch_packages:
+        logging.info(
+            "Extracted %d common and %d arch-specific packages from Containerfile",
+            len(common_packages),
+            sum(len(v) for v in arch_packages.values()),
+        )
+
+    return common_packages, arch_packages, upgrade_packages, builddep_packages, module_enable
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -548,39 +598,21 @@ def main():
         args.containerfile
         or _get_containerfile_path(config_dir, context)
     )
-    if containerfile:
+    if containerfile and analyze_containerfile_stages is not None:
         try:
-            from .containerfile_packages import analyze_containerfile_stages, select_stage
-        except ImportError:
+            (
+                containerfile_common_packages,
+                containerfile_arch_packages,
+                containerfile_upgrade_packages,
+                containerfile_builddep_packages,
+                containerfile_module_enable,
+            ) = _extract_containerfile_packages(containerfile, context)
+        except Exception:
             logging.warning(
-                "bashlex and dockerfile-parse are required to extract packages "
-                "from Containerfile RUN commands. Install them with: "
-                "pip install bashlex dockerfile-parse"
-            )
-            analyze_containerfile_stages = None
-    if containerfile and analyze_containerfile_stages:
-        cf_path = Path(containerfile)
-        source_dir = cf_path.parent
-        stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
-        cf_filters = _get_containerfile_filters(context)
-        selected = select_stage(
-            stages,
-            stage_num=cf_filters.get("stage_num"),
-            stage_name=cf_filters.get("stage_name"),
-            image_pattern=cf_filters.get("image_pattern"),
-        )
-        if selected:
-            containerfile_common_packages.update(selected.packages)
-            for arch, pkgs in selected.arch_packages.items():
-                containerfile_arch_packages.setdefault(arch, set()).update(pkgs)
-            containerfile_upgrade_packages.update(selected.update_targets)
-            containerfile_builddep_packages.update(selected.builddep_packages)
-            containerfile_module_enable.update(selected.module_specs)
-        if containerfile_common_packages or containerfile_arch_packages:
-            logging.info(
-                "Extracted %d common and %d arch-specific packages from Containerfile",
-                len(containerfile_common_packages),
-                sum(len(v) for v in containerfile_arch_packages.values()),
+                "Failed to extract packages from Containerfile %s; "
+                "falling back to explicitly listed packages only.",
+                containerfile,
+                exc_info=True,
             )
 
     for arch in sorted(arches):

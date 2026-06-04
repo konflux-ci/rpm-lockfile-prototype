@@ -70,82 +70,82 @@ class TestResolveBashExpansion(unittest.TestCase):
 class TestAnalyzeRunCommands(unittest.TestCase):
     def test_resolves_arg_in_packages(self):
         run_values = ["dnf install -y gcc-${GCC_VERSION} gcc-c++-${GCC_VERSION}"]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={"GCC_VERSION": "12"})
-        self.assertEqual(common, ["gcc-12", "gcc-c++-12"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values, env_vars={"GCC_VERSION": "12"})
+        self.assertEqual(result.packages, ["gcc-12", "gcc-c++-12"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_kernel_devel_conditional_with_version(self):
         run_values = [
             "dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
             " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={"KERNEL_VERSION": "5.14.0"})
-        self.assertEqual(common, ["kernel-devel-5.14.0", "kernel-headers-5.14.0"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values, env_vars={"KERNEL_VERSION": "5.14.0"})
+        self.assertEqual(result.packages, ["kernel-devel-5.14.0", "kernel-headers-5.14.0"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_kernel_devel_conditional_without_version(self):
         run_values = [
             "dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
             " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={})
-        self.assertEqual(common, ["kernel-devel", "kernel-headers"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values, env_vars={})
+        self.assertEqual(result.packages, ["kernel-devel", "kernel-headers"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_unresolved_var_skipped(self):
         run_values = ["dnf install -y gcc-${UNKNOWN} make"]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={})
-        self.assertEqual(common, ["make"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values, env_vars={})
+        self.assertEqual(result.packages, ["make"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_no_env_vars_backward_compatible(self):
         run_values = ['INSTALL_PKGS="wget tar" && dnf install -y ${INSTALL_PKGS} git']
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, ["git", "tar", "wget"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["git", "tar", "wget"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_arch_conditional_x86_64(self):
         run_values = [
             "dnf install -y make && if [ $(arch) = x86_64 ]; then dnf -y install kernel-rt-devel kernel-rt-modules; fi"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, ["make"])
-        self.assertEqual(arch, {"x86_64": ["kernel-rt-devel", "kernel-rt-modules"]})
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["make"])
+        self.assertEqual(result.arch_packages, {"x86_64": ["kernel-rt-devel", "kernel-rt-modules"]})
 
     def test_fallback_install_after_or(self):
         run_values = ["dnf -y install gcc-${GCC_VERSION} gcc-c++-${GCC_VERSION} || dnf -y install gcc gcc-c++"]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, ["gcc", "gcc-c++"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["gcc", "gcc-c++"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_if_not_yum_install(self):
         run_values = [
             "if ! yum install -y prometheus-promu; then curl -s -L https://example.com/promu.tar.gz | tar -xzvf -; fi"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, ["prometheus-promu"])
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["prometheus-promu"])
+        self.assertEqual(result.arch_packages, {})
 
     def test_subshell_arch_conditional_var(self):
         run_values = [
             'ARCH_DEP_PKGS=$(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint ; fi) && '
             "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertIn("mstflint", common)
-        self.assertIn("pciutils", common)
-        self.assertIn("hwdata", common)
-        self.assertIn("kmod", common)
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values)
+        self.assertIn("mstflint", result.packages)
+        self.assertIn("pciutils", result.packages)
+        self.assertIn("hwdata", result.packages)
+        self.assertIn("kmod", result.packages)
+        self.assertEqual(result.arch_packages, {})
 
     def test_arch_conditional_multiple_arches(self):
         run_values = [
             "if [ $(arch) = x86_64 ]; then dnf -y install kernel-rt-devel; fi && "
             "if [ $(arch) = aarch64 ]; then dnf -y install kernel-64k-devel; fi"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, [])
-        self.assertEqual(arch, {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]})
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, [])
+        self.assertEqual(result.arch_packages, {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]})
 
     def test_hosttype_arch_conditional(self):
         run_values = [
@@ -153,11 +153,11 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             "if [ $HOSTTYPE = x86_64 ]; then PACKAGES=\"$PACKAGES realtime-tests\"; fi && "
             "yum install -y $PACKAGES"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertIn("git", common)
-        self.assertIn("gzip", common)
-        self.assertNotIn("realtime-tests", common)
-        self.assertEqual(arch.get("x86_64"), ["realtime-tests"])
+        result = analyze_run_commands(run_values)
+        self.assertIn("git", result.packages)
+        self.assertIn("gzip", result.packages)
+        self.assertNotIn("realtime-tests", result.packages)
+        self.assertEqual(result.arch_packages.get("x86_64"), ["realtime-tests"])
 
     def test_glob_package_pattern_with_resolved_var(self):
         """
@@ -165,18 +165,18 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         variable resolution (e.g. golang-*1.26*). DNF supports globs.
         """
         run_values = ['dnf install -y "golang-*$VERSION*"']
-        common, arch, _, _, _, _ = analyze_run_commands(run_values, env_vars={"VERSION": "1.26"})
-        self.assertIn("golang-*1.26*", common)
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values, env_vars={"VERSION": "1.26"})
+        self.assertIn("golang-*1.26*", result.packages)
+        self.assertEqual(result.arch_packages, {})
 
     def test_glob_package_pattern_without_var(self):
         """
         Bare glob patterns like python3* should also be included.
         """
         run_values = ["dnf install -y python3*"]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertIn("python3*", common)
-        self.assertEqual(arch, {})
+        result = analyze_run_commands(run_values)
+        self.assertIn("python3*", result.packages)
+        self.assertEqual(result.arch_packages, {})
 
     def test_double_bracket_conditional_with_quoted_var_install(self):
         run_values = [
@@ -187,18 +187,18 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             "fi && "
             'dnf install -y "$GRUB_PKG" "$SHIM_PKG"'
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, [])
-        self.assertEqual(arch.get("x86_64"), ["grub2-efi-x64", "shim-x64"])
-        self.assertEqual(arch.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, [])
+        self.assertEqual(result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"])
+        self.assertEqual(result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"])
 
     def test_version_constraints_stripped(self):
         run_values = ["dnf install -y 'python3.12-setuptools >= 70.3.0' python3.12-pip"]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertIn("python3.12-setuptools", common)
-        self.assertIn("python3.12-pip", common)
-        self.assertNotIn(">=", common)
-        self.assertNotIn("70.3.0", common)
+        result = analyze_run_commands(run_values)
+        self.assertIn("python3.12-setuptools", result.packages)
+        self.assertIn("python3.12-pip", result.packages)
+        self.assertNotIn(">=", result.packages)
+        self.assertNotIn("70.3.0", result.packages)
 
     def test_file_path_package_specs_are_included(self):
         run_values = [
@@ -206,10 +206,10 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             "e2fsprogs xfsprogs util-linux nvme-cli "
             "/usr/lib/udev/scsi_id /usr/bin/xxd"
         ]
-        common, arch, _, _, _, _ = analyze_run_commands(run_values)
-        self.assertIn("e2fsprogs", common)
-        self.assertIn("/usr/lib/udev/scsi_id", common)
-        self.assertIn("/usr/bin/xxd", common)
+        result = analyze_run_commands(run_values)
+        self.assertIn("e2fsprogs", result.packages)
+        self.assertIn("/usr/lib/udev/scsi_id", result.packages)
+        self.assertIn("/usr/bin/xxd", result.packages)
 
 
 @pytest.mark.parametrize(
@@ -238,34 +238,34 @@ def test_arch_value_regex_no_match():
 class TestBuilddepParsing(unittest.TestCase):
     def test_simple_builddep(self):
         run_values = ["dnf builddep -y pkcs11-helper*"]
-        _, _, _, _, builddep, _ = analyze_run_commands(run_values)
-        self.assertEqual(builddep, ["pkcs11-helper*"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.builddep_packages, ["pkcs11-helper*"])
 
     def test_builddep_with_flags(self):
         run_values = ["dnf builddep -y --skip-broken --nobest openvpn*"]
-        _, _, _, _, builddep, _ = analyze_run_commands(run_values)
-        self.assertEqual(builddep, ["openvpn*"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.builddep_packages, ["openvpn*"])
 
     def test_builddep_does_not_interfere_with_install(self):
         run_values = ["dnf install -y gcc make && dnf builddep -y pkcs11-helper*"]
-        common, arch, _, _, builddep, _ = analyze_run_commands(run_values)
-        self.assertEqual(common, ["gcc", "make"])
-        self.assertEqual(arch, {})
-        self.assertEqual(builddep, ["pkcs11-helper*"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["gcc", "make"])
+        self.assertEqual(result.arch_packages, {})
+        self.assertEqual(result.builddep_packages, ["pkcs11-helper*"])
 
 
 class TestModuleParsing(unittest.TestCase):
     def test_module_install(self):
         run_values = ["dnf module install -y nodejs:18/development"]
-        _, _, _, _, _, modules = analyze_run_commands(run_values)
-        self.assertEqual(modules, ["nodejs:18/development"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.module_specs, ["nodejs:18/development"])
 
     def test_module_enable(self):
         run_values = ["dnf module enable -y nodejs:18"]
-        _, _, _, _, _, modules = analyze_run_commands(run_values)
-        self.assertEqual(modules, ["nodejs:18"])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.module_specs, ["nodejs:18"])
 
     def test_module_without_stream_ignored(self):
         run_values = ["dnf module enable -y nodejs"]
-        _, _, _, _, _, modules = analyze_run_commands(run_values)
-        self.assertEqual(modules, [])
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.module_specs, [])

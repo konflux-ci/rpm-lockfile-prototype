@@ -10,7 +10,7 @@ commands.
 import logging
 import re
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 try:
@@ -152,11 +152,13 @@ def build_copy_map(
         sources = non_flag_parts[:-1]
         dest = non_flag_parts[-1]
         for src in sources:
-            src_name = Path(src).name
-            dir_dest = dest.rstrip("/") + "/" + src_name
-            copy_map[dir_dest] = src
-            if not dest.endswith("/"):
-                copy_map[dest] = src
+            # Map as directory destination (COPY foo.sh /tmp/ → /tmp/foo.sh)
+            copy_map[dest.rstrip("/") + "/" + Path(src).name] = src
+        if len(sources) == 1 and not dest.endswith("/"):
+            # Also map as file rename (COPY foo.sh /opt/bar.sh → /opt/bar.sh).
+            # Without container filesystem context we can't distinguish
+            # file renames from directory copies, so we keep both mappings.
+            copy_map[dest] = sources[0]
     return copy_map
 
 
@@ -413,16 +415,14 @@ def extract_packages_from_scripts(
                     joined_lines.append(stripped)
             script_body = "\n".join(line for line in joined_lines if line.strip())
 
-            pkgs, script_arch_pkgs, updates, has_update, script_builddep, script_modules = analyze_run_commands(
-                [script_body]
-            )
-            all_packages.update(pkgs)
-            for arch, arch_pkgs in script_arch_pkgs.items():
+            result = analyze_run_commands([script_body])
+            all_packages.update(result.packages)
+            for arch, arch_pkgs in result.arch_packages.items():
                 all_arch_packages.setdefault(arch, set()).update(arch_pkgs)
-            all_updates.update(updates)
-            all_builddep.update(script_builddep)
-            all_modules.update(script_modules)
-            if has_update:
+            all_updates.update(result.update_targets)
+            all_builddep.update(result.builddep_packages)
+            all_modules.update(result.module_specs)
+            if result.has_update:
                 scripts_have_bare_update = True
 
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
@@ -515,18 +515,11 @@ def analyze_containerfile_stages(
                 base_image = resolve_bash_expansion(m.group("img"), stage_vars)
                 stage_name = m.group("name") or ""
 
-        common, arch_specific, update_targets, has_update, builddep, modules = analyze_run_commands(
-            run_values, env_vars=stage_vars
-        )
+        result = analyze_run_commands(run_values, env_vars=stage_vars)
         stage = StagePackages(
             base_image=base_image,
             stage_name=stage_name,
-            packages=common,
-            has_update=has_update,
-            arch_packages=arch_specific,
-            update_targets=update_targets,
-            builddep_packages=builddep,
-            module_specs=modules,
+            **asdict(result),
         )
 
         copy_map = build_copy_map(stage_entries, env_vars=stage_vars)

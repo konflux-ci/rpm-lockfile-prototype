@@ -64,6 +64,7 @@ class TestBuildCopyMap(unittest.TestCase):
         entries = [_make_entry("COPY", "hack/foo.sh /tmp")]
         result = build_copy_map(entries)
         self.assertEqual(result["/tmp/foo.sh"], "hack/foo.sh")
+        self.assertEqual(result["/tmp"], "hack/foo.sh")
 
     def test_copy_file_to_directory_with_trailing_slash(self):
         entries = [_make_entry("COPY", "hack/foo.sh /tmp/")]
@@ -79,6 +80,14 @@ class TestBuildCopyMap(unittest.TestCase):
         entries = [_make_entry("COPY", "--chown=root:root hack/foo.sh /tmp/")]
         result = build_copy_map(entries)
         self.assertEqual(result["/tmp/foo.sh"], "hack/foo.sh")
+
+    def test_copy_file_rename(self):
+        # Both directory-style and rename-style entries are kept since
+        # we can't distinguish without container filesystem context
+        entries = [_make_entry("COPY", "foo.sh /opt/bar.sh")]
+        result = build_copy_map(entries)
+        self.assertEqual(result["/opt/bar.sh"], "foo.sh")
+        self.assertEqual(result["/opt/bar.sh/foo.sh"], "foo.sh")
 
 
 class TestExtractPackagesFromFileInstalls(unittest.TestCase):

@@ -45,6 +45,20 @@ _RE_PLAIN_VAR = re.compile(r"\$(\w+)")  # $VAR
 
 
 @dataclass
+class RunCommandResult:
+    """
+    Aggregated result from analyzing RUN command bodies.
+    """
+
+    packages: list[str] = field(default_factory=list)
+    arch_packages: dict[str, list[str]] = field(default_factory=dict)
+    update_targets: list[str] = field(default_factory=list)
+    has_update: bool = False
+    builddep_packages: list[str] = field(default_factory=list)
+    module_specs: list[str] = field(default_factory=list)
+
+
+@dataclass
 class _WalkContext:
     """
     Mutable state accumulated during bashlex AST walking.
@@ -125,19 +139,6 @@ def _is_valid_package_token(token: str) -> bool:
         return False
     return True
 
-
-def _is_valid_builddep_token(token: str) -> bool:
-    """
-    Return True if token looks like a builddep argument (package name or glob).
-    Allows glob wildcards (*) unlike _is_valid_package_token.
-    """
-    if not token or token.startswith("-") or token.endswith("-"):
-        return False
-    if "$" in token:
-        return False
-    if token in (">=", "<=", "==", ">", "<", "!="):
-        return False
-    return True
 
 
 def _extract_condition_arch(node) -> list[str]:
@@ -385,12 +386,12 @@ def _classify_package_tokens(
         token = re.split(r"\s+(?:>=|<=|==|!=|>|<)\s+", token)[0].strip()
 
         if action == "builddep":
-            if _is_valid_builddep_token(token):
+            if _is_valid_package_token(token):
                 ctx.builddep_packages.add(token)
             continue
 
         if action == "module":
-            if _is_valid_builddep_token(token) and ":" in token:
+            if _is_valid_package_token(token) and ":" in token:
                 ctx.module_specs.add(token)
             continue
 
@@ -451,7 +452,7 @@ def _process_command_node(
         for sub in resolved.split():
             resolved_tokens.append(sub)
 
-    arch_resolved_tokens = set[str]()
+    arch_resolved_tokens: set[str] = set()
     if not arch_context:
         arch_resolved_tokens = _resolve_arch_specific_tokens(pkg_words, raw_args, all_vars, ctx)
 
@@ -477,7 +478,7 @@ def _extract_subshell_packages(subshell_body: str) -> str:
 def _parse_and_walk(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
-) -> tuple[set[str], dict[str, set[str]], set[str], bool, set[str], set[str]]:
+) -> _WalkContext:
     """
     Single pass: preprocess, parse with bashlex, and walk all RUN bodies.
 
@@ -485,13 +486,7 @@ def _parse_and_walk(
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
     Return Value(s):
-        tuple[set[str], dict[str, set[str]], set[str], bool, set[str], set[str]]:
-            - Install packages (common to all arches).
-            - Arch-specific install packages.
-            - Update target packages.
-            - Whether any update command was found.
-            - Builddep package patterns.
-            - Module specs (e.g., nodejs:18, nodejs:18/development).
+        _WalkContext: Walk context with accumulated packages and state.
     """
     if bashlex is None:
         raise ImportError(
@@ -513,39 +508,29 @@ def _parse_and_walk(
         ctx.arch_shell_vars = {}
         _walk_nodes(ast_nodes, ctx)
 
-    return ctx.packages, ctx.arch_packages, ctx.update_targets, ctx.has_update, ctx.builddep_packages, ctx.module_specs
+    return ctx
 
 
 def analyze_run_commands(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
-) -> tuple[list[str], dict[str, list[str]], list[str], bool, list[str], list[str]]:
+) -> RunCommandResult:
     """
-    Single-pass analysis of RUN command bodies. Returns all install
-    packages, arch-specific packages, update targets, update flag,
-    builddep package patterns, and module specs.
+    Single-pass analysis of RUN command bodies.
 
     Arg(s):
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
     Return Value(s):
-        tuple[list[str], dict[str, list[str]], list[str], bool, list[str], list[str]]:
-            - Sorted common package names.
-            - Dict mapping arch to sorted package names.
-            - Sorted update target package names.
-            - Whether any update command was found.
-            - Sorted builddep package patterns.
-            - Sorted module specs.
+        RunCommandResult: Sorted packages, arch-specific packages,
+            update targets, builddep patterns, and module specs.
     """
-    packages, arch_packages, update_targets, found_update, builddep_packages, module_specs = _parse_and_walk(
-        run_values, env_vars
-    )
-    arch_result = {arch: sorted(pkgs) for arch, pkgs in sorted(arch_packages.items())}
-    return (
-        sorted(packages),
-        arch_result,
-        sorted(update_targets),
-        found_update,
-        sorted(builddep_packages),
-        sorted(module_specs),
+    ctx = _parse_and_walk(run_values, env_vars)
+    return RunCommandResult(
+        packages=sorted(ctx.packages),
+        arch_packages={arch: sorted(pkgs) for arch, pkgs in sorted(ctx.arch_packages.items())},
+        update_targets=sorted(ctx.update_targets),
+        has_update=ctx.has_update,
+        builddep_packages=sorted(ctx.builddep_packages),
+        module_specs=sorted(ctx.module_specs),
     )
