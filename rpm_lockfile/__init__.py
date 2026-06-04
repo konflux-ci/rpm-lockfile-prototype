@@ -27,11 +27,7 @@ import yaml
 
 from . import containers, content_origin, schema, utils
 
-try:
-    from .containerfile_packages import analyze_containerfile_stages, select_stage
-except ImportError:
-    analyze_containerfile_stages = None
-    select_stage = None
+from .containerfile_packages import analyze_containerfile_stages, select_stage
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -598,7 +594,7 @@ def main():
         args.containerfile
         or _get_containerfile_path(config_dir, context)
     )
-    if containerfile and analyze_containerfile_stages is not None:
+    if containerfile:
         try:
             (
                 containerfile_common_packages,

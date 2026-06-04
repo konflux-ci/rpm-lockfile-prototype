@@ -13,10 +13,7 @@ import shlex
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-try:
-    from dockerfile_parse import DockerfileParser
-except ImportError:
-    DockerfileParser = None
+from dockerfile_parse import DockerfileParser
 
 from .shell_commands import (
     ARCH_SUBSHELL_KEYWORDS,
@@ -468,11 +465,6 @@ def analyze_containerfile_stages(
     Return Value(s):
         list[StagePackages]: Per-stage package analysis.
     """
-    if DockerfileParser is None:
-        raise ImportError(
-            "dockerfile-parse and bashlex are required for Containerfile parsing. "
-            "Install them with: pip install bashlex dockerfile-parse"
-        )
     dfp = DockerfileParser(str(containerfile_path))
     entries = dfp.structure
 

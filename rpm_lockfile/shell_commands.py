@@ -11,10 +11,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-try:
-    import bashlex
-except ImportError:
-    bashlex = None
+from rpm_lockfile.vendor import bashlex
 
 
 # Shell subshell expressions that evaluate to the current architecture
@@ -488,11 +485,6 @@ def _parse_and_walk(
     Return Value(s):
         _WalkContext: Walk context with accumulated packages and state.
     """
-    if bashlex is None:
-        raise ImportError(
-            "bashlex is required for shell command parsing. "
-            "Install it with: pip install bashlex"
-        )
     logger = logging.getLogger(__name__)
     ctx = _WalkContext(variables=dict(env_vars or {}))
 

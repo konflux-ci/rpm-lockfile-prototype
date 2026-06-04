@@ -7,6 +7,7 @@ authors = [
 ]
 readme = "README.md"
 dependencies = [
+    "dockerfile-parse",
     "jsonschema",
     "productmd",
     "pyyaml",
@@ -16,14 +17,8 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
 ]
 
-[project.optional-dependencies]
-containerfile = [
-    "bashlex",
-    "dockerfile-parse",
-]
-
 [tool.setuptools]
-packages = ['rpm_lockfile', 'rpm_lockfile.content_origin']
+packages = ['rpm_lockfile', 'rpm_lockfile.content_origin', 'rpm_lockfile.vendor', 'rpm_lockfile.vendor.bashlex']
 
 [project.scripts]
 rpm-lockfile-prototype = "rpm_lockfile:main"
