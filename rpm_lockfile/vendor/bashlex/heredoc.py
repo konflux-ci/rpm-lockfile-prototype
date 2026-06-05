@@ -1,4 +1,4 @@
-from bashlex import ast, errors
+from . import ast, errors
 
 def gatherheredocuments(tokenizer):
     # if we're at the end of the input and we're not strict, allow skipping

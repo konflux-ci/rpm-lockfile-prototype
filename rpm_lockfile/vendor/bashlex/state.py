@@ -1,3 +1,3 @@
-from bashlex import flags, utils
+from . import flags, utils
 
 parserstate = lambda: utils.typedset(flags.parser)

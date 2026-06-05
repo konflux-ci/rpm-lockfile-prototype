@@ -246,7 +246,7 @@ def extract_packages_from_file_installs(
     arch_list = arches or DEFAULT_ARCHES
     redirect_re = re.compile(
         r"""
-        (?:xargs\s+\S+\s+)?        # optional xargs with flags
+        (?:xargs\s+(?:\S+\s+)*)?    # optional xargs with optional flags
         (?:dnf|yum)\s+              # package manager
         .*?\b(?:install)\b          # install subcommand
         .*?<\s*(\S+)               # stdin redirect: < /path/to/file
@@ -258,7 +258,7 @@ def extract_packages_from_file_installs(
         (?:grep|cat)\s+             # grep or cat command
         .*?(\S+)                    # file path argument (captured)
         \s*\|\s*                    # pipe
-        (?:xargs\s+\S+\s+)?        # optional xargs with flags
+        (?:xargs\s+(?:\S+\s+)*)?    # optional xargs with optional flags
         (?:dnf|yum)\s+              # package manager
         .*?\b(?:install)\b          # install subcommand
         """,

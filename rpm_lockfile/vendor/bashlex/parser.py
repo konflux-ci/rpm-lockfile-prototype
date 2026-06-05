@@ -1,6 +1,6 @@
 import os, copy
 
-from bashlex import yacc, tokenizer, state, ast, subst, flags, errors, heredoc
+from . import yacc, tokenizer, state, ast, subst, flags, errors, heredoc
 
 def _partsspan(parts):
     return parts[0].pos[0], parts[-1].pos[1]

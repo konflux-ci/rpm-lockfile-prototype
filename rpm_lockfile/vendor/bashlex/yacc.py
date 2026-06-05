@@ -87,7 +87,7 @@ MAXINT = sys.maxsize
 # information, they can create their own logging object and pass
 # it into PLY.
 
-from bashlex import utils
+from . import utils
 
 class PlyLogger(object):
     def __init__(self, f):
