@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0] - 2026-06-08
+
+### Added
+
+- Common patterns for installing packages in Containerfiles are now recognized,
+  with users no longer needing to fully duplicate the list of needed packages
+  in the input file.
+
+### Fixed
+
+- Correctly detect rpmdb on bootc images.
+
+
 ## [0.21.0] - 2026-02-16
 
 ### Fixed
