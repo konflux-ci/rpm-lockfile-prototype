@@ -9,9 +9,11 @@ commands.
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 import shlex
+import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -571,6 +573,84 @@ def analyze_containerfile_stages(
         stages.append(stage)
 
     return stages
+
+
+def resolve_builddep_packages(
+    builddep_patterns: list[str],
+    source_dir: Path,
+) -> set[str]:
+    """
+    Resolve dnf builddep glob patterns to concrete BuildRequires by
+    finding matching SRPMs/spec files in source_dir and extracting
+    their dependencies via rpm -qpR (SRPMs) or rpmspec (spec files).
+
+    Arg(s):
+        builddep_patterns (list[str]): Glob patterns from dnf builddep
+            commands (e.g., ["pkcs11-helper*", "openvpn*"]).
+        source_dir (Path): Directory containing SRPMs or spec files.
+    Return Value(s):
+        set[str]: Deduplicated package names from BuildRequires.
+    """
+    resolved: set[str] = set()
+
+    for pattern in builddep_patterns:
+        srpm_pattern = pattern if pattern.endswith(".src.rpm") else f"{pattern}.src.rpm"
+        matching = [
+            f
+            for f in source_dir.iterdir()
+            if f.is_file()
+            and f.name.endswith(".src.rpm")
+            and fnmatch.fnmatch(f.name, srpm_pattern)
+        ]
+
+        if not matching:
+            matching = [
+                f
+                for f in source_dir.iterdir()
+                if f.is_file()
+                and f.name.endswith(".spec")
+                and fnmatch.fnmatch(f.name, pattern)
+            ]
+
+        if not matching:
+            logging.warning(
+                "No SRPM or spec file matching '%s' found in %s, "
+                "builddep packages will not be included in lockfile",
+                pattern,
+                source_dir,
+            )
+            continue
+
+        for path in matching:
+            logging.info("Extracting BuildRequires from %s", path.name)
+            if path.name.endswith(".spec"):
+                cmd = ["rpmspec", "-q", "--buildrequires", str(path)]
+            else:
+                cmd = ["rpm", "-qpR", str(path)]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    logging.warning("%s failed: %s", " ".join(cmd), result.stderr)
+                    continue
+                for line in result.stdout.strip().splitlines():
+                    req = line.strip().split()[0] if line.strip() else ""
+                    if req and not req.startswith("/") and "(" not in req:
+                        resolved.add(req)
+            except Exception as exc:
+                logging.warning(
+                    "Failed to extract BuildRequires from %s: %s", path.name, exc
+                )
+
+    if resolved:
+        logging.info(
+            "Resolved %d builddep packages: %s", len(resolved), sorted(resolved)
+        )
+    return resolved
 
 
 def select_stage(
