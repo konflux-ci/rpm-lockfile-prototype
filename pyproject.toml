@@ -1,12 +1,13 @@
 [project]
 name = "rpm-lockfile-prototype"
-version = "0.21.0"
+version = "0.22.0"
 description = ""
 authors = [
     {name = "Lubomír Sedlář", email = "lsedlar@redhat.com"},
 ]
 readme = "README.md"
 dependencies = [
+    "dockerfile-parse",
     "jsonschema",
     "productmd",
     "pyyaml",
@@ -17,7 +18,7 @@ classifiers = [
 ]
 
 [tool.setuptools]
-packages = ['rpm_lockfile', 'rpm_lockfile.content_origin']
+packages = ['rpm_lockfile', 'rpm_lockfile.content_origin', 'rpm_lockfile.vendor', 'rpm_lockfile.vendor.bashlex']
 
 [project.scripts]
 rpm-lockfile-prototype = "rpm_lockfile:main"

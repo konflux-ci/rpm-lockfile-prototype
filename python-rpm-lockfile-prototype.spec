@@ -55,6 +55,10 @@ Summary: RPM lockfile generator
 %python3_sitelib/rpm_lockfile/__pycache__/*.pyc
 %python3_sitelib/rpm_lockfile/content_origin/*.py
 %python3_sitelib/rpm_lockfile/content_origin/__pycache__/*.pyc
+%python3_sitelib/rpm_lockfile/vendor/__init__.py
+%python3_sitelib/rpm_lockfile/vendor/__pycache__/__init__.*.pyc
+%python3_sitelib/rpm_lockfile/vendor/bashlex/*.py
+%python3_sitelib/rpm_lockfile/vendor/bashlex/__pycache__/*.pyc
 %python3_sitelib/rpm_lockfile_prototype-*dist-info
 
 

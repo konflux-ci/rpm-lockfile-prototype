@@ -8,8 +8,8 @@ import platform
 import shutil
 import sys
 import tempfile
-from pathlib import Path
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 try:
     import dnf
@@ -20,12 +20,13 @@ except ImportError:
         "Python bindings for DNF are missing.",
         "Please install python3-dnf (or equivalent) with system package manager.",
         sep="\n",
-        file=sys.stderr
+        file=sys.stderr,
     )
     sys.exit(127)
 import yaml
 
 from . import containers, content_origin, schema, utils
+from .containerfile_packages import analyze_containerfile_stages, select_stage
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -168,7 +169,7 @@ def resolver(
                         repo.repoid, conf.substitutions
                     ),
                     conf,
-                    **repo.kwargs
+                    **repo.kwargs,
                 )
             base.fill_sack(load_system_repo=True)
 
@@ -358,7 +359,11 @@ def read_packages_from_treefile(arch, treefile):
         data = yaml.safe_load(f)
 
         include_raw_value = data.get("include", [])
-        treefiles_to_include = [include_raw_value] if isinstance(include_raw_value, str) else include_raw_value
+        treefiles_to_include = (
+            [include_raw_value]
+            if isinstance(include_raw_value, str)
+            else include_raw_value
+        )
 
         for path in treefiles_to_include:
             packages.update(
@@ -397,10 +402,7 @@ def _arch_matches(spec, arch):
     if isinstance(not_, str):
         not_ = [not_]
 
-    return (
-        (not only or arch in only) and
-        (not not_ or arch not in not_)
-    )
+    return (not only or arch in only) and (not not_ or arch not in not_)
 
 
 def read_packages_from_container_yaml(arch):
@@ -413,7 +415,7 @@ def read_packages_from_container_yaml(arch):
                 packages.add(package)
             else:
                 if _arch_matches(package.get("platforms", {}), arch):
-                    packages.add(package['name'])
+                    packages.add(package["name"])
 
     return packages
 
@@ -458,6 +460,61 @@ def logging_setup(debug=False):
     )
 
 
+def _extract_containerfile_packages(
+    containerfile: str,
+    context: dict,
+) -> tuple[set[str], dict[str, set[str]], set[str], set[str]]:
+    """
+    Extract RPM package names from Containerfile RUN commands.
+
+    Parses the Containerfile to find dnf/yum/microdnf install invocations
+    and returns the discovered packages grouped by type.
+
+    Arg(s):
+        containerfile (str): Path to the Containerfile.
+        context (dict): Configuration context with optional stage filters.
+    Return Value(s):
+        tuple: (common_packages, arch_packages, upgrade_packages,
+                module_enable) — all empty on failure.
+    """
+    common_packages: set[str] = set()
+    arch_packages: dict[str, set[str]] = {}
+    upgrade_packages: set[str] = set()
+    module_enable: set[str] = set()
+
+    cf_path = Path(containerfile)
+    source_dir = cf_path.parent
+    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
+    selected = select_stage(stages, **_get_containerfile_filters(context))
+    if selected:
+        common_packages.update(selected.packages)
+        for arch, pkgs in selected.arch_packages.items():
+            arch_packages.setdefault(arch, set()).update(pkgs)
+        upgrade_packages.update(selected.update_targets)
+        module_enable.update(selected.module_specs)
+    if common_packages or arch_packages:
+        logging.info(
+            "Extracted %d common and %d arch-specific packages from Containerfile",
+            len(common_packages),
+            sum(len(v) for v in arch_packages.values()),
+        )
+        if common_packages:
+            logging.debug("Containerfile packages: %s", sorted(common_packages))
+        for arch, pkgs in sorted(arch_packages.items()):
+            logging.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
+        if upgrade_packages:
+            logging.debug("Containerfile upgrade packages: %s", sorted(upgrade_packages))
+        if module_enable:
+            logging.debug("Containerfile module enable: %s", sorted(module_enable))
+
+    return (
+        common_packages,
+        arch_packages,
+        upgrade_packages,
+        module_enable,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -480,9 +537,7 @@ def main():
     parser.add_argument(
         "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
     )
-    parser.add_argument(
-        "--allowerasing", action="store_true", help=ALLOWERASING_HELP
-    )
+    parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
     args = parser.parse_args()
 
     logging_setup(args.debug)
@@ -508,6 +563,11 @@ def main():
 
     repos = collect_content_origins(config_dir, config["contentOrigin"])
 
+    containerfile_common_packages: set[str] = set()
+    containerfile_arch_packages: dict[str, set[str]] = {}
+    containerfile_upgrade_packages: set[str] = set()
+    containerfile_module_enable: set[str] = set()
+
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
     elif args.bare or context.get("bare") or args.rpm_ostree_treefile:
@@ -532,12 +592,27 @@ def main():
                 "or ensure a Containerfile/Dockerfile exists in the current directory."
             )
         rpmdb = image_rpmdb(
-            image or utils.extract_image(
-                containerfile, **_get_containerfile_filters(context)
-            )
+            image
+            or utils.extract_image(containerfile, **_get_containerfile_filters(context))
         )
 
-    # TODO maybe try extracting packages from Containerfile?
+        # Extract packages from Containerfile RUN commands
+        if containerfile:
+            try:
+                (
+                    containerfile_common_packages,
+                    containerfile_arch_packages,
+                    containerfile_upgrade_packages,
+                    containerfile_module_enable,
+                ) = _extract_containerfile_packages(containerfile, context)
+            except Exception:
+                logging.warning(
+                    "Failed to extract packages from Containerfile %s; "
+                    "falling back to explicitly listed packages only.",
+                    containerfile,
+                    exc_info=True,
+                )
+
     for arch in sorted(arches):
         packages = set()
         if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
@@ -548,6 +623,11 @@ def main():
             )
         elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
+
+        # Merge Containerfile-extracted packages
+        packages |= containerfile_common_packages
+        packages |= containerfile_arch_packages.get(arch, set())
+
         data["arches"].append(
             process_arch(
                 arch,
@@ -558,9 +638,8 @@ def main():
                 reinstall_packages=set(
                     filter_for_arch(arch, config.get("reinstallPackages", []))
                 ),
-                module_enable=set(
-                    filter_for_arch(arch, config.get("moduleEnable", []))
-                ),
+                module_enable=set(filter_for_arch(arch, config.get("moduleEnable", [])))
+                | containerfile_module_enable,
                 module_disable=set(
                     filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
@@ -568,7 +647,8 @@ def main():
                 install_weak_deps=config.get("installWeakDeps"),
                 upgrade_packages=set(
                     filter_for_arch(arch, config.get("upgradePackages", []))
-                ),
+                )
+                | containerfile_upgrade_packages,
                 zchunk=config.get("zchunk"),
             )
         )
