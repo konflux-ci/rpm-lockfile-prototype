@@ -25,6 +25,9 @@ rpm-lockfile-prototype = "rpm_lockfile:main"
 caching-rpm-lockfile-prototype = "rpm_lockfile.caching_wrapper:main"
 
 
+[tool.ruff]
+exclude = ["rpm_lockfile/vendor"]
+
 [build-system]
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
