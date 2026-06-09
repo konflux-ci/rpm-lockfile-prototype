@@ -59,18 +59,22 @@ class StagePackages:
             has_update=self.has_update or other.has_update,
             arch_packages=merged_arch,
             update_targets=sorted(set(self.update_targets + other.update_targets)),
-            builddep_packages=sorted(set(self.builddep_packages + other.builddep_packages)),
+            builddep_packages=sorted(
+                set(self.builddep_packages + other.builddep_packages)
+            ),
             module_specs=sorted(set(self.module_specs + other.module_specs)),
         )
 
 
 def _strip_quotes(value: str) -> str:
-    if len(value) >= 2 and value[0] in ("\"", "'") and value[-1] == value[0]:
+    if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
         return value[1:-1]
     return value
 
 
-def collect_stage_vars(entries: list[dict], inherited_vars: dict[str, str] | None = None) -> dict[str, str]:
+def collect_stage_vars(
+    entries: list[dict], inherited_vars: dict[str, str] | None = None
+) -> dict[str, str]:
     """
     Collect ARG and ENV variable definitions from DockerfileParser
     structure entries.
@@ -98,13 +102,17 @@ def collect_stage_vars(entries: list[dict], inherited_vars: dict[str, str] | Non
                 var_name = arg_match.group(1)
                 default_value = arg_match.group(2)
                 if default_value is not None:
-                    variables[var_name] = resolve_bash_expansion(_strip_quotes(default_value.strip()), variables)
+                    variables[var_name] = resolve_bash_expansion(
+                        _strip_quotes(default_value.strip()), variables
+                    )
 
         elif instruction == "ENV":
             env_match = re.match(r"^(\w+)(?:=|\s+)(.*)", value.strip())
             if env_match:
                 var_name = env_match.group(1)
-                variables[var_name] = resolve_bash_expansion(_strip_quotes(env_match.group(2).strip()), variables)
+                variables[var_name] = resolve_bash_expansion(
+                    _strip_quotes(env_match.group(2).strip()), variables
+                )
 
     return variables
 
@@ -271,7 +279,9 @@ def extract_packages_from_file_installs(
 
     for run_body in run_values:
         for cmd in re.split(r"&&|;", run_body):
-            cmd_clean = re.sub(r"^(if\s+!\s*|if\s+|then|else|elif|do)\s*", "", cmd.strip())
+            cmd_clean = re.sub(
+                r"^(if\s+!\s*|if\s+|then|else|elif|do)\s*", "", cmd.strip()
+            )
             match = redirect_re.search(cmd_clean)
             if not match:
                 match = pipe_re.search(cmd_clean)
@@ -291,18 +301,28 @@ def extract_packages_from_file_installs(
                     arch_path = resolved_path
                     for kw in ARCH_SUBSHELL_KEYWORDS:
                         arch_path = arch_path.replace(kw, arch)
-                    source_file = _resolve_file_from_copy_map(arch_path, copy_map, source_dir)
+                    source_file = _resolve_file_from_copy_map(
+                        arch_path, copy_map, source_dir
+                    )
                     if not source_file:
                         continue
-                    logger.info(f"Extracting arch-specific packages from {source_file} for {arch}")
+                    logger.info(
+                        f"Extracting arch-specific packages from {source_file} for {arch}"
+                    )
                     try:
-                        arch_packages.setdefault(arch, set()).update(_read_packages_from_file(source_file))
+                        arch_packages.setdefault(arch, set()).update(
+                            _read_packages_from_file(source_file)
+                        )
                     except OSError:
                         continue
             else:
-                source_file = _resolve_file_from_copy_map(resolved_path, copy_map, source_dir)
+                source_file = _resolve_file_from_copy_map(
+                    resolved_path, copy_map, source_dir
+                )
                 if not source_file:
-                    logger.debug(f"File install path {resolved_path} not resolved from COPY map")
+                    logger.debug(
+                        f"File install path {resolved_path} not resolved from COPY map"
+                    )
                     continue
                 logger.info(f"Extracting packages from file install: {source_file}")
                 try:
@@ -379,22 +399,30 @@ def extract_packages_from_scripts(
                 if found:
                     candidate = found
                 else:
-                    logger.debug(f"Skipping bare script {script_path}: not found in COPY map")
+                    logger.debug(
+                        f"Skipping bare script {script_path}: not found in COPY map"
+                    )
                     continue
             else:
-                logger.debug(f"Skipping script {script_path}: unsupported path prefix and not in COPY map")
+                logger.debug(
+                    f"Skipping script {script_path}: unsupported path prefix and not in COPY map"
+                )
                 continue
 
             try:
                 candidate = candidate.resolve()
                 if not candidate.is_relative_to(source_dir.resolve()):
-                    logger.debug(f"Skipping script {script_path}: path traversal outside source_dir")
+                    logger.debug(
+                        f"Skipping script {script_path}: path traversal outside source_dir"
+                    )
                     continue
             except (OSError, ValueError):
                 continue
 
             if not candidate.exists():
-                logger.warning(f"Script {script_path} referenced in Containerfile but not found at {candidate}")
+                logger.warning(
+                    f"Script {script_path} referenced in Containerfile but not found at {candidate}"
+                )
                 continue
 
             logger.info(f"Extracting packages from script: {candidate}")
@@ -404,7 +432,11 @@ def extract_packages_from_scripts(
             except OSError:
                 continue
 
-            raw_lines = [line for line in script_content.splitlines() if not line.strip().startswith("#")]
+            raw_lines = [
+                line
+                for line in script_content.splitlines()
+                if not line.strip().startswith("#")
+            ]
             joined_lines: list[str] = []
             for line in raw_lines:
                 stripped = line.rstrip()
@@ -434,7 +466,9 @@ def extract_packages_from_scripts(
     return StagePackages(
         packages=sorted(all_packages),
         has_update=scripts_have_bare_update,
-        arch_packages={arch: sorted(pkgs) for arch, pkgs in sorted(all_arch_packages.items())},
+        arch_packages={
+            arch: sorted(pkgs) for arch, pkgs in sorted(all_arch_packages.items())
+        },
         update_targets=sorted(all_updates),
         builddep_packages=sorted(all_builddep),
         module_specs=sorted(all_modules),
@@ -518,14 +552,21 @@ def analyze_containerfile_stages(
 
         copy_map = build_copy_map(stage_entries, env_vars=stage_vars)
         stage = stage.merge(
-            extract_packages_from_scripts(run_values, source_dir=source_dir, copy_map=copy_map, env_vars=stage_vars)
+            extract_packages_from_scripts(
+                run_values,
+                source_dir=source_dir,
+                copy_map=copy_map,
+                env_vars=stage_vars,
+            )
         )
 
         if source_dir:
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
                 run_values, copy_map, source_dir, env_vars=stage_vars
             )
-            stage = stage.merge(StagePackages(packages=file_pkgs, arch_packages=file_arch_pkgs))
+            stage = stage.merge(
+                StagePackages(packages=file_pkgs, arch_packages=file_arch_pkgs)
+            )
 
         stages.append(stage)
 

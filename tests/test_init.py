@@ -1,6 +1,4 @@
-import logging
-from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 
 import pytest
 

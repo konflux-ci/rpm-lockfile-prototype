@@ -75,6 +75,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
 
         Raises RuntimeError if a referenced variable has no default value.
         """
+
         # First expand ${VAR} syntax
         def replace_braced(match):
             var_name = match.group(1)
@@ -83,7 +84,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
                 raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
             return value
 
-        text = re.sub(r'\$\{(\w+)\}', replace_braced, text)
+        text = re.sub(r"\$\{(\w+)\}", replace_braced, text)
 
         # Then expand $VAR syntax (without braces)
         def replace_unbraced(match):
@@ -93,7 +94,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
                 raise RuntimeError(f"ARG '{var_name}' is used but has no default value")
             return value
 
-        text = re.sub(r'\$(\w+)', replace_unbraced, text)
+        text = re.sub(r"\$(\w+)", replace_unbraced, text)
 
         return text
 
@@ -237,7 +238,7 @@ def _get_containerfile_labels(containerfile, config_dir):
 def split_image(image_spec):
     # De don't want to validate the digest here in any way, so even wrong
     # length should be accepted.
-    m = re.match(r'([^:@]+)(:[^@]+)?(@sha\d+:[a-f0-9]+)?$', image_spec)
+    m = re.match(r"([^:@]+)(:[^@]+)?(@sha\d+:[a-f0-9]+)?$", image_spec)
     if m:
         repo = m.group(1)
         tag = m.group(2)
@@ -276,7 +277,7 @@ def check_image_spec(image_spec):
     """Check if the image is fully qualified with a registry."""
     # We only check that there's a slash in the image name, and the part before
     # slash contains at least one dot.
-    m = re.match(r'.+\..+/.+', image_spec)
+    m = re.match(r".+\..+/.+", image_spec)
     return bool(m)
 
 

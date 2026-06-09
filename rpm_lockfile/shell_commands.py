@@ -90,8 +90,12 @@ def resolve_bash_expansion(text: str, variables: dict[str, str]) -> str:
     """
     for _ in range(_MAX_EXPANSION_DEPTH):
         prev = text
-        text = _RE_CONDITIONAL_SET.sub(lambda m: m.group(2) if variables.get(m.group(1)) else "", text)
-        text = _RE_CONDITIONAL_DEFAULT.sub(lambda m: variables.get(m.group(1)) or m.group(2), text)
+        text = _RE_CONDITIONAL_SET.sub(
+            lambda m: m.group(2) if variables.get(m.group(1)) else "", text
+        )
+        text = _RE_CONDITIONAL_DEFAULT.sub(
+            lambda m: variables.get(m.group(1)) or m.group(2), text
+        )
         text = _RE_BRACED_VAR.sub(lambda m: variables.get(m.group(1), ""), text)
         text = _RE_PLAIN_VAR.sub(lambda m: variables.get(m.group(1), ""), text)
         if text == prev:
@@ -139,7 +143,6 @@ def _is_valid_package_token(token: str) -> bool:
     return True
 
 
-
 def _extract_condition_arch(node) -> list[str]:
     """
     Extract architecture names from an if/elif condition node.
@@ -181,10 +184,18 @@ def _walk_nodes(
                 if child.kind == "if":
                     _walk_if_node(child, ctx)
                 elif child.kind == "for":
-                    body_nodes = [p for p in child.parts if hasattr(p, "kind") and p.kind in ("list", "command")]
+                    body_nodes = [
+                        p
+                        for p in child.parts
+                        if hasattr(p, "kind") and p.kind in ("list", "command")
+                    ]
                     _walk_nodes(body_nodes, ctx, arch_context, in_conditional)
                 elif child.kind == "function":
-                    body_nodes = [p for p in child.parts if hasattr(p, "kind") and p.kind == "compound"]
+                    body_nodes = [
+                        p
+                        for p in child.parts
+                        if hasattr(p, "kind") and p.kind == "compound"
+                    ]
                     for body in body_nodes:
                         _walk_nodes([body], ctx, arch_context, in_conditional)
                 else:
@@ -194,7 +205,9 @@ def _walk_nodes(
             _process_command_node(node, ctx, arch_context, in_conditional)
 
         elif kind == "pipeline":
-            cmd_nodes = [p for p in node.parts if hasattr(p, "kind") and p.kind == "command"]
+            cmd_nodes = [
+                p for p in node.parts if hasattr(p, "kind") and p.kind == "command"
+            ]
             for cmd_node in cmd_nodes:
                 _process_command_node(cmd_node, ctx, arch_context, in_conditional)
 
@@ -202,7 +215,9 @@ def _walk_nodes(
             _walk_if_node(node, ctx)
 
         elif kind == "function":
-            body_nodes = [p for p in node.parts if hasattr(p, "kind") and p.kind == "compound"]
+            body_nodes = [
+                p for p in node.parts if hasattr(p, "kind") and p.kind == "compound"
+            ]
             for body in body_nodes:
                 _walk_nodes([body], ctx, arch_context, in_conditional)
 
@@ -233,7 +248,9 @@ def _walk_if_node(node, ctx: _WalkContext):
             arch_ctx = None
             if condition:
                 arch_ctx = _extract_condition_arch(condition) or None
-                _walk_nodes([condition], ctx, arch_ctx, in_conditional=not bool(arch_ctx))
+                _walk_nodes(
+                    [condition], ctx, arch_ctx, in_conditional=not bool(arch_ctx)
+                )
 
             if body:
                 _walk_nodes([body], ctx, arch_ctx, in_conditional=not bool(arch_ctx))
@@ -258,7 +275,7 @@ def _process_assignments(
         raw = assign.word
         eq_idx = raw.index("=")
         var_name = raw[:eq_idx]
-        var_value = raw[eq_idx + 1:]
+        var_value = raw[eq_idx + 1 :]
 
         has_cmdsub = any(
             hasattr(p, "kind") and p.kind == "commandsubstitution"
@@ -285,7 +302,9 @@ def _process_assignments(
                 ctx.shell_vars[var_name] = resolved
 
 
-def _detect_pkg_action(word_values: list[str], ctx: _WalkContext) -> tuple[str | None, int]:
+def _detect_pkg_action(
+    word_values: list[str], ctx: _WalkContext
+) -> tuple[str | None, int]:
     """
     Detect install/update/upgrade action in a dnf/yum command.
 
@@ -306,7 +325,7 @@ def _detect_pkg_action(word_values: list[str], ctx: _WalkContext) -> tuple[str |
         if wl == "builddep":
             return "builddep", idx
         if wl == "module":
-            for sub_idx, sub_w in enumerate(word_values[idx + 1:], idx + 1):
+            for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
                 sub_wl = sub_w.lower()
                 if sub_wl in ("install", "enable"):
                     return "module", sub_idx
@@ -356,7 +375,10 @@ def _resolve_arch_specific_tokens(
         for pw in pkg_words:
             r = resolve_bash_expansion(pw, {**all_vars, **arch_var_vals})
             for token in r.split():
-                if _is_valid_package_token(token) and token not in common_resolved_tokens:
+                if (
+                    _is_valid_package_token(token)
+                    and token not in common_resolved_tokens
+                ):
                     ctx.arch_packages.setdefault(arch, set()).add(token)
                     arch_resolved.add(token)
 
@@ -436,12 +458,17 @@ def _process_command_node(
     if not action:
         return
 
-    pkg_words = word_values[action_idx + 1:]
+    pkg_words = word_values[action_idx + 1 :]
     all_vars = {**ctx.variables, **ctx.shell_vars}
-    combined_arch_vals = {k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()}
+    combined_arch_vals = {
+        k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()
+    }
     all_vars_with_arch = {
         **all_vars,
-        **{k: resolve_bash_expansion(v, all_vars) for k, v in combined_arch_vals.items()},
+        **{
+            k: resolve_bash_expansion(v, all_vars)
+            for k, v in combined_arch_vals.items()
+        },
     }
 
     resolved_tokens: list[str] = []
@@ -453,9 +480,13 @@ def _process_command_node(
 
     arch_resolved_tokens: set[str] = set()
     if not arch_context:
-        arch_resolved_tokens = _resolve_arch_specific_tokens(pkg_words, raw_args, all_vars, ctx)
+        arch_resolved_tokens = _resolve_arch_specific_tokens(
+            pkg_words, raw_args, all_vars, ctx
+        )
 
-    _classify_package_tokens(resolved_tokens, arch_resolved_tokens, action, ctx, arch_context)
+    _classify_package_tokens(
+        resolved_tokens, arch_resolved_tokens, action, ctx, arch_context
+    )
 
 
 def _extract_subshell_packages(subshell_body: str) -> str:
@@ -469,7 +500,11 @@ def _extract_subshell_packages(subshell_body: str) -> str:
     for match in re.finditer(r"\becho\s+(?:-\w+\s+)*([\w\s-]+)", subshell_body):
         tokens = match.group(1).strip().split()
         for token in tokens:
-            if token and not token.startswith("-") and re.match(r"^[\w][\w.\-]*$", token):
+            if (
+                token
+                and not token.startswith("-")
+                and re.match(r"^[\w][\w.\-]*$", token)
+            ):
                 packages.append(token)
     return " ".join(packages)
 
@@ -522,7 +557,9 @@ def analyze_run_commands(
     ctx = _parse_and_walk(run_values, env_vars)
     return RunCommandResult(
         packages=sorted(ctx.packages),
-        arch_packages={arch: sorted(pkgs) for arch, pkgs in sorted(ctx.arch_packages.items())},
+        arch_packages={
+            arch: sorted(pkgs) for arch, pkgs in sorted(ctx.arch_packages.items())
+        },
         update_targets=sorted(ctx.update_targets),
         has_update=ctx.has_update,
         builddep_packages=sorted(ctx.builddep_packages),

@@ -12,7 +12,12 @@ from . import utils
 
 # Known locations for rpmdb inside the image; files/lib is for
 # Flatpak runtime images.
-RPMDB_PATHS = ["usr/lib/sysimage/rpm", "var/lib/rpm", "files/lib/sysimage/rpm", "usr/share/rpm"]
+RPMDB_PATHS = [
+    "usr/lib/sysimage/rpm",
+    "var/lib/rpm",
+    "files/lib/sysimage/rpm",
+    "usr/share/rpm",
+]
 
 # Storage usage limit. If the filesystem with the cache fills up over this
 # limit, nothing new will be added into the cache.
