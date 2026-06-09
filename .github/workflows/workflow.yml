@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fedora-version: [40, 41, 42, 43, rawhide]
+        fedora-version: [42, 43, 44, rawhide]
 
     steps:
     - name: Set up podman
@@ -37,7 +37,7 @@ jobs:
         podman build -v $(pwd):/src --tag test -f ./podmanfile
     # One upload per workflow (matrix runs 5 Fedoras; avoid duplicate uploads)
     - name: Upload coverage to Codecov
-      if: matrix.fedora-version == 43
+      if: matrix.fedora-version == 44
       uses: codecov/codecov-action@v5
       with:
         use_oidc: true
