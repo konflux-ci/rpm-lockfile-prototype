@@ -31,6 +31,10 @@ jobs:
         sudo apt-get -y install podman
         podman pull ${{ matrix.base-image }}
     - uses: actions/checkout@v5
+    - name: Derive coverage flag name
+      run: |
+        flag=$(echo "${{ matrix.base-image }}" | sed 's|[^/]*/||' | sed 's|/ubi:latest||' | sed 's|[:/]|-|g' | sed 's|-latest$||')
+        echo "COVERAGE_FLAG=$flag" >> $GITHUB_ENV
     - name: Test with pytest
       run: |
         {
@@ -41,13 +45,11 @@ jobs:
           echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'
         } > podmanfile
         podman build -v $(pwd):/src --tag test -f ./podmanfile
-    # One upload per workflow; avoid duplicate uploads
     - name: Upload coverage to Codecov
-      if: matrix.base-image == 'registry.fedoraproject.org/fedora:44'
       uses: codecov/codecov-action@v5
       with:
         use_oidc: true
-        flags: unit-tests
+        flags: ${{ env.COVERAGE_FLAG }}
         files: coverage.xml
         fail_ci_if_error: false
 

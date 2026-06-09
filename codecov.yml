@@ -6,10 +6,6 @@ coverage:
   precision: 2
   round: down
 
-flags:
-  unit-tests:
-    carryforward: true
-
 comment:
   layout: "reach,diff,flags,files"
   behavior: default
