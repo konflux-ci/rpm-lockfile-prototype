@@ -16,28 +16,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fedora-version: [42, 43, 44, rawhide]
+        base-image:
+          - registry.fedoraproject.org/fedora:42
+          - registry.fedoraproject.org/fedora:43
+          - registry.fedoraproject.org/fedora:44
+          - registry.fedoraproject.org/fedora:rawhide
+          - registry.access.redhat.com/ubi9/ubi:latest
+          - registry.access.redhat.com/ubi10/ubi:latest
 
     steps:
     - name: Set up podman
       run: |
         sudo apt update
         sudo apt-get -y install podman
-        podman pull registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}
+        podman pull ${{ matrix.base-image }}
     - uses: actions/checkout@v5
     - name: Test with pytest
       run: |
         {
-          echo 'FROM registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}'
+          echo 'FROM ${{ matrix.base-image }}'
           echo 'RUN dnf install -y python3-pip python3-dnf gcc'
           echo 'WORKDIR /src'
           echo 'RUN python3 -m pip install -e "." pytest pytest-cov'
           echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'
         } > podmanfile
         podman build -v $(pwd):/src --tag test -f ./podmanfile
-    # One upload per workflow (matrix runs 5 Fedoras; avoid duplicate uploads)
+    # One upload per workflow; avoid duplicate uploads
     - name: Upload coverage to Codecov
-      if: matrix.fedora-version == 44
+      if: matrix.base-image == 'registry.fedoraproject.org/fedora:44'
       uses: codecov/codecov-action@v5
       with:
         use_oidc: true
