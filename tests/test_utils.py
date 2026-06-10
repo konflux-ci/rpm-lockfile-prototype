@@ -355,7 +355,7 @@ def test_get_labels_from_image(image_spec, image_url):
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image_url}"],
+        ["skopeo", "inspect", "--no-tags", f"docker://{image_url}"],
         check=True,
         stdout=subprocess.PIPE,
     )
@@ -381,7 +381,7 @@ def test_get_labels_from_containerfile(tmpdir):
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+        ["skopeo", "inspect", "--no-tags", f"docker://{image}"], check=True, stdout=subprocess.PIPE
     )
 
 
@@ -419,7 +419,7 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+        ["skopeo", "inspect", "--no-tags", f"docker://{image}"], check=True, stdout=subprocess.PIPE
     )
 
 
