@@ -596,8 +596,11 @@ def main():
             or utils.extract_image(containerfile, **_get_containerfile_filters(context))
         )
 
-        # Extract packages from Containerfile RUN commands
-        if containerfile:
+        # Extract packages from Containerfile RUN commands only if the user
+        # has not explicitly declared a packages list. When packages are
+        # specified, the user's list should take precedence over the
+        # Containerfile scan
+        if containerfile and not config.get("packages"):
             try:
                 (
                     containerfile_common_packages,
