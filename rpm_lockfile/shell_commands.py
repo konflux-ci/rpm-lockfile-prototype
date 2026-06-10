@@ -15,12 +15,11 @@ from dataclasses import dataclass, field
 
 from rpm_lockfile.vendor import bashlex
 
-
 # Shell subshell expressions that evaluate to the current architecture
-ARCH_SUBSHELL_KEYWORDS = ("$(arch)", "$(uname -m)", "$(uname -p)")
+ARCH_SUBSHELL_KEYWORDS = ("$(arch)", "$(uname -m)", "$(uname -p)", "$(go env GOARCH)")
 
 # Shell variable names that hold the current architecture
-ARCH_VAR_NAMES = ("HOSTTYPE", "ARCH")
+ARCH_VAR_NAMES = ("HOSTTYPE", "ARCH", "GOARCH")
 
 # All arch keywords: subshells + variables in both $VAR and ${VAR} forms
 ARCH_KEYWORDS = ARCH_SUBSHELL_KEYWORDS + tuple(
@@ -33,6 +32,17 @@ ARCH_VALUE_RE = re.compile(
     rf"(?:{_ARCH_PATTERN})"
     r"[\"']?\s*==?\s*[\"']?(\w+)[\"']?"
 )
+
+
+ARCH_NEQ_VALUE_RE = re.compile(
+    rf"(?:{_ARCH_PATTERN})"
+    r"""[\"']?\s*!=\s*[\"']?(\w+)[\"']?"""
+)
+
+_GO_TO_RPM_ARCH = {
+    "amd64": "x86_64",
+    "arm64": "aarch64",
+}
 
 
 _MAX_EXPANSION_DEPTH = 10
@@ -143,6 +153,14 @@ def _is_valid_package_token(token: str) -> bool:
     return True
 
 
+def _normalize_arch_names(arches: list[str]) -> list[str]:
+    """
+    Normalize Go-style arch names (amd64, arm64) to RPM names
+    (x86_64, aarch64). Names already in RPM form pass through unchanged.
+    """
+    return [_GO_TO_RPM_ARCH.get(a, a) for a in arches]
+
+
 def _extract_condition_arch(node) -> list[str]:
     """
     Extract architecture names from an if/elif condition node.
@@ -159,8 +177,79 @@ def _extract_condition_arch(node) -> list[str]:
             words = [p.word for p in part.parts if hasattr(p, "word")]
             text = " ".join(words)
             if _has_arch_test(text):
-                arches.extend(_extract_arch_values(text))
+                arches.extend(_normalize_arch_names(_extract_arch_values(text)))
     return arches
+
+
+def _extract_list_arch_context(test_node, operator: str) -> list[str] | None:
+    """
+    Compute effective arch context from a ``[ test ] || cmd`` or
+    ``[ test ] && cmd`` pattern.
+
+    Handles:
+        ``[ $(arch) != X ] || cmd`` -> [X] (double negation = only on X)
+        ``[ $(arch) = X ] && cmd``  -> [X] (direct match = only on X)
+        Other combos need full arch set -> returns None (unconditional).
+    """
+    if not hasattr(test_node, "parts"):
+        return None
+    words = [p.word for p in test_node.parts if hasattr(p, "word")]
+    if not words or words[0] != "[":
+        return None
+    text = " ".join(words)
+    if not _has_arch_test(text):
+        return None
+
+    neq_arches = ARCH_NEQ_VALUE_RE.findall(text)
+    eq_arches = ARCH_VALUE_RE.findall(text)
+
+    if neq_arches and operator == "||":
+        return _normalize_arch_names(neq_arches)
+    if eq_arches and operator == "&&":
+        return _normalize_arch_names(eq_arches)
+
+    logger = logging.getLogger(__name__)
+    logger.debug(
+        f"Unsupported arch-conditional pattern (needs full arch set): {text} {operator} cmd"
+    )
+    return None
+
+
+def _walk_list_node(
+    node,
+    ctx: _WalkContext,
+    arch_context: list[str] | None = None,
+    in_conditional: bool = False,
+):
+    """
+    Walk a list node, detecting ``[ test ] || cmd`` and
+    ``[ test ] && cmd`` arch-conditional patterns.
+    """
+    parts = node.parts
+    consumed: set[int] = set()
+
+    for i, part in enumerate(parts):
+        if part.kind != "command" or i in consumed:
+            continue
+        words = [p.word for p in part.parts if hasattr(p, "word")]
+        if not words or words[0] != "[":
+            continue
+        if i + 2 >= len(parts):
+            continue
+        op_node = parts[i + 1]
+        if not hasattr(op_node, "op") or op_node.op not in ("||", "&&"):
+            continue
+        arch_ctx = _extract_list_arch_context(part, op_node.op)
+        if arch_ctx is None:
+            continue
+        consumed.add(i)
+        consumed.add(i + 1)
+        consumed.add(i + 2)
+        _walk_nodes([parts[i + 2]], ctx, arch_ctx, in_conditional=False)
+
+    remaining = [p for idx, p in enumerate(parts) if idx not in consumed]
+    if remaining:
+        _walk_nodes(remaining, ctx, arch_context, in_conditional)
 
 
 def _walk_nodes(
@@ -177,7 +266,7 @@ def _walk_nodes(
         kind = node.kind
 
         if kind == "list":
-            _walk_nodes(node.parts, ctx, arch_context, in_conditional)
+            _walk_list_node(node, ctx, arch_context, in_conditional)
 
         elif kind == "compound":
             for child in node.list:
