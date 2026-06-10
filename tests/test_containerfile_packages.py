@@ -472,10 +472,10 @@ class TestResolveBuilddepPackages(unittest.TestCase):
             self.assertEqual(result, {"gcc", "openssl-devel", "make"})
             mock_run.assert_called_once()
 
-    def test_from_spec(self):
+    def test_spec_files_not_supported(self):
         """
-        resolve_builddep_packages should fall back to .spec files and use
-        rpmspec instead of rpm -qpR.
+        Spec files are not supported because rpmspec resolves macros
+        using host definitions. Only SRPMs should be processed.
         """
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -483,18 +483,10 @@ class TestResolveBuilddepPackages(unittest.TestCase):
             spec.touch()
 
             with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(
-                    returncode=0,
-                    stdout="gcc\nopenssl-devel\nautomake\n",
-                    stderr="",
-                )
                 result = resolve_builddep_packages(["pkcs11-helper*"], tmp_path)
 
-            self.assertEqual(result, {"gcc", "openssl-devel", "automake"})
-            mock_run.assert_called_once()
-            cmd = mock_run.call_args[0][0]
-            self.assertEqual(cmd[0], "rpmspec")
-            self.assertIn("--buildrequires", cmd)
+            self.assertEqual(result, set())
+            mock_run.assert_not_called()
 
     def test_no_match(self):
         """

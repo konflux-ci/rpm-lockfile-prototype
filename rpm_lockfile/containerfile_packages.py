@@ -581,13 +581,17 @@ def resolve_builddep_packages(
 ) -> set[str]:
     """
     Resolve dnf builddep glob patterns to concrete BuildRequires by
-    finding matching SRPMs/spec files in source_dir and extracting
-    their dependencies via rpm -qpR (SRPMs) or rpmspec (spec files).
+    finding matching SRPMs in source_dir and extracting their
+    dependencies via rpm -qpR.
+
+    Spec files are intentionally not supported: rpmspec resolves macros
+    using host system definitions, which may not match the build
+    environment and would produce incorrect results.
 
     Arg(s):
         builddep_patterns (list[str]): Glob patterns from dnf builddep
             commands (e.g., ["pkcs11-helper*", "openvpn*"]).
-        source_dir (Path): Directory containing SRPMs or spec files.
+        source_dir (Path): Directory containing SRPMs.
     Return Value(s):
         set[str]: Deduplicated package names from BuildRequires.
     """
@@ -604,17 +608,8 @@ def resolve_builddep_packages(
         ]
 
         if not matching:
-            matching = [
-                f
-                for f in source_dir.iterdir()
-                if f.is_file()
-                and f.name.endswith(".spec")
-                and fnmatch.fnmatch(f.name, pattern)
-            ]
-
-        if not matching:
             logging.warning(
-                "No SRPM or spec file matching '%s' found in %s, "
+                "No SRPM matching '%s' found in %s, "
                 "builddep packages will not be included in lockfile",
                 pattern,
                 source_dir,
@@ -623,11 +618,8 @@ def resolve_builddep_packages(
 
         for path in matching:
             logging.info("Extracting BuildRequires from %s", path.name)
-            if path.name.endswith(".spec"):
-                cmd = ["rpmspec", "-q", "--buildrequires", str(path)]
-            else:
-                cmd = ["rpm", "-qpR", str(path)]
             try:
+                cmd = ["rpm", "-qpR", str(path)]
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -639,6 +631,8 @@ def resolve_builddep_packages(
                     continue
                 for line in result.stdout.strip().splitlines():
                     req = line.strip().split()[0] if line.strip() else ""
+                    # Skip file-path provides (/usr/bin/...) and virtual
+                    # provides like rpmlib(...) — only keep package names
                     if req and not req.startswith("/") and "(" not in req:
                         resolved.add(req)
             except Exception as exc:
