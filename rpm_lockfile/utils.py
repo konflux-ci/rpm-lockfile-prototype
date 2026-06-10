@@ -206,7 +206,7 @@ def inspect_image(image_spec, arch=None):
     cmd = ["skopeo"]
     if arch:
         cmd.append(f"--override-arch={translate_arch(arch)}")
-    cmd.extend(["inspect", f"docker://{strip_tag(image_spec)}"])
+    cmd.extend(["inspect", "--no-tags", f"docker://{strip_tag(image_spec)}"])
     cp = logged_run(cmd, stdout=subprocess.PIPE, check=True)
     return json.loads(cp.stdout)
 
