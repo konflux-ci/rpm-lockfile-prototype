@@ -261,6 +261,20 @@ containerfile:
 If multiple filters for selecting stage are set, the first one to match is
 used.
 
+## Containerfile package scanning and `packages` precedence
+
+When `context.containerfile` is set, the tool automatically extracts package
+names from `RUN dnf/yum/microdnf install` commands in the Containerfile.
+
+If the `packages` key is also present in the input file, the user-defined list
+takes precedence and the Containerfile package scan is skipped. This allows
+users to manually specify packages with `arches: only/not` filtering for cases
+the scanner cannot replicate (e.g. complex shell conditionals, dynamic package
+lists).
+
+The Containerfile is still used for base image resolution and rpmdb extraction
+regardless.
+
 # Environment variables
 
 It is possible to configure persistent cache location for downloaded repodata
