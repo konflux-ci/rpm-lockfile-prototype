@@ -631,9 +631,10 @@ def resolve_builddep_packages(
                     continue
                 for line in result.stdout.strip().splitlines():
                     req = line.strip().split()[0] if line.strip() else ""
-                    # Skip file-path provides (/usr/bin/...) and virtual
-                    # provides like rpmlib(...) — only keep package names
-                    if req and not req.startswith("/") and "(" not in req:
+                    # Skip rpmlib(...) — those are RPM-internal and not
+                    # installable. Everything else (package names, file
+                    # paths, virtual provides) is valid for resolution.
+                    if req and not req.startswith("rpmlib("):
                         resolved.add(req)
             except Exception as exc:
                 logging.warning(

@@ -464,12 +464,18 @@ class TestResolveBuilddepPackages(unittest.TestCase):
             with patch("subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(
                     returncode=0,
-                    stdout="gcc\nopenssl-devel\nrpmlib(CompressedFileNames)\n/usr/bin/perl\nmake\n",
+                    stdout="gcc\nopenssl-devel\nrpmlib(CompressedFileNames)\n/usr/bin/perl\npython3dist(setuptools)\npkgconfig(libcrypto)\nmake\n",
                     stderr="",
                 )
                 result = resolve_builddep_packages(["pkcs11-helper*"], tmp_path)
 
-            self.assertEqual(result, {"gcc", "openssl-devel", "make"})
+            self.assertEqual(
+                result,
+                {
+                    "gcc", "openssl-devel", "/usr/bin/perl",
+                    "python3dist(setuptools)", "pkgconfig(libcrypto)", "make",
+                },
+            )
             mock_run.assert_called_once()
 
     def test_spec_files_not_supported(self):
