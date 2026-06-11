@@ -37,6 +37,7 @@ class FakeImage:
     layer is represented as a dict with keys being file paths and values being
     FSObject instances.
     """
+
     def __init__(self, layers):
         self.layers = layers
 
@@ -98,16 +99,12 @@ class Symlink(FSObject):
     "image_spec,expected_content",
     [
         pytest.param(
-            FakeImage(
-                [{"var/lib/rpm/foo": File("foo")}]
-            ),
+            FakeImage([{"var/lib/rpm/foo": File("foo")}]),
             "foo",
             id="var-lib-rpm",
         ),
         pytest.param(
-            FakeImage(
-                [{"usr/lib/sysimage/rpm/foo": File("foo")}]
-            ),
+            FakeImage([{"usr/lib/sysimage/rpm/foo": File("foo")}]),
             "foo",
             id="usr-lib-sysimage-rpm",
         ),
@@ -157,11 +154,13 @@ def test_extraction(
     def fake_inspect(image, arch=None):
         return {"Digest": digest}
 
-    with caplog.at_level(logging.DEBUG), \
-            mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
-            mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy), \
-            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
-            mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
+    with (
+        caplog.at_level(logging.DEBUG),
+        mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb),
+        mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy),
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect),
+    ):
         containers.setup_rpmdb(dest_dir, baseimage, "x86_64")
 
     # Test that rpmdb is in expected location with expected content
@@ -193,10 +192,12 @@ def test_caching(tmp_path, rpmdb, baseimage, caplog, disk_is_free):
     def fake_inspect(image, arch=None):
         return {"Digest": digest}
 
-    with mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
-            mock.patch("rpm_lockfile.containers._copy_image") as copy, \
-            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
-            mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
+    with (
+        mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb),
+        mock.patch("rpm_lockfile.containers._copy_image") as copy,
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect),
+    ):
         copy.side_effect = fake_copy
         containers.setup_rpmdb(tmp_path / "dest1", baseimage, "x86_64")
         containers.setup_rpmdb(tmp_path / "dest2", baseimage, "x86_64")
@@ -225,7 +226,7 @@ def test_caching(tmp_path, rpmdb, baseimage, caplog, disk_is_free):
             "sha256:12345",
             "registry.example.com/image@sha256:12345",
         ),
-    ]
+    ],
 )
 def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_free):
     cache_dir = tmp_path / "cache"
@@ -241,19 +242,19 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
         assert image == input_image
         return {"Digest": default_digest}
 
-    with mock.patch("rpm_lockfile.containers._online_setup_rpmdb") as _online_setup, \
-            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
-            mock.patch("shutil.copytree") as copytree, \
-            mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
+    with (
+        mock.patch("rpm_lockfile.containers._online_setup_rpmdb") as _online_setup,
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("shutil.copytree") as copytree,
+        mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect),
+    ):
         _online_setup.side_effect = fake_setup
         containers.setup_rpmdb(tmp_path / "d1", input_image, arch)
         containers.setup_rpmdb(tmp_path / "d2", input_image, arch)
 
     img_cache = cache_dir / "rpmdbs" / arch / (digest or default_digest)
 
-    assert _online_setup.mock_calls == [
-        mock.call(img_cache, resolved_image, arch)
-    ]
+    assert _online_setup.mock_calls == [mock.call(img_cache, resolved_image, arch)]
 
     assert copytree.mock_calls == [
         mock.call(img_cache, tmp_path / "d1", dirs_exist_ok=True),
@@ -282,10 +283,12 @@ def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
     def fake_inspect(image, arch=None):
         return {"Digest": digest}
 
-    with mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb), \
-            mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy), \
-            mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir), \
-            mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect):
+    with (
+        mock.patch("rpm_lockfile.utils.RPMDB_PATH", new=rpmdb),
+        mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy),
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", new=fake_inspect),
+    ):
         containers.setup_rpmdb(tmp_path / "dest1", baseimage, "x86_64")
 
     assert (tmp_path / "dest1" / rpmdb / "foo").read_text().strip() == expected_content

@@ -40,9 +40,7 @@ def fake_get_labels(obj, config_dir):
     }
 
 
-TEMPLATE_CONFIG = {
-    "repoid": "a", "baseurl": "https://example.com/{architecture}/repo"
-}
+TEMPLATE_CONFIG = {"repoid": "a", "baseurl": "https://example.com/{architecture}/repo"}
 EXPANDED_REPO = Repo(
     repoid="a", kwargs={"baseurl": ["https://example.com/x86_64/repo"]}
 )

@@ -503,7 +503,9 @@ def _extract_containerfile_packages(
         for arch, pkgs in sorted(arch_packages.items()):
             logging.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
         if upgrade_packages:
-            logging.debug("Containerfile upgrade packages: %s", sorted(upgrade_packages))
+            logging.debug(
+                "Containerfile upgrade packages: %s", sorted(upgrade_packages)
+            )
         if module_enable:
             logging.debug("Containerfile module enable: %s", sorted(module_enable))
 

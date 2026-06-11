@@ -80,7 +80,9 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}"
         ]
         result = analyze_run_commands(run_values, env_vars={"KERNEL_VERSION": "5.14.0"})
-        self.assertEqual(result.packages, ["kernel-devel-5.14.0", "kernel-headers-5.14.0"])
+        self.assertEqual(
+            result.packages, ["kernel-devel-5.14.0", "kernel-headers-5.14.0"]
+        )
         self.assertEqual(result.arch_packages, {})
 
     def test_kernel_devel_conditional_without_version(self):
@@ -110,10 +112,14 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["make"])
-        self.assertEqual(result.arch_packages, {"x86_64": ["kernel-rt-devel", "kernel-rt-modules"]})
+        self.assertEqual(
+            result.arch_packages, {"x86_64": ["kernel-rt-devel", "kernel-rt-modules"]}
+        )
 
     def test_fallback_install_after_or(self):
-        run_values = ["dnf -y install gcc-${GCC_VERSION} gcc-c++-${GCC_VERSION} || dnf -y install gcc gcc-c++"]
+        run_values = [
+            "dnf -y install gcc-${GCC_VERSION} gcc-c++-${GCC_VERSION} || dnf -y install gcc gcc-c++"
+        ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["gcc", "gcc-c++"])
         self.assertEqual(result.arch_packages, {})
@@ -145,12 +151,15 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]})
+        self.assertEqual(
+            result.arch_packages,
+            {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]},
+        )
 
     def test_hosttype_arch_conditional(self):
         run_values = [
             'PACKAGES="git gzip" && '
-            "if [ $HOSTTYPE = x86_64 ]; then PACKAGES=\"$PACKAGES realtime-tests\"; fi && "
+            'if [ $HOSTTYPE = x86_64 ]; then PACKAGES="$PACKAGES realtime-tests"; fi && '
             "yum install -y $PACKAGES"
         ]
         result = analyze_run_commands(run_values)
@@ -189,8 +198,12 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"])
-        self.assertEqual(result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"])
+        self.assertEqual(
+            result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"]
+        )
+        self.assertEqual(
+            result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"]
+        )
 
     def test_version_constraints_stripped(self):
         run_values = ["dnf install -y 'python3.12-setuptools >= 70.3.0' python3.12-pip"]
@@ -221,7 +234,7 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ("[ $(uname -m) = s390x ]", "s390x"),
         ("[ $(uname -p) == x86_64 ]", "x86_64"),
         ("[ $ARCH = aarch64 ]", "aarch64"),
-        ('[ ${ARCH} == x86_64 ]', "x86_64"),
+        ("[ ${ARCH} == x86_64 ]", "x86_64"),
         ('[ $(arch) == "x86_64" ]', "x86_64"),
     ],
 )

@@ -53,21 +53,19 @@ def get_schema():
                                         "required": ["not"],
                                     },
                                 ],
-                            }
+                            },
                         },
                         "required": ["name"],
-                    }
+                    },
                 ],
-            }
+            },
         },
         "type": "object",
         "properties": {
-
             "packages": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/pkg"},
             },
-
             "arches": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -114,18 +112,18 @@ def get_schema():
                     },
                     {
                         "additionalProperties": False,
-                        "properties": {"rpmOstreeTreefile": {"type": "string"}}
+                        "properties": {"rpmOstreeTreefile": {"type": "string"}},
                     },
                     {
                         "additionalProperties": False,
-                        "properties": {"localSystem": {"type": "boolean"}}
+                        "properties": {"localSystem": {"type": "boolean"}},
                     },
                     {
                         "additionalProperties": False,
                         "properties": {
                             "bare": {"type": "boolean"},
                             "flatpak": {"type": "boolean"},
-                        }
+                        },
                     },
                 ],
             },

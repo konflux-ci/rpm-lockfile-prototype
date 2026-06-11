@@ -21,7 +21,13 @@ def _make_entry(instruction: str, value: str) -> dict:
     """
     Build a minimal DockerfileParser structure entry for testing.
     """
-    return {"instruction": instruction, "value": value, "startline": 0, "endline": 0, "content": ""}
+    return {
+        "instruction": instruction,
+        "value": value,
+        "startline": 0,
+        "endline": 0,
+        "content": "",
+    }
 
 
 class TestCollectStageVars(unittest.TestCase):
@@ -98,8 +104,12 @@ class TestExtractPackagesFromFileInstalls(unittest.TestCase):
             pkg_file.write_text("httpd\npython3-pip\n# comment\nqemu-img\n")
             copy_map = {"/tmp/main-packages-list.txt": "main-packages-list.txt"}
 
-            run_values = ["xargs -rtd'\\n' dnf install -y < /tmp/main-packages-list.txt"]
-            result, arch_result = extract_packages_from_file_installs(run_values, copy_map, source_dir)
+            run_values = [
+                "xargs -rtd'\\n' dnf install -y < /tmp/main-packages-list.txt"
+            ]
+            result, arch_result = extract_packages_from_file_installs(
+                run_values, copy_map, source_dir
+            )
             self.assertEqual(result, ["httpd", "python3-pip", "qemu-img"])
             self.assertEqual(arch_result, {})
 
@@ -110,8 +120,12 @@ class TestExtractPackagesFromFileInstalls(unittest.TestCase):
             pkg_file.write_text("httpd\nqemu-img\n# comment\nsqlite\n")
             copy_map = {"/tmp/main-packages-list.ocp": "main-packages-list.ocp"}
 
-            run_values = ["grep -vE '^(#|$)' /tmp/main-packages-list.ocp | xargs -rtd'\\n' dnf install -y"]
-            result, arch_result = extract_packages_from_file_installs(run_values, copy_map, source_dir)
+            run_values = [
+                "grep -vE '^(#|$)' /tmp/main-packages-list.ocp | xargs -rtd'\\n' dnf install -y"
+            ]
+            result, arch_result = extract_packages_from_file_installs(
+                run_values, copy_map, source_dir
+            )
             self.assertEqual(result, ["httpd", "qemu-img", "sqlite"])
             self.assertEqual(arch_result, {})
 
@@ -122,7 +136,9 @@ class TestExtractPackagesFromFileInstalls(unittest.TestCase):
             x86_file.write_text("biosdevname\n")
             copy_map = {"/tmp/packages-list.ocp": "packages-list.ocp"}
 
-            run_values = ["grep -vE '^(#|$)' /tmp/${PKGS_LIST}-$(arch) | xargs -rtd'\\n' dnf install -y"]
+            run_values = [
+                "grep -vE '^(#|$)' /tmp/${PKGS_LIST}-$(arch) | xargs -rtd'\\n' dnf install -y"
+            ]
             result, arch_result = extract_packages_from_file_installs(
                 run_values,
                 copy_map,
@@ -143,7 +159,9 @@ class TestExtractPackagesFromScripts(unittest.TestCase):
 
             copy_map = {"/tmp/install.sh": "hack/install.sh"}
             run_values = ["/bin/bash /tmp/install.sh"]
-            result = extract_packages_from_scripts(run_values, source_dir=source_dir, copy_map=copy_map)
+            result = extract_packages_from_scripts(
+                run_values, source_dir=source_dir, copy_map=copy_map
+            )
             self.assertIn("nmap-ncat", result.packages)
             self.assertIn("procps-ng", result.packages)
 
@@ -164,8 +182,12 @@ class TestExtractPackagesFromScripts(unittest.TestCase):
             script.write_text("dnf install -y httpd qemu-img\n")
 
             copy_map = {"/bin/prepare-image.sh": "prepare-image.sh"}
-            run_values = ["set -euxo pipefail && prepare-image.sh && rm -f /bin/prepare-image.sh"]
-            result = extract_packages_from_scripts(run_values, source_dir=source_dir, copy_map=copy_map)
+            run_values = [
+                "set -euxo pipefail && prepare-image.sh && rm -f /bin/prepare-image.sh"
+            ]
+            result = extract_packages_from_scripts(
+                run_values, source_dir=source_dir, copy_map=copy_map
+            )
             self.assertIn("httpd", result.packages)
             self.assertIn("qemu-img", result.packages)
 
@@ -174,24 +196,30 @@ class TestExtractPackagesFromScripts(unittest.TestCase):
             source_dir = Path(tmpdir)
             script = source_dir / "prepare-efi.sh"
             script.write_text(
-                'dnf install -y grub2 dosfstools\n'
+                "dnf install -y grub2 dosfstools\n"
                 'if [[ "$ARCH" == "x86_64" ]]; then\n'
-                '    GRUB_PKG=grub2-efi-x64\n'
-                '    SHIM_PKG=shim-x64\n'
+                "    GRUB_PKG=grub2-efi-x64\n"
+                "    SHIM_PKG=shim-x64\n"
                 'elif [[ "$ARCH" == "aarch64" ]]; then\n'
-                '    GRUB_PKG=grub2-efi-aa64\n'
-                '    SHIM_PKG=shim-aa64\n'
-                'fi\n'
+                "    GRUB_PKG=grub2-efi-aa64\n"
+                "    SHIM_PKG=shim-aa64\n"
+                "fi\n"
                 'dnf install -y "$GRUB_PKG" "$SHIM_PKG"\n'
             )
 
             copy_map = {"/bin/prepare-efi.sh": "prepare-efi.sh"}
             run_values = ["prepare-efi.sh redhat"]
-            result = extract_packages_from_scripts(run_values, source_dir=source_dir, copy_map=copy_map)
+            result = extract_packages_from_scripts(
+                run_values, source_dir=source_dir, copy_map=copy_map
+            )
             self.assertIn("grub2", result.packages)
             self.assertIn("dosfstools", result.packages)
-            self.assertEqual(result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"])
-            self.assertEqual(result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"])
+            self.assertEqual(
+                result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"]
+            )
+            self.assertEqual(
+                result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"]
+            )
 
     def test_bare_update_in_script_sets_has_update(self):
         with TemporaryDirectory() as tmpdir:
@@ -232,15 +260,17 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
     def test_shell_variable_expansion(self):
         with TemporaryDirectory() as tmpdir:
             content = (
-                'FROM base\n'
+                "FROM base\n"
                 'RUN INSTALL_PKGS=" \\\n'
                 '      which tar wget hostname" && \\\n'
-                '    dnf install -y --nodocs ${INSTALL_PKGS} gpgme && \\\n'
-                '    dnf clean all\n'
+                "    dnf install -y --nodocs ${INSTALL_PKGS} gpgme && \\\n"
+                "    dnf clean all\n"
             )
             path = self._write_containerfile(tmpdir, content)
             stages = analyze_containerfile_stages(path)
-            self.assertEqual(stages[0].packages, ["gpgme", "hostname", "tar", "wget", "which"])
+            self.assertEqual(
+                stages[0].packages, ["gpgme", "hostname", "tar", "wget", "which"]
+            )
 
     def test_arg_env_variable_resolution(self):
         with TemporaryDirectory() as tmpdir:
@@ -258,7 +288,9 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
             )
             path = self._write_containerfile(tmpdir, content)
             stages = analyze_containerfile_stages(path)
-            self.assertEqual(stages[0].packages, ["gcc-12", "gcc-c++-12", "kernel-devel", "make"])
+            self.assertEqual(
+                stages[0].packages, ["gcc-12", "gcc-c++-12", "kernel-devel", "make"]
+            )
 
     def test_arch_conditional_packages(self):
         with TemporaryDirectory() as tmpdir:
@@ -275,14 +307,21 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
             path = self._write_containerfile(tmpdir, content)
             stages = analyze_containerfile_stages(path)
             self.assertEqual(stages[0].packages, ["make"])
-            self.assertEqual(stages[0].arch_packages, {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]})
+            self.assertEqual(
+                stages[0].arch_packages,
+                {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]},
+            )
 
     def test_copy_then_bash_script(self):
         with TemporaryDirectory() as tmpdir:
             hack_dir = Path(tmpdir) / "hack"
             hack_dir.mkdir()
-            (hack_dir / "install.sh").write_text('INSTALL_PKGS="nmap-ncat procps-ng"\ndnf install -y ${INSTALL_PKGS}\n')
-            content = "FROM base\nCOPY hack/install.sh /tmp\nRUN /bin/bash /tmp/install.sh\n"
+            (hack_dir / "install.sh").write_text(
+                'INSTALL_PKGS="nmap-ncat procps-ng"\ndnf install -y ${INSTALL_PKGS}\n'
+            )
+            content = (
+                "FROM base\nCOPY hack/install.sh /tmp\nRUN /bin/bash /tmp/install.sh\n"
+            )
             path = self._write_containerfile(tmpdir, content)
             stages = analyze_containerfile_stages(path, source_dir=Path(tmpdir))
             self.assertIn("nmap-ncat", stages[0].packages)
@@ -292,14 +331,14 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir)
             (source_dir / "prepare-efi.sh").write_text(
-                'dnf install -y grub2 dosfstools\n'
+                "dnf install -y grub2 dosfstools\n"
                 'if [[ "$ARCH" == "x86_64" ]]; then\n'
-                '    GRUB_PKG=grub2-efi-x64\n'
-                '    SHIM_PKG=shim-x64\n'
+                "    GRUB_PKG=grub2-efi-x64\n"
+                "    SHIM_PKG=shim-x64\n"
                 'elif [[ "$ARCH" == "aarch64" ]]; then\n'
-                '    GRUB_PKG=grub2-efi-aa64\n'
-                '    SHIM_PKG=shim-aa64\n'
-                'fi\n'
+                "    GRUB_PKG=grub2-efi-aa64\n"
+                "    SHIM_PKG=shim-aa64\n"
+                "fi\n"
                 'dnf install -y "$GRUB_PKG" "$SHIM_PKG"\n'
             )
             content = (
@@ -314,8 +353,12 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
             stages = analyze_containerfile_stages(path, source_dir=source_dir)
             self.assertIn("grub2", stages[0].packages)
             self.assertIn("dosfstools", stages[0].packages)
-            self.assertEqual(stages[0].arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"])
-            self.assertEqual(stages[0].arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"])
+            self.assertEqual(
+                stages[0].arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"]
+            )
+            self.assertEqual(
+                stages[0].arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"]
+            )
             self.assertEqual(stages[1].packages, ["httpd"])
 
     def test_detect_update(self):
@@ -329,7 +372,9 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
     def test_bare_update_in_script_propagates(self):
         with TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir)
-            (source_dir / "install-python-deps-ocp.sh").write_text("yum update -y\npip install requests==2.28.0\n")
+            (source_dir / "install-python-deps-ocp.sh").write_text(
+                "yum update -y\npip install requests==2.28.0\n"
+            )
             content = (
                 "FROM builder AS build\n"
                 "RUN dnf install -y gcc\n"
@@ -347,8 +392,14 @@ class TestAnalyzeContainerfileStages(unittest.TestCase):
 class TestSelectStage(unittest.TestCase):
     def _make_stages(self) -> list[StagePackages]:
         return [
-            StagePackages(base_image="builder", stage_name="build", packages=["gcc", "make"]),
-            StagePackages(base_image="registry.redhat.io/ubi9/ubi:latest", stage_name="runtime", packages=["httpd"]),
+            StagePackages(
+                base_image="builder", stage_name="build", packages=["gcc", "make"]
+            ),
+            StagePackages(
+                base_image="registry.redhat.io/ubi9/ubi:latest",
+                stage_name="runtime",
+                packages=["httpd"],
+            ),
             StagePackages(base_image="base-rhel9", stage_name="", packages=["skopeo"]),
         ]
 

@@ -7,6 +7,12 @@ on:
     branches: [ "main" ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - uses: astral-sh/ruff-action@v3
+
   build:
 
     runs-on: ubuntu-latest
@@ -16,32 +22,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fedora-version: [40, 41, 42, 43, rawhide]
+        base-image:
+          - registry.fedoraproject.org/fedora:42
+          - registry.fedoraproject.org/fedora:43
+          - registry.fedoraproject.org/fedora:44
+          - registry.fedoraproject.org/fedora:rawhide
+          - registry.access.redhat.com/ubi9/ubi:latest
+          - registry.access.redhat.com/ubi10/ubi:latest
 
     steps:
     - name: Set up podman
       run: |
         sudo apt update
         sudo apt-get -y install podman
-        podman pull registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}
+        podman pull ${{ matrix.base-image }}
     - uses: actions/checkout@v5
+    - name: Derive coverage flag name
+      run: |
+        flag=$(echo "${{ matrix.base-image }}" | sed 's|[^/]*/||' | sed 's|/ubi:latest||' | sed 's|[:/]|-|g' | sed 's|-latest$||')
+        echo "COVERAGE_FLAG=$flag" >> $GITHUB_ENV
     - name: Test with pytest
       run: |
         {
-          echo 'FROM registry.fedoraproject.org/fedora:${{ matrix.fedora-version }}'
+          echo 'FROM ${{ matrix.base-image }}'
           echo 'RUN dnf install -y python3-pip python3-dnf gcc'
           echo 'WORKDIR /src'
           echo 'RUN python3 -m pip install -e "." pytest pytest-cov'
           echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'
         } > podmanfile
         podman build -v $(pwd):/src --tag test -f ./podmanfile
-    # One upload per workflow (matrix runs 5 Fedoras; avoid duplicate uploads)
     - name: Upload coverage to Codecov
-      if: matrix.fedora-version == 43
       uses: codecov/codecov-action@v5
       with:
         use_oidc: true
-        flags: unit-tests
+        flags: ${{ env.COVERAGE_FLAG }}
         files: coverage.xml
         fail_ci_if_error: false
 
