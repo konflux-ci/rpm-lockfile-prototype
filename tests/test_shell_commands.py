@@ -252,6 +252,26 @@ def test_arch_value_regex_no_match():
     assert ARCH_VALUE_RE.search("echo hello") is None
 
 
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ('[ "$(uname -m)" != x86_64 ]', "x86_64"),
+        ("[ $(uname -m) != aarch64 ]", "aarch64"),
+        ('[ "$(go env GOARCH)" != amd64 ]', "amd64"),
+        ("[ $GOARCH != arm64 ]", "arm64"),
+        ('[ ${GOARCH} != ppc64le ]', "ppc64le"),
+    ],
+)
+def test_arch_neq_value_regex_matches(text, expected):
+    m = ARCH_NEQ_VALUE_RE.search(text)
+    assert m is not None, f"No match for: {text}"
+    assert m.group(1) == expected
+
+
+def test_arch_neq_value_regex_no_match():
+    assert ARCH_NEQ_VALUE_RE.search("echo hello") is None
+
+
 class TestListArchConditional(unittest.TestCase):
     """
     Tests for ``[ test ] || cmd`` and ``[ test ] && cmd`` arch-conditional
