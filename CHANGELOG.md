@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.1] - 2026-06-08
+
+## Fixed
+
+- Resolving container image tags to digest has been greatly speed up by not
+  looking up all tags on that image which were never used.
+
+- Fixed compatibility with Python 3.9.
+
+- Containerfile scanning for required packages is now only done when there is
+  no explicit package configuration. This makes the feature opt-in.
+
+
 ## [0.22.0] - 2026-06-08
 
 ### Added
