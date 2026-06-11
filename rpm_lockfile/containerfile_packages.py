@@ -7,6 +7,8 @@ referenced in RUN commands, and analyze per-stage install and update
 commands.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import shlex

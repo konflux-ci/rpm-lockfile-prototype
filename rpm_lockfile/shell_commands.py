@@ -7,6 +7,8 @@ Handles variable assignments, arch-conditional blocks, subshell
 expansions, and bash-to-POSIX preprocessing.
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass, field
