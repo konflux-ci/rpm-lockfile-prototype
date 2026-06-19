@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.0] - 2026-06-19
+
+### Added
+
+- Build dependency packages discovered from Containerfiles are now wired into
+  the dependency resolution. The `dnf builddep` patterns in Containerfiles are
+  parsed and their requirements (including virtual provides like file paths,
+  pkgconfig, python3dist, etc.) are resolved alongside regular packages.
+
+- The shell parser for Containerfiles now supports `[ arch != X ] || dnf install`
+  conditional patterns.
+
+
 ## [0.22.1] - 2026-06-08
 
 ## Fixed
