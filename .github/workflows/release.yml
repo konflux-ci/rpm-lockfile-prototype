@@ -19,7 +19,23 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           # Extract the section between this version's header and the next one
-          notes=$(awk "/^## \[$version\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          # Extract section for this version and unwrap continuation lines
+          # (lines starting with two spaces are joined to the previous line)
+          notes=$(awk "
+            /^## \[$version\]/{found=1; next}
+            found && /^## \[/{exit}
+            found{
+              if (/^  [^ ]/ && have_prev) {
+                sub(/^  /, \" \")
+                prev = prev \$0
+              } else {
+                if (have_prev) print prev
+                prev = \$0
+                have_prev = 1
+              }
+            }
+            END { if (have_prev) print prev }
+          " CHANGELOG.md)
           if [ -z "$notes" ]; then
             echo "No changelog entry found for version $version" >&2
             exit 1
