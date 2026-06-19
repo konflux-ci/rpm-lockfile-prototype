@@ -5,6 +5,7 @@ Tests for rpm_lockfile.containerfile_packages.
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock, patch
 
 from rpm_lockfile.containerfile_packages import (
     StagePackages,
@@ -13,6 +14,7 @@ from rpm_lockfile.containerfile_packages import (
     collect_stage_vars,
     extract_packages_from_file_installs,
     extract_packages_from_scripts,
+    resolve_builddep_packages,
     select_stage,
 )
 
@@ -445,3 +447,59 @@ class TestSelectStage(unittest.TestCase):
     def test_empty_stages_returns_none(self):
         result = select_stage([])
         self.assertIsNone(result)
+
+
+class TestResolveBuilddepPackages(unittest.TestCase):
+
+    def test_from_srpm(self):
+        """
+        resolve_builddep_packages should extract BuildRequires from
+        matching SRPMs via rpm -qpR.
+        """
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            srpm = tmp_path / "pkcs11-helper-1.26.0-3.el8.src.rpm"
+            srpm.touch()
+
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(
+                    returncode=0,
+                    stdout="gcc\nopenssl-devel\nrpmlib(CompressedFileNames)\n/usr/bin/perl\npython3dist(setuptools)\npkgconfig(libcrypto)\nmake\n",
+                    stderr="",
+                )
+                result = resolve_builddep_packages(["pkcs11-helper*"], tmp_path)
+
+            self.assertEqual(
+                result,
+                {
+                    "gcc", "openssl-devel", "/usr/bin/perl",
+                    "python3dist(setuptools)", "pkgconfig(libcrypto)", "make",
+                },
+            )
+            mock_run.assert_called_once()
+
+    def test_spec_files_not_supported(self):
+        """
+        Spec files are not supported because rpmspec resolves macros
+        using host definitions. Only SRPMs should be processed.
+        """
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            spec = tmp_path / "pkcs11-helper.spec"
+            spec.touch()
+
+            with patch("subprocess.run") as mock_run:
+                result = resolve_builddep_packages(["pkcs11-helper*"], tmp_path)
+
+            self.assertEqual(result, set())
+            mock_run.assert_not_called()
+
+    def test_no_match(self):
+        """
+        When no SRPM matches, resolve_builddep_packages should return
+        empty set.
+        """
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            result = resolve_builddep_packages(["nonexistent*"], tmp_path)
+            self.assertEqual(result, set())

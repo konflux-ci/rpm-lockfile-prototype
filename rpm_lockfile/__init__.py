@@ -26,7 +26,7 @@ except ImportError:
 import yaml
 
 from . import containers, content_origin, schema, utils
-from .containerfile_packages import analyze_containerfile_stages, select_stage
+from .containerfile_packages import analyze_containerfile_stages, resolve_builddep_packages, select_stage
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -463,7 +463,7 @@ def logging_setup(debug=False):
 def _extract_containerfile_packages(
     containerfile: str,
     context: dict,
-) -> tuple[set[str], dict[str, set[str]], set[str], set[str]]:
+) -> tuple[set[str], dict[str, set[str]], set[str], set[str], list[str]]:
     """
     Extract RPM package names from Containerfile RUN commands.
 
@@ -475,12 +475,13 @@ def _extract_containerfile_packages(
         context (dict): Configuration context with optional stage filters.
     Return Value(s):
         tuple: (common_packages, arch_packages, upgrade_packages,
-                module_enable) — all empty on failure.
+                module_enable, builddep_packages) — all empty on failure.
     """
     common_packages: set[str] = set()
     arch_packages: dict[str, set[str]] = {}
     upgrade_packages: set[str] = set()
     module_enable: set[str] = set()
+    builddep_packages: list[str] = []
 
     cf_path = Path(containerfile)
     source_dir = cf_path.parent
@@ -492,6 +493,7 @@ def _extract_containerfile_packages(
             arch_packages.setdefault(arch, set()).update(pkgs)
         upgrade_packages.update(selected.update_targets)
         module_enable.update(selected.module_specs)
+        builddep_packages = list(selected.builddep_packages)
     if common_packages or arch_packages:
         logging.info(
             "Extracted %d common and %d arch-specific packages from Containerfile",
@@ -508,12 +510,15 @@ def _extract_containerfile_packages(
             )
         if module_enable:
             logging.debug("Containerfile module enable: %s", sorted(module_enable))
+        if builddep_packages:
+            logging.debug("Containerfile builddep patterns: %s", sorted(builddep_packages))
 
     return (
         common_packages,
         arch_packages,
         upgrade_packages,
         module_enable,
+        builddep_packages,
     )
 
 
@@ -569,6 +574,7 @@ def main():
     containerfile_arch_packages: dict[str, set[str]] = {}
     containerfile_upgrade_packages: set[str] = set()
     containerfile_module_enable: set[str] = set()
+    containerfile_builddep_packages: list[str] = []
 
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
@@ -609,6 +615,7 @@ def main():
                     containerfile_arch_packages,
                     containerfile_upgrade_packages,
                     containerfile_module_enable,
+                    containerfile_builddep_packages,
                 ) = _extract_containerfile_packages(containerfile, context)
             except Exception:
                 logging.warning(
@@ -617,6 +624,11 @@ def main():
                     containerfile,
                     exc_info=True,
                 )
+
+            if containerfile_builddep_packages:
+                source_dir = Path(containerfile).parent
+                builddep_resolved = resolve_builddep_packages(containerfile_builddep_packages, source_dir)
+                containerfile_common_packages |= builddep_resolved
 
     for arch in sorted(arches):
         packages = set()
