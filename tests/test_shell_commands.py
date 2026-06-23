@@ -138,12 +138,47 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             'ARCH_DEP_PKGS=$(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint ; fi) && '
             "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS"
         ]
-        result = analyze_run_commands(run_values)
-        self.assertIn("mstflint", result.packages)
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("mstflint", result.packages)
         self.assertIn("pciutils", result.packages)
         self.assertIn("hwdata", result.packages)
         self.assertIn("kmod", result.packages)
+        for a in ("x86_64", "aarch64", "ppc64le"):
+            self.assertIn("mstflint", result.arch_packages.get(a, []))
+        self.assertNotIn("s390x", result.arch_packages)
+
+    def test_subshell_arch_conditional_var_eq(self):
+        run_values = [
+            'SPECIAL=$(if [ "$(uname -m)" == "x86_64" ]; then echo -n intel-pkg ; fi) && '
+            "yum -y install base-pkg $SPECIAL"
+        ]
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("intel-pkg", result.packages)
+        self.assertIn("base-pkg", result.packages)
+        self.assertEqual(result.arch_packages, {"x86_64": ["intel-pkg"]})
+
+    def test_subshell_no_arch_condition(self):
+        run_values = ['EXTRA=$(echo extra-pkg) && yum -y install base-pkg $EXTRA']
+        result = analyze_run_commands(run_values)
+        self.assertIn("extra-pkg", result.packages)
+        self.assertIn("base-pkg", result.packages)
         self.assertEqual(result.arch_packages, {})
+
+    def test_subshell_arch_conditional_var_go_arch(self):
+        run_values = [
+            'SPECIAL=$(if [ "$(go env GOARCH)" == "amd64" ]; then echo -n x86-only ; fi) && '
+            "yum -y install common-pkg $SPECIAL"
+        ]
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("x86-only", result.packages)
+        self.assertIn("common-pkg", result.packages)
+        self.assertEqual(result.arch_packages, {"x86_64": ["x86-only"]})
 
     def test_arch_conditional_multiple_arches(self):
         run_values = [
