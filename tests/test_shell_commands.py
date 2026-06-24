@@ -465,3 +465,37 @@ class TestModuleParsing(unittest.TestCase):
         run_values = ["dnf module enable -y nodejs"]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.module_specs, [])
+
+
+class TestVariablePackageManager(unittest.TestCase):
+    def test_variable_resolves_to_microdnf(self):
+        run_values = ["${DNF} install -y openssh-clients"]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertIn("openssh-clients", result.packages)
+
+    def test_variable_resolves_to_dnf(self):
+        run_values = ["${DNF} install -y gcc"]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "dnf"})
+        self.assertIn("gcc", result.packages)
+
+    def test_variable_in_conditional(self):
+        run_values = [
+            "if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients "
+            "&& ${DNF} clean all && rm -rf /var/cache/dnf/*; fi"
+        ]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertIn("openssh-clients", result.packages)
+
+    def test_variable_multiple_commands(self):
+        run_values = [
+            "if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients && ${DNF} clean all; fi",
+            "if ! rpm -q libvirt-libs; then ${DNF} install -y libvirt-libs && ${DNF} clean all; fi",
+            "if ! command -v tar; then ${DNF} install -y tar && ${DNF} clean all; fi",
+        ]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertEqual(result.packages, ["libvirt-libs", "openssh-clients", "tar"])
+
+    def test_variable_with_default(self):
+        run_values = ["${DNF:-microdnf} install -y tar"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("tar", result.packages)

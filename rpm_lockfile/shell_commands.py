@@ -555,12 +555,14 @@ def _process_command_node(
         return
 
     word_values = [w.word for w in words]
-    action, action_idx = _detect_pkg_action(word_values, ctx)
+    all_vars = {**ctx.variables, **ctx.shell_vars}
+    resolved_first = resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
+    resolved_word_values = [resolved_first] + word_values[1:] if word_values else word_values
+    action, action_idx = _detect_pkg_action(resolved_word_values, ctx)
     if not action:
         return
 
     pkg_words = word_values[action_idx + 1 :]
-    all_vars = {**ctx.variables, **ctx.shell_vars}
     combined_arch_vals = {
         k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()
     }
