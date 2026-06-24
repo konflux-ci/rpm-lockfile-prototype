@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import argparse
 import contextlib
 import logging
@@ -463,6 +465,7 @@ def logging_setup(debug=False):
 def _extract_containerfile_packages(
     containerfile: str,
     context: dict,
+    arches: list[str] | None = None,
 ) -> tuple[set[str], dict[str, set[str]], set[str], set[str], list[str]]:
     """
     Extract RPM package names from Containerfile RUN commands.
@@ -473,6 +476,8 @@ def _extract_containerfile_packages(
     Arg(s):
         containerfile (str): Path to the Containerfile.
         context (dict): Configuration context with optional stage filters.
+        arches (list[str] | None): Architectures being resolved, passed
+            through to shell command analysis for arch-conditional detection.
     Return Value(s):
         tuple: (common_packages, arch_packages, upgrade_packages,
                 module_enable, builddep_packages) — all empty on failure.
@@ -485,7 +490,7 @@ def _extract_containerfile_packages(
 
     cf_path = Path(containerfile)
     source_dir = cf_path.parent
-    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir)
+    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir, arches=arches)
     selected = select_stage(stages, **_get_containerfile_filters(context))
     if selected:
         common_packages.update(selected.packages)
@@ -616,7 +621,7 @@ def main():
                     containerfile_upgrade_packages,
                     containerfile_module_enable,
                     containerfile_builddep_packages,
-                ) = _extract_containerfile_packages(containerfile, context)
+                ) = _extract_containerfile_packages(containerfile, context, arches)
             except Exception:
                 logging.warning(
                     "Failed to extract packages from Containerfile %s; "

@@ -146,6 +146,7 @@ class TestExtractPackagesFromFileInstalls(unittest.TestCase):
                 copy_map,
                 source_dir,
                 env_vars={"PKGS_LIST": "packages-list.ocp"},
+                arches=["x86_64", "s390x", "ppc64le", "aarch64"],
             )
             self.assertEqual(result, [])
             self.assertEqual(arch_result.get("x86_64"), ["biosdevname"])

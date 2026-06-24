@@ -138,12 +138,47 @@ class TestAnalyzeRunCommands(unittest.TestCase):
             'ARCH_DEP_PKGS=$(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint ; fi) && '
             "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS"
         ]
-        result = analyze_run_commands(run_values)
-        self.assertIn("mstflint", result.packages)
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("mstflint", result.packages)
         self.assertIn("pciutils", result.packages)
         self.assertIn("hwdata", result.packages)
         self.assertIn("kmod", result.packages)
+        for a in ("x86_64", "aarch64", "ppc64le"):
+            self.assertIn("mstflint", result.arch_packages.get(a, []))
+        self.assertNotIn("s390x", result.arch_packages)
+
+    def test_subshell_arch_conditional_var_eq(self):
+        run_values = [
+            'SPECIAL=$(if [ "$(uname -m)" == "x86_64" ]; then echo -n intel-pkg ; fi) && '
+            "yum -y install base-pkg $SPECIAL"
+        ]
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("intel-pkg", result.packages)
+        self.assertIn("base-pkg", result.packages)
+        self.assertEqual(result.arch_packages, {"x86_64": ["intel-pkg"]})
+
+    def test_subshell_no_arch_condition(self):
+        run_values = ['EXTRA=$(echo extra-pkg) && yum -y install base-pkg $EXTRA']
+        result = analyze_run_commands(run_values)
+        self.assertIn("extra-pkg", result.packages)
+        self.assertIn("base-pkg", result.packages)
         self.assertEqual(result.arch_packages, {})
+
+    def test_subshell_arch_conditional_var_go_arch(self):
+        run_values = [
+            'SPECIAL=$(if [ "$(go env GOARCH)" == "amd64" ]; then echo -n x86-only ; fi) && '
+            "yum -y install common-pkg $SPECIAL"
+        ]
+        result = analyze_run_commands(
+            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
+        )
+        self.assertNotIn("x86-only", result.packages)
+        self.assertIn("common-pkg", result.packages)
+        self.assertEqual(result.arch_packages, {"x86_64": ["x86-only"]})
 
     def test_arch_conditional_multiple_arches(self):
         run_values = [
@@ -415,6 +450,21 @@ class TestBuilddepParsing(unittest.TestCase):
         self.assertEqual(result.builddep_packages, ["pkcs11-helper*"])
 
 
+    def test_build_dep_hyphenated(self):
+        run_values = ["dnf build-dep tuned.spec -y"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("tuned.spec", result.builddep_packages)
+
+    def test_build_dep_hyphenated_with_install(self):
+        run_values = [
+            "dnf install -y gcc rpm-build && cd assets/tuned/daemon "
+            "&& dnf build-dep tuned.spec -y"
+        ]
+        result = analyze_run_commands(run_values)
+        self.assertIn("gcc", result.packages)
+        self.assertIn("tuned.spec", result.builddep_packages)
+
+
 class TestModuleParsing(unittest.TestCase):
     def test_module_install(self):
         run_values = ["dnf module install -y nodejs:18/development"]
@@ -430,3 +480,37 @@ class TestModuleParsing(unittest.TestCase):
         run_values = ["dnf module enable -y nodejs"]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.module_specs, [])
+
+
+class TestVariablePackageManager(unittest.TestCase):
+    def test_variable_resolves_to_microdnf(self):
+        run_values = ["${DNF} install -y openssh-clients"]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertIn("openssh-clients", result.packages)
+
+    def test_variable_resolves_to_dnf(self):
+        run_values = ["${DNF} install -y gcc"]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "dnf"})
+        self.assertIn("gcc", result.packages)
+
+    def test_variable_in_conditional(self):
+        run_values = [
+            "if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients "
+            "&& ${DNF} clean all && rm -rf /var/cache/dnf/*; fi"
+        ]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertIn("openssh-clients", result.packages)
+
+    def test_variable_multiple_commands(self):
+        run_values = [
+            "if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients && ${DNF} clean all; fi",
+            "if ! rpm -q libvirt-libs; then ${DNF} install -y libvirt-libs && ${DNF} clean all; fi",
+            "if ! command -v tar; then ${DNF} install -y tar && ${DNF} clean all; fi",
+        ]
+        result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
+        self.assertEqual(result.packages, ["libvirt-libs", "openssh-clients", "tar"])
+
+    def test_variable_with_default(self):
+        run_values = ["${DNF:-microdnf} install -y tar"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("tar", result.packages)

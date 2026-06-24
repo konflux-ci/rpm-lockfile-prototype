@@ -25,8 +25,6 @@ from .shell_commands import (
     resolve_bash_expansion,
 )
 
-# Common Linux architectures for multi-arch resolution
-DEFAULT_ARCHES = ["x86_64", "s390x", "ppc64le", "aarch64"]
 
 
 @dataclass
@@ -247,7 +245,7 @@ def extract_packages_from_file_installs(
         source_dir (Path): Source tree root.
         env_vars (dict[str, str] | None): Variables for path resolution.
         arches (list[str] | None): Architectures to resolve for arch-specific
-            file paths. Defaults to DEFAULT_ARCHES.
+            file paths.
     Return Value(s):
         tuple[list[str], dict[str, list[str]]]:
             - Sorted unique package names (common to all arches).
@@ -255,7 +253,7 @@ def extract_packages_from_file_installs(
     """
     logger = logging.getLogger(__name__)
     variables = dict(env_vars or {})
-    arch_list = arches or DEFAULT_ARCHES
+    arch_list = arches or []
     redirect_re = re.compile(
         r"""
         (?:xargs\s+(?:\S+\s+)*)?    # optional xargs with optional flags
@@ -341,6 +339,7 @@ def extract_packages_from_scripts(
     source_dir: Path | None = None,
     copy_map: dict[str, str] | None = None,
     env_vars: dict[str, str] | None = None,
+    arches: list[str] | None = None,
 ) -> StagePackages:
     """
     Find shell scripts invoked in RUN commands and extract yum/dnf
@@ -362,6 +361,8 @@ def extract_packages_from_scripts(
         copy_map (dict[str, str] | None): Container path to source path
             mapping from COPY/ADD instructions.
         env_vars (dict[str, str] | None): Variables for path resolution.
+        arches (list[str] | None): Architectures being resolved, passed
+            through for arch-conditional subshell detection.
     Return Value(s):
         StagePackages: Extracted packages, update targets, arch-specific
             packages, and update flag from scripts.
@@ -448,7 +449,7 @@ def extract_packages_from_scripts(
                     joined_lines.append(stripped)
             script_body = "\n".join(line for line in joined_lines if line.strip())
 
-            result = analyze_run_commands([script_body])
+            result = analyze_run_commands([script_body], arches=arches)
             all_packages.update(result.packages)
             for arch, arch_pkgs in result.arch_packages.items():
                 all_arch_packages.setdefault(arch, set()).update(arch_pkgs)
@@ -459,7 +460,8 @@ def extract_packages_from_scripts(
                 scripts_have_bare_update = True
 
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                [script_body], copy_map, source_dir, env_vars=env_vars
+                [script_body], copy_map, source_dir, env_vars=env_vars,
+                arches=arches,
             )
             all_packages.update(file_pkgs)
             for arch, arch_pkgs in file_arch_pkgs.items():
@@ -480,6 +482,7 @@ def extract_packages_from_scripts(
 def analyze_containerfile_stages(
     containerfile_path: Path,
     source_dir: Path | None = None,
+    arches: list[str] | None = None,
 ) -> list[StagePackages]:
     """
     Parse a Containerfile and return per-stage package analysis.
@@ -500,6 +503,8 @@ def analyze_containerfile_stages(
         containerfile_path (Path): Path to the Containerfile/Dockerfile.
         source_dir (Path | None): Source tree root to locate script files
             referenced in RUN commands.
+        arches (list[str] | None): Architectures being resolved, passed
+            through for arch-conditional subshell detection.
     Return Value(s):
         list[StagePackages]: Per-stage package analysis.
     """
@@ -545,7 +550,9 @@ def analyze_containerfile_stages(
                 base_image = resolve_bash_expansion(m.group("img"), stage_vars)
                 stage_name = m.group("name") or ""
 
-        result = analyze_run_commands(run_values, env_vars=stage_vars)
+        result = analyze_run_commands(
+            run_values, env_vars=stage_vars, arches=arches
+        )
         stage = StagePackages(
             base_image=base_image,
             stage_name=stage_name,
@@ -559,12 +566,14 @@ def analyze_containerfile_stages(
                 source_dir=source_dir,
                 copy_map=copy_map,
                 env_vars=stage_vars,
+                arches=arches,
             )
         )
 
         if source_dir:
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                run_values, copy_map, source_dir, env_vars=stage_vars
+                run_values, copy_map, source_dir, env_vars=stage_vars,
+                arches=arches,
             )
             stage = stage.merge(
                 StagePackages(packages=file_pkgs, arch_packages=file_arch_pkgs)

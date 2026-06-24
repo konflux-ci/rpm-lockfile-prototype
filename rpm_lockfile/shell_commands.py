@@ -74,6 +74,7 @@ class _WalkContext:
     """
 
     variables: dict[str, str] = field(default_factory=dict)
+    known_arches: frozenset[str] = field(default_factory=frozenset)
     shell_vars: dict[str, str] = field(default_factory=dict)
     arch_shell_vars: dict[str, dict[str, str]] = field(default_factory=dict)
     packages: set[str] = field(default_factory=set)
@@ -374,7 +375,18 @@ def _process_assignments(
         if has_cmdsub:
             extracted = _extract_subshell_packages(var_value)
             if extracted:
-                ctx.shell_vars[var_name] = extracted
+                target_arches = _extract_subshell_arch_condition(
+                    var_value, ctx.known_arches
+                )
+                if target_arches:
+                    per_arch = ctx.arch_shell_vars.setdefault(var_name, {})
+                    for arch in target_arches:
+                        if arch in per_arch:
+                            per_arch[arch] = f"{per_arch[arch]} {extracted}"
+                        else:
+                            per_arch[arch] = extracted
+                else:
+                    ctx.shell_vars[var_name] = extracted
         elif arch_context:
             per_arch = ctx.arch_shell_vars.setdefault(var_name, {})
             for arch in arch_context:
@@ -411,7 +423,7 @@ def _detect_pkg_action(
         if wl in ("update", "upgrade"):
             ctx.has_update = True
             return "update", idx
-        if wl == "builddep":
+        if wl in ("builddep", "build-dep"):
             return "builddep", idx
         if wl == "module":
             for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
@@ -543,12 +555,14 @@ def _process_command_node(
         return
 
     word_values = [w.word for w in words]
-    action, action_idx = _detect_pkg_action(word_values, ctx)
+    all_vars = {**ctx.variables, **ctx.shell_vars}
+    resolved_first = resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
+    resolved_word_values = [resolved_first] + word_values[1:] if word_values else word_values
+    action, action_idx = _detect_pkg_action(resolved_word_values, ctx)
     if not action:
         return
 
     pkg_words = word_values[action_idx + 1 :]
-    all_vars = {**ctx.variables, **ctx.shell_vars}
     combined_arch_vals = {
         k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()
     }
@@ -578,6 +592,47 @@ def _process_command_node(
     )
 
 
+def _extract_subshell_arch_condition(
+    subshell_body: str, known_arches: frozenset[str]
+) -> list[str] | None:
+    """
+    Detect architecture conditions inside a subshell body and return
+    the list of arches where the subshell produces output.
+
+    Arg(s):
+        subshell_body (str): Text inside a $(...) subshell, e.g.
+            'if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint; fi'
+        known_arches (frozenset[str]): Full set of architectures being
+            resolved, used for complement computation on != patterns.
+    Return Value(s):
+        list[str] | None: Target arches (RPM names), or None if no
+            arch condition detected or pattern is ambiguous.
+    """
+    if not _has_arch_test(subshell_body):
+        return None
+
+    if not known_arches:
+        return None
+
+    neq_arches = ARCH_NEQ_VALUE_RE.findall(subshell_body)
+    eq_arches = ARCH_VALUE_RE.findall(subshell_body)
+
+    if neq_arches and eq_arches:
+        return None
+
+    if neq_arches:
+        excluded = set(_normalize_arch_names(neq_arches))
+        target = sorted(known_arches - excluded)
+        return target if target else None
+
+    if eq_arches:
+        if len(eq_arches) > 1:
+            return None
+        return _normalize_arch_names(eq_arches)
+
+    return None
+
+
 def _extract_subshell_packages(subshell_body: str) -> str:
     """
     Extract package names from echo commands inside a $(...) subshell.
@@ -601,6 +656,7 @@ def _extract_subshell_packages(subshell_body: str) -> str:
 def _parse_and_walk(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
+    arches: list[str] | None = None,
 ) -> _WalkContext:
     """
     Single pass: preprocess, parse with bashlex, and walk all RUN bodies.
@@ -608,11 +664,16 @@ def _parse_and_walk(
     Arg(s):
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
+        arches (list[str] | None): Architectures being resolved, used for
+            complement computation in subshell arch conditions.
     Return Value(s):
         _WalkContext: Walk context with accumulated packages and state.
     """
     logger = logging.getLogger(__name__)
-    ctx = _WalkContext(variables=dict(env_vars or {}))
+    ctx = _WalkContext(
+        variables=dict(env_vars or {}),
+        known_arches=frozenset(arches) if arches else frozenset(),
+    )
 
     for run_body in run_values:
         preprocessed = _preprocess_for_bashlex(run_body)
@@ -632,6 +693,7 @@ def _parse_and_walk(
 def analyze_run_commands(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
+    arches: list[str] | None = None,
 ) -> RunCommandResult:
     """
     Single-pass analysis of RUN command bodies.
@@ -639,11 +701,13 @@ def analyze_run_commands(
     Arg(s):
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
+        arches (list[str] | None): Architectures being resolved, used for
+            complement computation in subshell arch conditions.
     Return Value(s):
         RunCommandResult: Sorted packages, arch-specific packages,
             update targets, builddep patterns, and module specs.
     """
-    ctx = _parse_and_walk(run_values, env_vars)
+    ctx = _parse_and_walk(run_values, env_vars, arches)
     return RunCommandResult(
         packages=sorted(ctx.packages),
         arch_packages={
