@@ -450,6 +450,21 @@ class TestBuilddepParsing(unittest.TestCase):
         self.assertEqual(result.builddep_packages, ["pkcs11-helper*"])
 
 
+    def test_build_dep_hyphenated(self):
+        run_values = ["dnf build-dep tuned.spec -y"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("tuned.spec", result.builddep_packages)
+
+    def test_build_dep_hyphenated_with_install(self):
+        run_values = [
+            "dnf install -y gcc rpm-build && cd assets/tuned/daemon "
+            "&& dnf build-dep tuned.spec -y"
+        ]
+        result = analyze_run_commands(run_values)
+        self.assertIn("gcc", result.packages)
+        self.assertIn("tuned.spec", result.builddep_packages)
+
+
 class TestModuleParsing(unittest.TestCase):
     def test_module_install(self):
         run_values = ["dnf module install -y nodejs:18/development"]
