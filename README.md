@@ -19,8 +19,8 @@ source.
 
 First install system dependencies that are difficult to obtain via `pip`.
 
-```
-$ sudo dnf install python3 python3-pip python3-dnf
+```bash
+sudo dnf install python3 python3-pip python3-dnf
 ```
 
 Note that for the following commands you need to use default system version of
@@ -28,14 +28,16 @@ Python. Any other version will fail to find the DNF bindings.
 
 Install with pip directly from Git:
 
-```
-$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
+```bash
+python3 -m pip install --user \
+ https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/heads/main.zip
 ```
 
 Or latest released version:
 
-```
-$ python3 -m pip install --user https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.23.0.tar.gz
+```bash
+python3 -m pip install --user \
+ https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.23.0.tar.gz
 ```
 
 You can also use COPR repo created by Packit, which tracks the latest main branch:
@@ -49,11 +51,11 @@ environment. Enabling system packages makes it easier.
 
 Additionally, the tool requires skopeo and rpm to be available on the system.
 
-```
+```console
 $ python -m venv venv --system-site-packages
-$ . venv/bin/activate
-(venv) $ python -m pip install -e .
-(venv) $ rpm-lockfile-prototype --help
+$ . ./venv/bin/activate
+$ (venv) python -m pip install -e .
+$ (venv) rpm-lockfile-prototype --help
 usage: rpm-lockfile-prototype [-h]
                               [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
                               [--flatpak] [--debug] [--arch ARCH] [--outfile OUTFILE]
@@ -82,7 +84,7 @@ options:
   --outfile OUTFILE
   --print-schema        Print schema for the input file to stdout.
   --allowerasing        Allow erasing of installed packages to resolve dependencies.
-(venv) $
+$ (venv)
 ```
 
 # Running in a container
@@ -93,31 +95,34 @@ from a local container image using the [`Containerfile`](./Containerfile) at the
 1. Build the image (this only needs to be done once or if updates are needed):
 
    ```bash
-   $ podman build -f Containerfile -t localhost/rpm-lockfile-prototype
+   podman build -f Containerfile -t localhost/rpm-lockfile-prototype
    ```
 
    or, to skip cloning the repo and install the latest commit from `main`:
 
    ```bash
-   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
-      | podman build -t localhost/rpm-lockfile-prototype -
+   curl \
+    https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+    | podman build -t localhost/rpm-lockfile-prototype -
    ```
 
    Alternatively, to use a different base image that has `dnf` or specify a tag other than `main` 
    to install:
 
    ```bash
-   $ curl https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
-      | podman build -t localhost/rpm-lockfile-prototype \
-        --build-arg BASE_IMAGE=other-base-image:latest \
-        --build-arg GIT_REF=tags/v0.13.1 -
+   curl \
+    https://raw.githubusercontent.com/konflux-ci/rpm-lockfile-prototype/refs/heads/main/Containerfile \
+    | podman build -t localhost/rpm-lockfile-prototype \
+      --build-arg BASE_IMAGE=other-base-image:latest \
+      --build-arg GIT_REF=tags/v0.13.1 -
    ```
 
 2. Run the image from the directory containing the `rpms.in.yaml` to generate the `rpms.lock.yaml`
    file:
 
    ```bash
-   $ podman run --rm -v ${PWD}:/work localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
+   podman run --rm -v ${PWD}:/work \
+    localhost/rpm-lockfile-prototype:latest --outfile=rpms.lock.yaml rpms.in.yaml
    ```
 
    The container uses `/work` as current working directory, so the command will
