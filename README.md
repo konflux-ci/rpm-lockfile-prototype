@@ -54,8 +54,8 @@ Additionally, the tool requires skopeo and rpm to be available on the system.
 ```console
 $ python -m venv venv --system-site-packages
 $ . ./venv/bin/activate
-$ (venv) python -m pip install -e .
-$ (venv) rpm-lockfile-prototype --help
+$ python -m pip install -e .
+$ rpm-lockfile-prototype --help
 usage: rpm-lockfile-prototype [-h]
                               [-f CONTAINERFILE | --image IMAGE | --local-system | --bare | --rpm-ostree-treefile RPM_OSTREE_TREEFILE]
                               [--flatpak] [--debug] [--arch ARCH] [--outfile OUTFILE]
