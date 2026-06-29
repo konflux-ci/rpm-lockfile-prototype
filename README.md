@@ -84,7 +84,6 @@ options:
   --outfile OUTFILE
   --print-schema        Print schema for the input file to stdout.
   --allowerasing        Allow erasing of installed packages to resolve dependencies.
-$ (venv)
 ```
 
 # Running in a container
