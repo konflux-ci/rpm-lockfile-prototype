@@ -215,10 +215,10 @@ def resolver(
             # And resolve the transaction
             try:
                 base.resolve(allow_erasing=allow_erasing)
-            except dnf.exceptions.DepsolveError as exc:
-                if not download_filelists and "nothing provides /" in exc.value:
-                    # If we did not download filelists and the error indicates
-                    # they may be needed, signal that with a custom exception.
+            except dnf.exceptions.DepsolveError:
+                if not download_filelists:
+                    # Retry with filelists — they may provide file-level
+                    # dependencies needed to validate the transaction.
                     raise MissingFilelists()
                 raise
 
