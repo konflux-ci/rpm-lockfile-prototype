@@ -14,14 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Extract changelog for this version
-        id: changelog
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           # Extract the section between this version's header and the next one
-          # Extract section for this version and unwrap continuation lines
-          # (lines starting with two spaces are joined to the previous line)
-          notes=$(awk "
+          # and unwrap continuation lines (lines starting with two spaces are
+          # joined to the previous line)
+          awk "
             /^## \[$version\]/{found=1; next}
             found && /^## \[/{exit}
             found{
@@ -35,19 +36,11 @@ jobs:
               }
             }
             END { if (have_prev) print prev }
-          " CHANGELOG.md)
-          if [ -z "$notes" ]; then
+          " CHANGELOG.md > /tmp/release-notes.md
+          if [ ! -s /tmp/release-notes.md ]; then
             echo "No changelog entry found for version $version" >&2
             exit 1
           fi
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$notes" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --notes "${{ steps.changelog.outputs.notes }}"
+            --notes-file /tmp/release-notes.md
