@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.24.0] - 2026-07-02
+
+### Fixed
+
+- Dependency resolution now retries with filelists on any `DepsolveError`,
+  not just errors containing "nothing provides /". This fixes resolution
+  failures caused by package replacement conflicts when the base image has
+  a security-patched version that differs from compose repos.
+
+- `build-dep` is now recognized as an alias for `builddep` when scanning
+  Containerfiles for packages to install with `dnf`.
+
+- Variable package manager commands (e.g., `${DNF}` resolving to `microdnf`)
+  are now resolved before matching against known package manager names. This
+  ensures packages installed via a variable-defined command are correctly
+  detected.
+
+- Arch conditions inside subshell package assignments in Containerfiles are
+  now correctly detected, preventing resolution failures on architectures
+  where conditional packages are unavailable.
+
+
 ## [0.23.0] - 2026-06-19
 
 ### Added
