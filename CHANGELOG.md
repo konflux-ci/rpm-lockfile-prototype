@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- New `assumeProvides` configuration key to declare packages or capabilities
+  that should be treated as already installed during dependency resolution.
+  This is useful when RPMs are built in earlier Containerfile stages and
+  installed in a later stage. ([#147](https://github.com/konflux-ci/rpm-lockfile-prototype/issues/147))
+
 ## [0.24.0] - 2026-07-02
 
 ### Fixed

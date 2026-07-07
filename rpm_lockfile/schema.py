@@ -131,6 +131,10 @@ def get_schema():
             "noSources": {"type": "boolean"},
             "installWeakDeps": {"type": "boolean"},
             "zchunk": {"type": "boolean"},
+            "assumeProvides": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
         },
         "required": ["contentOrigin"],
         "additionalProperties": False,
