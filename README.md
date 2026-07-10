@@ -207,6 +207,13 @@ reinstallPackages: []
 upgradePackages: []
   # List of rpms to update. Same specification as `packages` above.
 
+assumeProvides:
+  # List of package names or RPM capabilities that should be treated as
+  # already satisfied during dependency resolution. Use this when packages
+  # are built in an earlier Containerfile stage and installed later.
+  - nvidia-kmod
+  - cuda-libs
+
 moduleEnable: []
   # List of module streams that should be enabled during the dependency
   # resolution. The specification uses the same format as `packages` above.

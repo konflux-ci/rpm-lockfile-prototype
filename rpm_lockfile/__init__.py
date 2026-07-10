@@ -27,7 +27,7 @@ except ImportError:
     sys.exit(127)
 import yaml
 
-from . import containers, content_origin, schema, utils
+from . import assumed_provides, containers, content_origin, schema, utils
 from .containerfile_packages import analyze_containerfile_stages, resolve_builddep_packages, select_stage
 
 CONTAINERFILE_HELP = """
@@ -128,6 +128,7 @@ def resolver(
     upgrade_packages: set[str],
     download_filelists: bool = False,
     zchunk: bool = None,
+    assume_provides: list[str] = None,
 ):
     packages = set()
     sources = set()
@@ -172,6 +173,17 @@ def resolver(
                     ),
                     conf,
                     **repo.kwargs,
+                )
+            if assume_provides:
+                logging.info(
+                    "Adding assumed provides repo: %s",
+                    ", ".join(assume_provides),
+                )
+                repo_path = assumed_provides.create_repo(cache_dir, assume_provides)
+                base.repos.add_new_repo(
+                    assumed_provides.REPO_ID,
+                    conf,
+                    baseurl=[f"file://{repo_path}"],
                 )
             base.fill_sack(load_system_repo=True)
 
@@ -231,6 +243,8 @@ def resolver(
 
             # These packages would be installed
             for pkg in base.transaction.install_set:
+                if pkg.name.startswith(assumed_provides.PACKAGE_PREFIX):
+                    continue
                 if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
                     modular_repos.add(pkg.repoid)
                 packages.add(PackageItem.from_dnf(pkg))
@@ -305,6 +319,7 @@ def process_arch(
     install_weak_deps: bool,
     upgrade_packages: set[str],
     zchunk: bool = None,
+    assume_provides: list[str] = None,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -325,6 +340,7 @@ def process_arch(
                     upgrade_packages,
                     download_filelists=download_filelists,
                     zchunk=zchunk,
+                    assume_provides=assume_provides,
                 )
                 break
             except MissingFilelists:
@@ -566,6 +582,7 @@ def main():
     context = config.get("context", {})
     allowerasing = args.allowerasing or config.get("allowerasing", False)
     no_sources = config.get("noSources", False)
+    assume_provides = config.get("assumeProvides", [])
 
     local = args.local_system or context.get("localSystem")
     if local and arches != [platform.machine()]:
@@ -672,6 +689,7 @@ def main():
                 )
                 | containerfile_upgrade_packages,
                 zchunk=config.get("zchunk"),
+                assume_provides=assume_provides,
             )
         )
 

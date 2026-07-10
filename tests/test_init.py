@@ -1,8 +1,12 @@
+import os
+import tempfile
 from unittest.mock import patch, mock_open
+from xml.etree import ElementTree
 
 import pytest
 
 import rpm_lockfile
+from rpm_lockfile import assumed_provides, schema
 
 
 @pytest.mark.parametrize(
@@ -47,3 +51,43 @@ def test_read_container_yaml(arch, expected):
 )
 def test_filter_for_arch(input, expected):
     assert sorted(rpm_lockfile.filter_for_arch("ppc64le", input)) == sorted(expected)
+
+
+class TestAssumeProvides:
+    def test_schema_accepts_assume_provides(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "assumeProvides": ["nvidia-kmod", "cuda-libs"],
+        }
+        schema.validate(config)
+
+    def test_schema_rejects_invalid_assume_provides(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "assumeProvides": "not-a-list",
+        }
+        with pytest.raises(SystemExit):
+            schema.validate(config)
+
+    def test_create_assumed_provides_repo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = assumed_provides.create_repo(
+                tmpdir, ["nvidia-kmod", "cuda-libs"]
+            )
+            repomd_path = os.path.join(repo_dir, "repodata", "repomd.xml")
+            assert os.path.exists(repomd_path)
+
+            ns = {"repo": "http://linux.duke.edu/metadata/repo"}
+            tree = ElementTree.parse(repomd_path)
+            data_types = {
+                el.get("type") for el in tree.findall("repo:data", ns)
+            }
+            assert "primary" in data_types
+            assert "filelists" in data_types
+            assert "other" in data_types
+
+    def test_create_assumed_provides_repo_empty(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = assumed_provides.create_repo(tmpdir, [])
+            repomd_path = os.path.join(repo_dir, "repodata", "repomd.xml")
+            assert os.path.exists(repomd_path)
