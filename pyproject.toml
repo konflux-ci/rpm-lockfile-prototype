@@ -7,7 +7,6 @@ authors = [
 ]
 readme = "README.md"
 dependencies = [
-    "createrepo-c",
     "dockerfile-parse",
     "jsonschema",
     "productmd",

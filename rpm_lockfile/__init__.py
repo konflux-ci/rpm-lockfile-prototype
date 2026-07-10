@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import hashlib
 import logging
 import os
 import platform
@@ -26,10 +25,9 @@ except ImportError:
         file=sys.stderr,
     )
     sys.exit(127)
-import createrepo_c as cr
 import yaml
 
-from . import containers, content_origin, schema, utils
+from . import assumed_provides, containers, content_origin, schema, utils
 from .containerfile_packages import analyze_containerfile_stages, resolve_builddep_packages, select_stage
 
 CONTAINERFILE_HELP = """
@@ -181,11 +179,9 @@ def resolver(
                     "Adding assumed provides repo: %s",
                     ", ".join(assume_provides),
                 )
-                repo_path = create_assumed_provides_repo(
-                    cache_dir, assume_provides
-                )
+                repo_path = assumed_provides.create_repo(cache_dir, assume_provides)
                 base.repos.add_new_repo(
-                    ASSUMED_PROVIDES_REPO_ID,
+                    assumed_provides.REPO_ID,
                     conf,
                     baseurl=[f"file://{repo_path}"],
                 )
@@ -247,7 +243,7 @@ def resolver(
 
             # These packages would be installed
             for pkg in base.transaction.install_set:
-                if pkg.name.startswith(ASSUMED_PROVIDES_PREFIX):
+                if pkg.name.startswith(assumed_provides.PACKAGE_PREFIX):
                     continue
                 if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
                     modular_repos.add(pkg.repoid)
@@ -283,60 +279,6 @@ def resolver(
                 )
 
     return packages, sources, module_metadata
-
-
-ASSUMED_PROVIDES_REPO_ID = "_assumed-provides"
-ASSUMED_PROVIDES_PREFIX = "_assumed-provides-"
-
-
-def create_assumed_provides_repo(tmpdir, assume_provides):
-    repo_dir = os.path.join(tmpdir, ASSUMED_PROVIDES_REPO_ID)
-    repodata_dir = os.path.join(repo_dir, "repodata")
-    os.makedirs(repodata_dir, exist_ok=True)
-
-    primary_path = os.path.join(repodata_dir, "primary.xml.gz")
-    filelists_path = os.path.join(repodata_dir, "filelists.xml.gz")
-    other_path = os.path.join(repodata_dir, "other.xml.gz")
-
-    primary = cr.PrimaryXmlFile(primary_path)
-    filelists = cr.FilelistsXmlFile(filelists_path)
-    other = cr.OtherXmlFile(other_path)
-
-    for entry in assume_provides:
-        pkg = cr.Package()
-        pkg.name = f"{ASSUMED_PROVIDES_PREFIX}{entry}"
-        pkg.version = "0"
-        pkg.release = "0"
-        pkg.epoch = "0"
-        pkg.arch = "noarch"
-        pkg.summary = "Assumed provides placeholder"
-        pkg.description = "Placeholder"
-        pkg.pkgId = hashlib.sha256(entry.encode()).hexdigest()
-        pkg.checksum_type = "sha256"
-        pkg.provides = [(entry, None, None, None, None, None)]
-        primary.add_pkg(pkg)
-        filelists.add_pkg(pkg)
-        other.add_pkg(pkg)
-
-    primary.close()
-    filelists.close()
-    other.close()
-
-    repomd = cr.Repomd()
-    for md_type, path in [
-        ("primary", primary_path),
-        ("filelists", filelists_path),
-        ("other", other_path),
-    ]:
-        rec = cr.RepomdRecord(md_type, path)
-        rec.fill(cr.SHA256)
-        rec.rename_file()
-        repomd.set_record(rec)
-
-    with open(os.path.join(repodata_dir, "repomd.xml"), "w") as f:
-        f.write(repomd.xml_dump())
-
-    return repo_dir
 
 
 def rpmdb_preparer(func=None):

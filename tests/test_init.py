@@ -1,12 +1,12 @@
 import os
 import tempfile
 from unittest.mock import patch, mock_open
+from xml.etree import ElementTree
 
-import createrepo_c as cr
 import pytest
 
 import rpm_lockfile
-from rpm_lockfile import schema
+from rpm_lockfile import assumed_provides, schema
 
 
 @pytest.mark.parametrize(
@@ -71,19 +71,23 @@ class TestAssumeProvides:
 
     def test_create_assumed_provides_repo(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = rpm_lockfile.create_assumed_provides_repo(
+            repo_dir = assumed_provides.create_repo(
                 tmpdir, ["nvidia-kmod", "cuda-libs"]
             )
             repomd_path = os.path.join(repo_dir, "repodata", "repomd.xml")
             assert os.path.exists(repomd_path)
 
-            repomd = cr.Repomd(repomd_path)
-            assert repomd.repo_tags == []
-            records = {r.type: r for r in repomd.records}
-            assert "primary" in records
+            ns = {"repo": "http://linux.duke.edu/metadata/repo"}
+            tree = ElementTree.parse(repomd_path)
+            data_types = {
+                el.get("type") for el in tree.findall("repo:data", ns)
+            }
+            assert "primary" in data_types
+            assert "filelists" in data_types
+            assert "other" in data_types
 
     def test_create_assumed_provides_repo_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = rpm_lockfile.create_assumed_provides_repo(tmpdir, [])
+            repo_dir = assumed_provides.create_repo(tmpdir, [])
             repomd_path = os.path.join(repo_dir, "repodata", "repomd.xml")
             assert os.path.exists(repomd_path)
