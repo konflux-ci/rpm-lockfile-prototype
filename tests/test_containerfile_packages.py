@@ -131,6 +131,24 @@ class TestExtractPackagesFromFileInstalls(unittest.TestCase):
             self.assertEqual(result, ["httpd", "qemu-img", "sqlite"])
             self.assertEqual(arch_result, {})
 
+    def test_pipe_with_quoted_env_var_in_path(self):
+        with TemporaryDirectory() as tmpdir:
+            source_dir = Path(tmpdir)
+            pkg_file = source_dir / "main-packages-list.ocp"
+            pkg_file.write_text("coreos-installer\ndosfstools\n")
+            copy_map = {"/tmp/main-packages-list.ocp": "main-packages-list.ocp"}
+
+            run_values = [
+                "grep -v '^#' \"/tmp/${PKGS_LIST}\" | xargs -rtd'\\n' dnf install -y"
+            ]
+            result, _ = extract_packages_from_file_installs(
+                run_values,
+                copy_map,
+                source_dir,
+                env_vars={"PKGS_LIST": "main-packages-list.ocp"},
+            )
+            self.assertEqual(result, ["coreos-installer", "dosfstools"])
+
     def test_arch_suffix_in_filename(self):
         with TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir)

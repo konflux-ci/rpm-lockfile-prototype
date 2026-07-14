@@ -287,7 +287,7 @@ def extract_packages_from_file_installs(
                 match = pipe_re.search(cmd_clean)
             if not match:
                 continue
-            raw_path = match.group(1)
+            raw_path = _strip_quotes(match.group(1))
             resolved_path = resolve_bash_expansion(raw_path, variables)
             if not resolved_path:
                 continue
