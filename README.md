@@ -37,7 +37,7 @@ Or latest released version:
 
 ```bash
 python3 -m pip install --user \
- https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.25.0.tar.gz
+ https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.25.1.tar.gz
 ```
 
 You can also use COPR repo created by Packit, which tracks the latest main branch:

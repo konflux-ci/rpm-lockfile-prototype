@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1] - 2026-07-14
+
+### Fixed
+
+- Quoted file paths in pipe patterns (e.g., `grep -v '^#' "/tmp/${PKGS_LIST}" | xargs dnf install`)
+  are now handled correctly, fixing packages being silently missing from lockfiles.
+
 ## [0.25.0] - 2026-07-10
 
 ### Added
