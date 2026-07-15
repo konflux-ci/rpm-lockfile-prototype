@@ -103,8 +103,9 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
         def filter_rpmdb(member, path):
             for candidate_path in RPMDB_PATHS:
                 if Path(member.name).is_relative_to(candidate_path):
+                    result = tarfile.data_filter(member, path)
                     dbpaths.add(candidate_path)
-                    return tarfile.data_filter(member, path)
+                    return result
 
         # One layer at a time...
         for layer in manifest["layers"]:
