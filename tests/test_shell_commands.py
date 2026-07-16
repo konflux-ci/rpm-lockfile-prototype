@@ -120,15 +120,14 @@ class TestAnalyzeRunCommands(unittest.TestCase):
     def test_reinstall_packages_parsed(self):
         run_values = ["dnf -y reinstall tzdata && dnf clean all"]
         result = analyze_run_commands(run_values)
-        self.assertIn("tzdata", result.packages)
-        self.assertEqual(result.arch_packages, {})
+        self.assertEqual(result.reinstall_targets, ["tzdata"])
+        self.assertEqual(result.packages, [])
 
     def test_reinstall_multiple_packages_parsed(self):
         run_values = ["microdnf -y reinstall tzdata glibc && microdnf clean all"]
         result = analyze_run_commands(run_values)
-        self.assertIn("tzdata", result.packages)
-        self.assertIn("glibc", result.packages)
-        self.assertEqual(result.arch_packages, {})
+        self.assertEqual(sorted(result.reinstall_targets), ["glibc", "tzdata"])
+        self.assertEqual(result.packages, [])
 
     def test_reinstall_mixed_with_install(self):
         run_values = [
@@ -136,8 +135,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertIn("openssl", result.packages)
-        self.assertIn("tzdata", result.packages)
-        self.assertEqual(result.arch_packages, {})
+        self.assertNotIn("tzdata", result.packages)
+        self.assertEqual(result.reinstall_targets, ["tzdata"])
 
     def test_fallback_install_after_or(self):
         run_values = [

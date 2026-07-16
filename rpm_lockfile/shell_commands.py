@@ -64,6 +64,7 @@ class RunCommandResult:
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     has_update: bool = False
+    reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
     module_specs: list[str] = field(default_factory=list)
 
@@ -82,6 +83,7 @@ class _WalkContext:
     arch_packages: dict[str, set[str]] = field(default_factory=dict)
     update_targets: set[str] = field(default_factory=set)
     has_update: bool = False
+    reinstall_targets: set[str] = field(default_factory=set)
     builddep_packages: set[str] = field(default_factory=set)
     module_specs: set[str] = field(default_factory=set)
 
@@ -527,6 +529,8 @@ def _classify_package_tokens(
 
         if action == "update":
             ctx.update_targets.add(token)
+        elif action == "reinstall":
+            ctx.reinstall_targets.add(token)
         elif arch_context:
             for arch in arch_context:
                 ctx.arch_packages.setdefault(arch, set()).add(token)
@@ -718,6 +722,7 @@ def analyze_run_commands(
         },
         update_targets=sorted(ctx.update_targets),
         has_update=ctx.has_update,
+        reinstall_targets=sorted(ctx.reinstall_targets),
         builddep_packages=sorted(ctx.builddep_packages),
         module_specs=sorted(ctx.module_specs),
     )

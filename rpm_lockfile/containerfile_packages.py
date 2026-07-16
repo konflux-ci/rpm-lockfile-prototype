@@ -39,6 +39,7 @@ class StagePackages:
     has_update: bool = False
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
+    reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
     module_specs: list[str] = field(default_factory=list)
 
@@ -59,6 +60,9 @@ class StagePackages:
             has_update=self.has_update or other.has_update,
             arch_packages=merged_arch,
             update_targets=sorted(set(self.update_targets + other.update_targets)),
+            reinstall_targets=sorted(
+                set(self.reinstall_targets + other.reinstall_targets)
+            ),
             builddep_packages=sorted(
                 set(self.builddep_packages + other.builddep_packages)
             ),
@@ -379,6 +383,7 @@ def extract_packages_from_scripts(
     copy_map = copy_map or {}
     all_packages: set[str] = set()
     all_updates: set[str] = set()
+    all_reinstalls: set[str] = set()
     all_arch_packages: dict[str, set[str]] = {}
     all_builddep: set[str] = set()
     all_modules: set[str] = set()
@@ -454,6 +459,7 @@ def extract_packages_from_scripts(
             for arch, arch_pkgs in result.arch_packages.items():
                 all_arch_packages.setdefault(arch, set()).update(arch_pkgs)
             all_updates.update(result.update_targets)
+            all_reinstalls.update(result.reinstall_targets)
             all_builddep.update(result.builddep_packages)
             all_modules.update(result.module_specs)
             if result.has_update:
@@ -474,6 +480,7 @@ def extract_packages_from_scripts(
             arch: sorted(pkgs) for arch, pkgs in sorted(all_arch_packages.items())
         },
         update_targets=sorted(all_updates),
+        reinstall_targets=sorted(all_reinstalls),
         builddep_packages=sorted(all_builddep),
         module_specs=sorted(all_modules),
     )
