@@ -496,11 +496,13 @@ def _extract_containerfile_packages(
             through to shell command analysis for arch-conditional detection.
     Return Value(s):
         tuple: (common_packages, arch_packages, upgrade_packages,
-                module_enable, builddep_packages) — all empty on failure.
+                reinstall_packages, module_enable, builddep_packages)
+                — all empty on failure.
     """
     common_packages: set[str] = set()
     arch_packages: dict[str, set[str]] = {}
     upgrade_packages: set[str] = set()
+    reinstall_packages: set[str] = set()
     module_enable: set[str] = set()
     builddep_packages: list[str] = []
 
@@ -513,6 +515,7 @@ def _extract_containerfile_packages(
         for arch, pkgs in selected.arch_packages.items():
             arch_packages.setdefault(arch, set()).update(pkgs)
         upgrade_packages.update(selected.update_targets)
+        reinstall_packages.update(selected.reinstall_targets)
         module_enable.update(selected.module_specs)
         builddep_packages = list(selected.builddep_packages)
     if common_packages or arch_packages:
@@ -529,6 +532,10 @@ def _extract_containerfile_packages(
             logging.debug(
                 "Containerfile upgrade packages: %s", sorted(upgrade_packages)
             )
+        if reinstall_packages:
+            logging.debug(
+                "Containerfile reinstall packages: %s", sorted(reinstall_packages)
+            )
         if module_enable:
             logging.debug("Containerfile module enable: %s", sorted(module_enable))
         if builddep_packages:
@@ -538,6 +545,7 @@ def _extract_containerfile_packages(
         common_packages,
         arch_packages,
         upgrade_packages,
+        reinstall_packages,
         module_enable,
         builddep_packages,
     )
@@ -595,6 +603,7 @@ def main():
     containerfile_common_packages: set[str] = set()
     containerfile_arch_packages: dict[str, set[str]] = {}
     containerfile_upgrade_packages: set[str] = set()
+    containerfile_reinstall_packages: set[str] = set()
     containerfile_module_enable: set[str] = set()
     containerfile_builddep_packages: list[str] = []
 
@@ -636,6 +645,7 @@ def main():
                     containerfile_common_packages,
                     containerfile_arch_packages,
                     containerfile_upgrade_packages,
+                    containerfile_reinstall_packages,
                     containerfile_module_enable,
                     containerfile_builddep_packages,
                 ) = _extract_containerfile_packages(containerfile, context, arches)
@@ -676,7 +686,8 @@ def main():
                 allow_erasing=allowerasing,
                 reinstall_packages=set(
                     filter_for_arch(arch, config.get("reinstallPackages", []))
-                ),
+                )
+                | containerfile_reinstall_packages,
                 module_enable=set(filter_for_arch(arch, config.get("moduleEnable", [])))
                 | containerfile_module_enable,
                 module_disable=set(

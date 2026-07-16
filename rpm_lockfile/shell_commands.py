@@ -2,7 +2,8 @@
 Shell command parsing for RPM package extraction.
 
 Provides bashlex-based AST walking to extract package names from
-yum/dnf install and update commands in RUN bodies and shell scripts.
+yum/dnf install, update, and reinstall commands in RUN bodies and
+shell scripts.
 Handles variable assignments, arch-conditional blocks, subshell
 expansions, and bash-to-POSIX preprocessing.
 """
@@ -63,6 +64,7 @@ class RunCommandResult:
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     has_update: bool = False
+    reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
     module_specs: list[str] = field(default_factory=list)
 
@@ -81,6 +83,7 @@ class _WalkContext:
     arch_packages: dict[str, set[str]] = field(default_factory=dict)
     update_targets: set[str] = field(default_factory=set)
     has_update: bool = False
+    reinstall_targets: set[str] = field(default_factory=set)
     builddep_packages: set[str] = field(default_factory=set)
     module_specs: set[str] = field(default_factory=set)
 
@@ -407,7 +410,7 @@ def _detect_pkg_action(
     word_values: list[str], ctx: _WalkContext
 ) -> tuple[str | None, int]:
     """
-    Detect install/update/upgrade action in a dnf/yum command.
+    Detect install/update/upgrade/reinstall action in a dnf/yum command.
 
     Return Value(s):
         tuple[str | None, int]: (action, action_index) or (None, -1).
@@ -423,6 +426,8 @@ def _detect_pkg_action(
         if wl in ("update", "upgrade"):
             ctx.has_update = True
             return "update", idx
+        if wl == "reinstall":
+            return "reinstall", idx
         if wl in ("builddep", "build-dep"):
             return "builddep", idx
         if wl == "module":
@@ -524,6 +529,8 @@ def _classify_package_tokens(
 
         if action == "update":
             ctx.update_targets.add(token)
+        elif action == "reinstall":
+            ctx.reinstall_targets.add(token)
         elif arch_context:
             for arch in arch_context:
                 ctx.arch_packages.setdefault(arch, set()).add(token)
@@ -715,6 +722,7 @@ def analyze_run_commands(
         },
         update_targets=sorted(ctx.update_targets),
         has_update=ctx.has_update,
+        reinstall_targets=sorted(ctx.reinstall_targets),
         builddep_packages=sorted(ctx.builddep_packages),
         module_specs=sorted(ctx.module_specs),
     )
