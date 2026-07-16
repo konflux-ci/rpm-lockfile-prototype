@@ -524,3 +524,126 @@ def test_hash_file(content, hash, tmp_path):
     fn = tmp_path / "something"
     fn.write_text(content, encoding="utf-8")
     assert utils.hash_file(fn) == hash
+
+
+@pytest.mark.parametrize(
+    "content,expected",
+    [
+        ("FOO=bar\nBAZ=qux\n", {"FOO": "bar", "BAZ": "qux"}),
+        ("FOO=bar\n\n# comment\nBAZ=qux\n", {"FOO": "bar", "BAZ": "qux"}),
+        ('FOO="bar baz"\nQUX=\'hello\'\n', {"FOO": "bar baz", "QUX": "hello"}),
+        ("FOO=bar=baz\n", {"FOO": "bar=baz"}),
+        ("  FOO = bar  \n", {"FOO": "bar"}),
+        ("NO_EQUALS_LINE\nFOO=bar\n", {"FOO": "bar"}),
+        ("=valuewithnokey\nFOO=bar\n", {"FOO": "bar"}),
+    ],
+)
+def test_load_variables_file(content, expected, tmp_path):
+    fn = tmp_path / "vars.conf"
+    fn.write_text(content, encoding="utf-8")
+    assert utils.load_variables_file("vars.conf", str(tmp_path)) == expected
+
+
+def test_load_variables_file_missing(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        utils.load_variables_file("nonexistent.conf", str(tmp_path))
+
+
+@pytest.mark.parametrize(
+    "items,variables,expected",
+    [
+        (
+            ["nvidia-driver-{VER}", "other-pkg"],
+            {"VER": "580.0"},
+            ["nvidia-driver-580.0", "other-pkg"],
+        ),
+        (
+            [{"name": "nvidia-driver-{VER}", "arches": {"only": "x86_64"}}],
+            {"VER": "580.0"},
+            [{"name": "nvidia-driver-580.0", "arches": {"only": "x86_64"}}],
+        ),
+        (
+            ["pkg-{A}-{B}"],
+            {"A": "1", "B": "2"},
+            ["pkg-1-2"],
+        ),
+        (
+            ["no-placeholders"],
+            {"VER": "580.0"},
+            ["no-placeholders"],
+        ),
+        (
+            ["pkg-{VER}"],
+            {},
+            ["pkg-{VER}"],
+        ),
+    ],
+)
+def test_subst_vars_in_list(items, variables, expected):
+    assert utils.subst_vars_in_list(items, variables) == expected
+
+
+def test_load_variables_inline(tmp_path):
+    sources = [{"inline": {"FOO": "bar", "BAZ": "qux"}}]
+    assert utils.load_variables(sources, str(tmp_path)) == {"FOO": "bar", "BAZ": "qux"}
+
+
+def test_load_variables_file_source(tmp_path):
+    fn = tmp_path / "vars.conf"
+    fn.write_text("FOO=bar\nBAZ=qux\n", encoding="utf-8")
+    sources = [{"file": "vars.conf"}]
+    assert utils.load_variables(sources, str(tmp_path)) == {"FOO": "bar", "BAZ": "qux"}
+
+
+def test_load_variables_ordering(tmp_path):
+    fn = tmp_path / "vars.conf"
+    fn.write_text("FOO=from-file\nBAZ=only-file\n", encoding="utf-8")
+    sources = [
+        {"file": "vars.conf"},
+        {"inline": {"FOO": "from-inline", "QUX": "only-inline"}},
+    ]
+    result = utils.load_variables(sources, str(tmp_path))
+    assert result == {"FOO": "from-inline", "BAZ": "only-file", "QUX": "only-inline"}
+
+
+def test_load_variables_image(tmp_path):
+    with patch("rpm_lockfile.utils._get_image_labels") as mock:
+        mock.return_value = {"vcs-ref": "abc123", "architecture": "x86_64"}
+        sources = [{"image": "registry.example.com/image:latest"}]
+        result = utils.load_variables(sources, str(tmp_path))
+    assert result == {"vcs-ref": "abc123", "architecture": "x86_64"}
+    mock.assert_called_once_with("registry.example.com/image:latest")
+
+
+def test_load_variables_containerfile(tmp_path):
+    with patch("rpm_lockfile.utils._get_containerfile_labels") as mock:
+        mock.return_value = {"vcs-ref": "abc123"}
+        sources = [{"containerfile": "Containerfile"}]
+        result = utils.load_variables(sources, str(tmp_path))
+    assert result == {"vcs-ref": "abc123"}
+    mock.assert_called_once_with("Containerfile", str(tmp_path))
+
+
+def test_load_variables_empty(tmp_path):
+    assert utils.load_variables([], str(tmp_path)) == {}
+
+
+def test_load_variables_unknown_source(tmp_path):
+    with pytest.raises(RuntimeError, match="Unknown variable source"):
+        utils.load_variables([{"bogus": "value"}], str(tmp_path))
+
+
+def test_get_labels_with_base_vars():
+    obj = {"repoid": "a", "baseurl": "https://example.com/repo"}
+    result = utils.get_labels(obj, "/top", base_vars={"FOO": "bar", "BAZ": "qux"})
+    assert result == {"FOO": "bar", "BAZ": "qux"}
+
+
+def test_get_labels_base_vars_overridden_by_source():
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        obj = {"varsFromImage": "registry.example.com/image:latest", "architecture": "override-me"}
+        result = utils.get_labels(obj, "/top", base_vars={"architecture": "ppc64le", "custom": "kept"})
+    assert result["architecture"] == "x86_64"
+    assert result["custom"] == "kept"
+    assert result["vcs-ref"] == "abcdef"

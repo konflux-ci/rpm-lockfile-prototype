@@ -9,6 +9,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from .containerfile_packages import _strip_quotes
+
 
 # Path to where local dnf expects to find rpmdb. This is relative to /.
 RPMDB_PATH = subprocess.run(
@@ -195,6 +197,74 @@ def subst_vars(template, vars):
     return template
 
 
+def load_variables_file(filepath, config_dir):
+    """Parse a KEY=VALUE file into a dict.
+
+    Same format as Containerfile --build-arg-file: one KEY=VALUE per line,
+    blank lines and lines starting with # are skipped, optional quotes on
+    values are stripped.
+    """
+    resolved = os.path.join(config_dir, filepath)
+    variables = {}
+    with open(resolved) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+            variables[key] = _strip_quotes(value.strip())
+    return variables
+
+
+def subst_vars_in_list(items, variables):
+    """Apply {var} substitution to each entry in a package-like list.
+
+    Items can be plain strings or dicts with a "name" key (arch-filtered
+    packages).  Returns a new list with substitutions applied.
+    """
+    result = []
+    for item in items:
+        if isinstance(item, str):
+            result.append(subst_vars(item, variables))
+        elif isinstance(item, dict) and "name" in item:
+            result.append({**item, "name": subst_vars(item["name"], variables)})
+        else:
+            result.append(item)
+    return result
+
+
+def load_variables(sources, config_dir):
+    """Process an ordered list of variable sources.
+
+    Each source is a dict with exactly one key: file, containerfile, image,
+    or inline.  Sources are processed in order; later values override earlier
+    ones for the same key.
+    """
+    variables = {}
+    for source in sources:
+        if "file" in source:
+            variables.update(load_variables_file(source["file"], config_dir))
+        elif "containerfile" in source:
+            variables.update(
+                _get_containerfile_labels(source["containerfile"], config_dir)
+            )
+        elif "image" in source:
+            variables.update(_get_image_labels(source["image"]))
+        elif "inline" in source:
+            variables.update(source["inline"])
+        else:
+            raise RuntimeError(
+                f"Unknown variable source: {source}. "
+                "Expected one of: file, containerfile, image, inline."
+            )
+    return variables
+
+
 def translate_arch(arch):
     # This is a horrible hack. Skopeo will reject x86_64, but is happy with
     # amd64. The same goes for aarch64 -> arm64.
@@ -281,12 +351,15 @@ def check_image_spec(image_spec):
     return bool(m)
 
 
-def get_labels(obj, config_dir):
+def get_labels(obj, config_dir, base_vars=None):
     """Find labels from an image or the base image used in the containerfile
     from given configuration object. The given configuration dict is modified
     in place to remove any keys relevant for this lookup.
+
+    If base_vars is provided, start with those values; per-source labels
+    override them.
     """
-    vars = {}
+    vars = dict(base_vars) if base_vars else {}
     image = obj.pop("varsFromImage", None)
     if image:
         vars |= _get_image_labels(image)

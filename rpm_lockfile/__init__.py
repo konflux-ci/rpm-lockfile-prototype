@@ -357,12 +357,12 @@ def process_arch(
     }
 
 
-def collect_content_origins(config_dir, origins):
+def collect_content_origins(config_dir, origins, variables=None):
     loaders = content_origin.load()
     repos = []
     for source_type, source_data in origins.items():
         try:
-            collector = loaders[source_type](config_dir)
+            collector = loaders[source_type](config_dir, variables=variables)
         except KeyError:
             raise RuntimeError(f"Unknown content origin '{source_type}'")
         repos.extend(collector.collect(source_data))
@@ -576,6 +576,24 @@ def main():
 
     schema.validate(config)
 
+    variables = utils.load_variables(config.pop("variables", []), config_dir)
+
+    if variables:
+        logging.info("Substitution variables: %s", ", ".join(sorted(variables)))
+        for key in (
+            "packages",
+            "reinstallPackages",
+            "upgradePackages",
+            "moduleEnable",
+            "moduleDisable",
+            "assumeProvides",
+        ):
+            if key in config:
+                config[key] = utils.subst_vars_in_list(config[key], variables)
+        ctx = config.get("context", {})
+        if isinstance(ctx.get("image"), str):
+            ctx["image"] = utils.subst_vars(ctx["image"], variables)
+
     data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or config.get("arches") or [platform.machine()]
 
@@ -590,7 +608,7 @@ def main():
             f"Only current architecture ({platform.machine()}) can be resolved against local system.",
         )
 
-    repos = collect_content_origins(config_dir, config["contentOrigin"])
+    repos = collect_content_origins(config_dir, config["contentOrigin"], variables)
 
     containerfile_common_packages: set[str] = set()
     containerfile_arch_packages: dict[str, set[str]] = {}

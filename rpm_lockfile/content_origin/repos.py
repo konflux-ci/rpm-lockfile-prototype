@@ -19,12 +19,13 @@ class RepoOrigin:
         ],
     }
 
-    def __init__(self, config_dir):
+    def __init__(self, config_dir, variables=None):
         self.config_dir = config_dir
+        self.variables = variables or {}
 
     def collect(self, sources):
         for source in sources:
-            vars = utils.get_labels(source, self.config_dir)
+            vars = utils.get_labels(source, self.config_dir, base_vars=self.variables)
             if "baseurl" in source:
                 source["baseurl"] = utils.subst_vars(source["baseurl"], vars)
             yield Repo.from_dict(source)
