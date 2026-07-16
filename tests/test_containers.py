@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import os
 import subprocess
 import tempfile
 from abc import ABC
@@ -56,12 +57,15 @@ class FakeImage:
             # Create file structure
             for fn, content in layer.items():
                 (layer_dir / fn).parent.mkdir(parents=True, exist_ok=True)
-                content.create(layer_dir / fn)
-            # Pack it into a tarfile
+                content.create(layer_dir, fn)
+            # Pack it into a tarfile. Sort top-level entries so that
+            # tar encounters them in a deterministic order. This is
+            # important for hardlinks: tar stores the first path for a
+            # given inode as the original and later paths as LNKTYPE.
             archive = Path(temp_dir) / "layer.tar.gz"
             subprocess.run(
                 ["/usr/bin/tar", "cvfz", str(archive)]
-                + [p.name for p in layer_dir.iterdir()],
+                + sorted(p.name for p in layer_dir.iterdir()),
                 check=True,
                 cwd=layer_dir,
             )
@@ -74,7 +78,7 @@ class FakeImage:
 
 
 class FSObject(ABC):
-    def create(self, name):
+    def create(self, root, fn):
         return NotImplemented
 
 
@@ -82,16 +86,33 @@ class File(FSObject):
     def __init__(self, content):
         self.content = content
 
-    def create(self, name):
-        name.write_text(self.content, encoding="utf-8")
+    def create(self, root, fn):
+        (root / fn).write_text(self.content, encoding="utf-8")
 
 
 class Symlink(FSObject):
     def __init__(self, dest):
         self.dest = dest
 
-    def create(self, name):
-        name.symlink_to(self.dest)
+    def create(self, root, fn):
+        (root / fn).symlink_to(self.dest)
+
+
+class Hardlink(FSObject):
+    """A hardlink to another path within the same layer.
+
+    The target is a path relative to the layer root (same as the keys
+    in the layer dict). The target must already exist on disk when
+    create() is called.
+    """
+
+    def __init__(self, target):
+        self.target = target
+
+    def create(self, root, fn):
+        # pathlib.Path.hardlink_to() always follows symlinks, but we
+        # need to hardlink to the symlink itself (as ostree does).
+        os.link(root / self.target, root / fn, follow_symlinks=False)
 
 
 @pytest.mark.parametrize("rpmdb", containers.RPMDB_PATHS)
@@ -129,6 +150,26 @@ class Symlink(FSObject):
             ),
             "bar",
             id="two-layers",
+        ),
+        pytest.param(
+            FakeImage(
+                [
+                    {
+                        "sysroot/ostree/repo/objects/53/def.file": Symlink(
+                            "../../share/rpm"
+                        ),
+                        "sysroot/ostree/repo/objects/68/abc.file": File("foo"),
+                        "usr/lib/sysimage/rpm": Hardlink(
+                            "sysroot/ostree/repo/objects/53/def.file"
+                        ),
+                        "usr/share/rpm/foo": Hardlink(
+                            "sysroot/ostree/repo/objects/68/abc.file"
+                        ),
+                    }
+                ]
+            ),
+            "foo",
+            id="ostree-hardlinks",
         ),
     ],
 )
@@ -257,8 +298,8 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
     assert _online_setup.mock_calls == [mock.call(img_cache, resolved_image, arch)]
 
     assert copytree.mock_calls == [
-        mock.call(img_cache, tmp_path / "d1", dirs_exist_ok=True),
-        mock.call(img_cache, tmp_path / "d2", dirs_exist_ok=True),
+        mock.call(img_cache, tmp_path / "d1", symlinks=True, dirs_exist_ok=True),
+        mock.call(img_cache, tmp_path / "d2", symlinks=True, dirs_exist_ok=True),
     ]
 
 
