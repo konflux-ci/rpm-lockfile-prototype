@@ -1,0 +1,9 @@
+contentOrigin:
+  repofiles:
+    - ubi.repo
+packages:
+  - gcc
+context:
+  containerfile:
+    file: Containerfile
+    stageName: runtime

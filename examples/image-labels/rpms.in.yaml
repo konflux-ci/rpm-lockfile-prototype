@@ -1,0 +1,14 @@
+contentOrigin:
+  repos:
+    - repoid: fedora
+      baseurl: https://kojipkgs.fedoraproject.org/compose/{org.opencontainers.image.version}/latest-Fedora-Rawhide/compose/Everything/$basearch/os/
+      varsFromContainerfile: Containerfile
+
+packages:
+  - vim-enhanced
+
+arches:
+  - x86_64
+
+context:
+  containerfile: Containerfile
