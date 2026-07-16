@@ -298,8 +298,8 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
     assert _online_setup.mock_calls == [mock.call(img_cache, resolved_image, arch)]
 
     assert copytree.mock_calls == [
-        mock.call(img_cache, tmp_path / "d1", dirs_exist_ok=True),
-        mock.call(img_cache, tmp_path / "d2", dirs_exist_ok=True),
+        mock.call(img_cache, tmp_path / "d1", symlinks=True, dirs_exist_ok=True),
+        mock.call(img_cache, tmp_path / "d2", symlinks=True, dirs_exist_ok=True),
     ]
 
 

@@ -73,8 +73,11 @@ def setup_rpmdb(dest_dir, baseimage, arch):
     else:
         logging.info("Using already downloaded rpmdb")
 
-    # Copy the cache to the correct destination directory.
-    shutil.copytree(cache, dest_dir, dirs_exist_ok=True)
+    # Copy the cache to the correct destination directory. Use
+    # symlinks=True to preserve symlinks as-is. The cache may contain
+    # symlinks from the image (e.g. usr/lib/sysimage/rpm pointing to
+    # ../../share/rpm in ostree-based images).
+    shutil.copytree(cache, dest_dir, symlinks=True, dirs_exist_ok=True)
 
     _maybe_cleanup(cache)
 
@@ -96,15 +99,31 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
         with open(tmpdir / "manifest.json") as f:
             manifest = json.load(f)
 
-        # This are all possible locations for rpmdb that are populated by the
-        # image.
-        dbpaths = set()
+        # In ostree-based images (e.g. bootc), rpmdb entries can be
+        # hardlinks to content-addressed objects stored elsewhere in
+        # the tar (under sysroot/ostree/repo/objects/). When extractall
+        # can not create a hardlink because the target was filtered
+        # out, it falls back to calling the filter on the target
+        # member. Pre-scan all layers to collect these targets so the
+        # filter can accept them.
+        _hardlink_targets = set()
+        for layer in manifest["layers"]:
+            digest = layer["digest"].split(":", 1)[1]
+            archive = tarfile.open(tmpdir / digest)
+            for member in archive:
+                if not member.islnk():
+                    continue
+                for candidate_path in RPMDB_PATHS:
+                    if Path(member.name).is_relative_to(candidate_path):
+                        _hardlink_targets.add(member.linkname)
+                        break
 
         def filter_rpmdb(member, path):
             for candidate_path in RPMDB_PATHS:
                 if Path(member.name).is_relative_to(candidate_path):
-                    dbpaths.add(candidate_path)
                     return tarfile.data_filter(member, path)
+            if member.name in _hardlink_targets:
+                return tarfile.data_filter(member, path)
 
         # One layer at a time...
         for layer in manifest["layers"]:
@@ -114,6 +133,16 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
             # the destination cache.
             archive = tarfile.open(tmpdir / digest)
             archive.extractall(path=dest_dir, filter=filter_rpmdb)
+
+        # Determine which rpmdb paths actually have content on disk.
+        # Tracking accepted members in the filter is unreliable:
+        # extraction can silently skip members (e.g. hardlinks whose
+        # targets were not extracted).
+        dbpaths = {
+            p
+            for p in RPMDB_PATHS
+            if (dest_dir / p).is_dir() and any((dest_dir / p).iterdir())
+        }
 
         if dbpaths and utils.RPMDB_PATH not in dbpaths:
             # If we have at least one possible rpmdb location populated by the
@@ -130,9 +159,11 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
                 os.path.dirname(os.path.join(dest_dir, utils.RPMDB_PATH)),
                 exist_ok=True,
             )
+            link_path = os.path.join(dest_dir, utils.RPMDB_PATH)
+            target_path = os.path.join(dest_dir, dbpath)
             os.symlink(
-                os.path.join(dest_dir, dbpath),
-                os.path.join(dest_dir, utils.RPMDB_PATH),
+                os.path.relpath(target_path, os.path.dirname(link_path)),
+                link_path,
             )
 
 
