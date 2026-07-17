@@ -248,7 +248,22 @@ installWeakDeps: false
 # standard downloads instead. This can improve performance when using a caching
 # proxy. The default is to use whatever is configured for the system DNF.
 zchunk: false
+
+variables:
+  # Ordered list of variable sources for {var} substitution in package names,
+  # module streams, assumeProvides, context.image, and contentOrigin URLs.
+  # Sources are processed in order; later values override earlier ones.
+  - file: versions.conf           # KEY=VALUE file (same format as --build-arg-file)
+  - image: registry.example.com/base:latest   # use image labels as variables
+  - containerfile: Containerfile   # use labels from the base image in a Containerfile
+  - inline:                        # define variables directly
+      DRIVER_VERSION: "580.126.20"
 ```
+
+The `{var}` placeholders are replaced everywhere: `packages`, `reinstallPackages`,
+`upgradePackages`, `moduleEnable`, `moduleDisable`, `assumeProvides`, `context.image`,
+and in `contentOrigin` URLs (where they merge with any per-source `varsFromImage` or
+`varsFromContainerfile` labels; the per-source values take precedence over globals).
 
 The configuration file can specify a containerfile to extract a base image from
 either in the `context` section or in `varsFromContainerfile` inside

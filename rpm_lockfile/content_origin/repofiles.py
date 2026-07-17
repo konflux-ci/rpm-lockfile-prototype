@@ -45,9 +45,10 @@ class RepofileOrigin:
         ],
     }
 
-    def __init__(self, config_dir):
+    def __init__(self, config_dir, variables=None):
         self.session = requests.Session()
         self.config_dir = config_dir
+        self.variables = variables or {}
 
     def collect(self, sources):
         for source in sources:
@@ -57,7 +58,7 @@ class RepofileOrigin:
     def _get_repofile_path(self, source):
         if isinstance(source, str):
             return source
-        vars = utils.get_labels(source, self.config_dir)
+        vars = utils.get_labels(source, self.config_dir, base_vars=self.variables)
         if "location" in source:
             return utils.subst_vars(source["location"], vars)
         return utils.get_file_from_git(

@@ -31,7 +31,7 @@ def test_collect_simple_mirrorlist(tmpdir):
     assert repos == [Repo(repoid="a", kwargs={"mirrorlist": url})]
 
 
-def fake_get_labels(obj, config_dir):
+def fake_get_labels(obj, config_dir, base_vars=None):
     obj.pop("varsFromContainerfile", None)
     obj.pop("varsFromImage", None)
     return {
@@ -69,4 +69,22 @@ def test_collect_with_vars_from_containerfile(tmpdir):
             )
         )
 
+    assert repos == [EXPANDED_REPO]
+
+
+def test_collect_with_global_variables(tmpdir):
+    origin = RepoOrigin(tmpdir, variables={"architecture": "x86_64"})
+    config = [{"repoid": "a", "baseurl": "https://example.com/{architecture}/repo"}]
+    repos = list(origin.collect(config))
+    assert repos == [EXPANDED_REPO]
+
+
+def test_collect_global_vars_overridden_by_source(tmpdir):
+    origin = RepoOrigin(tmpdir, variables={"architecture": "ppc64le"})
+    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
+        repos = list(
+            origin.collect(
+                [TEMPLATE_CONFIG | {"varsFromImage": "registry.example.com/image:latest"}]
+            )
+        )
     assert repos == [EXPANDED_REPO]

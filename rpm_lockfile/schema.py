@@ -135,6 +135,44 @@ def get_schema():
                 "type": "array",
                 "items": {"type": "string", "minLength": 1},
             },
+            "variables": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {"file": {"type": "string"}},
+                            "required": ["file"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "containerfile": utils.CONTAINERFILE_SCHEMA,
+                            },
+                            "required": ["containerfile"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "type": "object",
+                            "properties": {"image": {"type": "string"}},
+                            "required": ["image"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "inline": {
+                                    "type": "object",
+                                    "additionalProperties": {"type": "string"},
+                                },
+                            },
+                            "required": ["inline"],
+                            "additionalProperties": False,
+                        },
+                    ],
+                },
+            },
         },
         "required": ["contentOrigin"],
         "additionalProperties": False,

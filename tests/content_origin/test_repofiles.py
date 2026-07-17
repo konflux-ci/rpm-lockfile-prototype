@@ -52,7 +52,7 @@ def test_collect_http_complex():
     origin.session.get.assert_called_once_with(repourl, timeout=ANY)
 
 
-def fake_get_labels(obj, config_dir):
+def fake_get_labels(obj, config_dir, base_vars=None):
     obj.pop("varsFromContainerfile", None)
     obj.pop("varsFromImage", None)
     return {
@@ -131,3 +131,15 @@ def test_collect_git_with_vars_from_image(tmpdir):
 
     assert repos == [REPO]
     mock_get_file.assert_called_once_with(giturl, "abcdef", "test.repo")
+
+
+def test_collect_http_with_global_variables():
+    origin = repofiles.RepofileOrigin("/test", variables={"vcs-ref": "abcdef"})
+    origin.session = Mock()
+    origin.session.get.return_value = Mock(text=REPOFILE)
+    repourl = "http://example.com/test.repo"
+
+    repos = list(origin.collect([{"location": f"{repourl}?x={{vcs-ref}}"}]))
+
+    assert repos == [REPO]
+    origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
