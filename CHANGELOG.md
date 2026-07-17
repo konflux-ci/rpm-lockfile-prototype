@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.26.0] - 2026-07-17
+
+### Added
+
+- New `variables` configuration key for `{var}` placeholder substitution
+  across the configuration. Variables can be sourced from KEY=VALUE files,
+  container image labels, Containerfile base image labels, or inline
+  definitions. Sources are specified as an ordered list with last-wins
+  precedence. Placeholders are expanded in `packages`, `reinstallPackages`,
+  `upgradePackages`, `moduleEnable`, `moduleDisable`, `assumeProvides`,
+  `context.image`, and `contentOrigin` URLs.
+  ([#150](https://github.com/konflux-ci/rpm-lockfile-prototype/issues/150))
+
+- Containerfile `dnf reinstall` commands are now parsed and included
+  in the lockfile.
+
+### Fixed
+
+- Fixed rpmdb extraction for ostree-based images where database entries
+  are hardlinked to content-addressed objects.
+
 ## [0.25.1] - 2026-07-14
 
 ### Fixed
