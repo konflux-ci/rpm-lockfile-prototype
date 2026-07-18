@@ -136,6 +136,10 @@ def get_schema():
                 "type": "array",
                 "items": {"type": "string", "minLength": 1},
             },
+            "matchContextVersions": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
             "variables": {
                 "type": "array",
                 "items": {
