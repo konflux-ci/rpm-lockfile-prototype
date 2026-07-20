@@ -556,11 +556,6 @@ def main():
         "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
     )
     parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
-    parser.add_argument(
-        "--packages-from-containerfile",
-        help="Extract packages from the given Containerfile. "
-             "Works with any rpmdb mode and is additive with the packages list.",
-    )
     args = parser.parse_args()
 
     logging_setup(args.debug)
@@ -643,7 +638,7 @@ def main():
         )
 
     # Determine package extraction source — independent of rpmdb mode.
-    pfc_spec = args.packages_from_containerfile or config.get("packagesFromContainerfile")
+    pfc_spec = config.get("packagesFromContainerfile")
 
     if pfc_spec:
         pfc_context = {"containerfile": pfc_spec}
@@ -662,6 +657,13 @@ def main():
             source_dir = Path(pfc_path).parent
             builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
             cf_pkgs.common |= builddep_resolved
+
+    elif containerfile and not config.get("packages"):
+        logging.warning(
+            "Implicit package extraction from Containerfile is deprecated. "
+            "Add 'packagesFromContainerfile' with the Containerfile path "
+            "to your config file to preserve this behavior."
+        )
 
     for arch in sorted(arches):
         packages = set()
