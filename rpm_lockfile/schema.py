@@ -127,6 +127,7 @@ def get_schema():
                     },
                 ],
             },
+            "packagesFromContainerfile": utils.CONTAINERFILE_SCHEMA,
             "allowerasing": {"type": "boolean"},
             "noSources": {"type": "boolean"},
             "installWeakDeps": {"type": "boolean"},

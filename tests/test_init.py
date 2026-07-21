@@ -8,7 +8,6 @@ import pytest
 import rpm_lockfile
 from rpm_lockfile import assumed_provides, schema
 
-
 @pytest.mark.parametrize(
     "arch,expected",
     [
@@ -91,3 +90,39 @@ class TestAssumeProvides:
             repo_dir = assumed_provides.create_repo(tmpdir, [])
             repomd_path = os.path.join(repo_dir, "repodata", "repomd.xml")
             assert os.path.exists(repomd_path)
+
+
+class TestPackagesFromContainerfileSchema:
+    def test_accepts_string(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "packagesFromContainerfile": "Containerfile",
+        }
+        schema.validate(config)
+
+    def test_accepts_dict_with_file(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "packagesFromContainerfile": {
+                "file": "Containerfile",
+                "stageNum": 1,
+            },
+        }
+        schema.validate(config)
+
+    def test_rejects_invalid_type(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "packagesFromContainerfile": 42,
+        }
+        with pytest.raises(SystemExit):
+            schema.validate(config)
+
+    def test_works_with_packages_and_bare(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "context": {"bare": True},
+            "packages": ["extra-pkg"],
+            "packagesFromContainerfile": "Containerfile",
+        }
+        schema.validate(config)

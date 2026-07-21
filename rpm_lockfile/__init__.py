@@ -10,7 +10,7 @@ import platform
 import shutil
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 try:
@@ -478,77 +478,59 @@ def logging_setup(debug=False):
     )
 
 
+@dataclass
+class ContainerfilePackages:
+    common: set[str] = field(default_factory=set)
+    arch_specific: dict[str, set[str]] = field(default_factory=dict)
+    upgrade: set[str] = field(default_factory=set)
+    reinstall: set[str] = field(default_factory=set)
+    module_enable: set[str] = field(default_factory=set)
+    builddep: list[str] = field(default_factory=list)
+
+
 def _extract_containerfile_packages(
     containerfile: str,
     context: dict,
     arches: list[str] | None = None,
-) -> tuple[set[str], dict[str, set[str]], set[str], set[str], list[str]]:
-    """
-    Extract RPM package names from Containerfile RUN commands.
-
-    Parses the Containerfile to find dnf/yum/microdnf install invocations
-    and returns the discovered packages grouped by type.
-
-    Arg(s):
-        containerfile (str): Path to the Containerfile.
-        context (dict): Configuration context with optional stage filters.
-        arches (list[str] | None): Architectures being resolved, passed
-            through to shell command analysis for arch-conditional detection.
-    Return Value(s):
-        tuple: (common_packages, arch_packages, upgrade_packages,
-                reinstall_packages, module_enable, builddep_packages)
-                — all empty on failure.
-    """
-    common_packages: set[str] = set()
-    arch_packages: dict[str, set[str]] = {}
-    upgrade_packages: set[str] = set()
-    reinstall_packages: set[str] = set()
-    module_enable: set[str] = set()
-    builddep_packages: list[str] = []
+) -> ContainerfilePackages:
+    result = ContainerfilePackages()
 
     cf_path = Path(containerfile)
     source_dir = cf_path.parent
     stages = analyze_containerfile_stages(cf_path, source_dir=source_dir, arches=arches)
     selected = select_stage(stages, **_get_containerfile_filters(context))
     if selected:
-        common_packages.update(selected.packages)
+        result.common.update(selected.packages)
         for arch, pkgs in selected.arch_packages.items():
-            arch_packages.setdefault(arch, set()).update(pkgs)
-        upgrade_packages.update(selected.update_targets)
-        reinstall_packages.update(selected.reinstall_targets)
-        module_enable.update(selected.module_specs)
-        builddep_packages = list(selected.builddep_packages)
-    if common_packages or arch_packages:
+            result.arch_specific.setdefault(arch, set()).update(pkgs)
+        result.upgrade.update(selected.update_targets)
+        result.reinstall.update(selected.reinstall_targets)
+        result.module_enable.update(selected.module_specs)
+        result.builddep = list(selected.builddep_packages)
+    if result.common or result.arch_specific:
         logging.info(
             "Extracted %d common and %d arch-specific packages from Containerfile",
-            len(common_packages),
-            sum(len(v) for v in arch_packages.values()),
+            len(result.common),
+            sum(len(v) for v in result.arch_specific.values()),
         )
-        if common_packages:
-            logging.debug("Containerfile packages: %s", sorted(common_packages))
-        for arch, pkgs in sorted(arch_packages.items()):
+        if result.common:
+            logging.debug("Containerfile packages: %s", sorted(result.common))
+        for arch, pkgs in sorted(result.arch_specific.items()):
             logging.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
-        if upgrade_packages:
+        if result.upgrade:
             logging.debug(
-                "Containerfile upgrade packages: %s", sorted(upgrade_packages)
+                "Containerfile upgrade packages: %s", sorted(result.upgrade)
             )
-        if reinstall_packages:
+        if result.reinstall:
             logging.debug(
-                "Containerfile reinstall packages: %s", sorted(reinstall_packages)
+                "Containerfile reinstall packages: %s", sorted(result.reinstall)
             )
-        if module_enable:
-            logging.debug("Containerfile module enable: %s", sorted(module_enable))
-        if builddep_packages:
-            logging.debug("Containerfile builddep patterns: %s", sorted(builddep_packages))
+        if result.module_enable:
+            logging.debug("Containerfile module enable: %s", sorted(result.module_enable))
+        if result.builddep:
+            logging.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
 
-    return (
-        common_packages,
-        arch_packages,
-        upgrade_packages,
-        reinstall_packages,
-        module_enable,
-        builddep_packages,
-    )
+    return result
 
 
 def main():
@@ -601,6 +583,11 @@ def main():
         ctx = config.get("context", {})
         if isinstance(ctx.get("image"), str):
             ctx["image"] = utils.subst_vars(ctx["image"], variables)
+        pfc = config.get("packagesFromContainerfile")
+        if isinstance(pfc, str):
+            config["packagesFromContainerfile"] = utils.subst_vars(pfc, variables)
+        elif isinstance(pfc, dict):
+            pfc["file"] = utils.subst_vars(pfc["file"], variables)
 
     data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or config.get("arches") or [platform.machine()]
@@ -618,13 +605,10 @@ def main():
 
     repos = collect_content_origins(config_dir, config["contentOrigin"], variables)
 
-    containerfile_common_packages: set[str] = set()
-    containerfile_arch_packages: dict[str, set[str]] = {}
-    containerfile_upgrade_packages: set[str] = set()
-    containerfile_reinstall_packages: set[str] = set()
-    containerfile_module_enable: set[str] = set()
-    containerfile_builddep_packages: list[str] = []
+    cf_pkgs = ContainerfilePackages()
 
+    # Determine rpmdb source — independent of package extraction.
+    containerfile = None
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
     elif args.bare or context.get("bare") or args.rpm_ostree_treefile:
@@ -653,32 +637,47 @@ def main():
             or utils.extract_image(containerfile, **_get_containerfile_filters(context))
         )
 
-        # Extract packages from Containerfile RUN commands only if the user
-        # has not explicitly declared a packages list. When packages are
-        # specified, the user's list should take precedence over the
-        # Containerfile scan
-        if containerfile and not config.get("packages"):
-            try:
-                (
-                    containerfile_common_packages,
-                    containerfile_arch_packages,
-                    containerfile_upgrade_packages,
-                    containerfile_reinstall_packages,
-                    containerfile_module_enable,
-                    containerfile_builddep_packages,
-                ) = _extract_containerfile_packages(containerfile, context, arches)
-            except Exception:
-                logging.warning(
-                    "Failed to extract packages from Containerfile %s; "
-                    "falling back to explicitly listed packages only.",
-                    containerfile,
-                    exc_info=True,
-                )
+    # Determine package extraction source — independent of rpmdb mode.
+    pfc_spec = config.get("packagesFromContainerfile")
 
-            if containerfile_builddep_packages:
-                source_dir = Path(containerfile).parent
-                builddep_resolved = resolve_builddep_packages(containerfile_builddep_packages, source_dir)
-                containerfile_common_packages |= builddep_resolved
+    if pfc_spec:
+        pfc_context = {"containerfile": pfc_spec}
+        pfc_path = _get_containerfile_path(config_dir, pfc_context)
+        try:
+            cf_pkgs = _extract_containerfile_packages(pfc_path, pfc_context, arches)
+        except Exception:
+            logging.warning(
+                "Failed to extract packages from Containerfile %s; "
+                "falling back to explicitly listed packages only.",
+                pfc_path,
+                exc_info=True,
+            )
+
+        if cf_pkgs.builddep:
+            source_dir = Path(pfc_path).parent
+            builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
+            cf_pkgs.common |= builddep_resolved
+
+    elif containerfile and not config.get("packages"):
+        logging.warning(
+            "Implicit package extraction from Containerfile is deprecated. "
+            "Add 'packagesFromContainerfile' with the Containerfile path "
+            "to your config file to preserve this behavior."
+        )
+        try:
+            cf_pkgs = _extract_containerfile_packages(containerfile, context, arches)
+        except Exception:
+            logging.warning(
+                "Failed to extract packages from Containerfile %s; "
+                "falling back to explicitly listed packages only.",
+                containerfile,
+                exc_info=True,
+            )
+
+        if cf_pkgs.builddep:
+            source_dir = Path(containerfile).parent
+            builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
+            cf_pkgs.common |= builddep_resolved
 
     for arch in sorted(arches):
         packages = set()
@@ -692,8 +691,8 @@ def main():
             packages = read_packages_from_container_yaml(arch)
 
         # Merge Containerfile-extracted packages
-        packages |= containerfile_common_packages
-        packages |= containerfile_arch_packages.get(arch, set())
+        packages |= cf_pkgs.common
+        packages |= cf_pkgs.arch_specific.get(arch, set())
 
         data["arches"].append(
             process_arch(
@@ -705,9 +704,9 @@ def main():
                 reinstall_packages=set(
                     filter_for_arch(arch, config.get("reinstallPackages", []))
                 )
-                | containerfile_reinstall_packages,
+                | cf_pkgs.reinstall,
                 module_enable=set(filter_for_arch(arch, config.get("moduleEnable", [])))
-                | containerfile_module_enable,
+                | cf_pkgs.module_enable,
                 module_disable=set(
                     filter_for_arch(arch, config.get("moduleDisable", []))
                 ),
@@ -716,7 +715,7 @@ def main():
                 upgrade_packages=set(
                     filter_for_arch(arch, config.get("upgradePackages", []))
                 )
-                | containerfile_upgrade_packages,
+                | cf_pkgs.upgrade,
                 zchunk=config.get("zchunk"),
                 assume_provides=assume_provides,
             )
