@@ -1,3 +1,4 @@
+import fnmatch
 import functools
 import hashlib
 import json
@@ -369,6 +370,62 @@ def get_labels(obj, config_dir, base_vars=None):
         vars |= _get_containerfile_labels(containerfile, config_dir)
 
     return vars
+
+
+def pin_context_versions(installed_packages, solvables, patterns):
+    """Pin requested packages to versions from the context image's rpmdb.
+
+    For each glob pattern in ``patterns``, find the EVR of installed packages
+    matching it, then rewrite any requested solvable that also matches the
+    pattern to require that exact EVR.
+
+    ``installed_packages`` is an iterable of objects with ``name``,
+    ``version``, and ``release`` attributes (e.g. DNF package objects).
+    """
+    installed = {}
+    for pkg in installed_packages:
+        installed[pkg.name] = pkg
+
+    pattern_evrs = {}
+    for pattern in patterns:
+        for name, pkg in installed.items():
+            if fnmatch.fnmatch(name, pattern):
+                evr = f"{pkg.epoch}:{pkg.version}-{pkg.release}" if pkg.epoch else f"{pkg.version}-{pkg.release}"
+                if pattern not in pattern_evrs:
+                    pattern_evrs[pattern] = (evr, name)
+                elif pattern_evrs[pattern][0] != evr:
+                    raise RuntimeError(
+                        f"matchContextVersions: pattern {pattern!r} matches "
+                        f"installed packages with different versions "
+                        f"({pattern_evrs[pattern][1]}-{pattern_evrs[pattern][0]} vs {name}-{evr})"
+                    )
+
+    unmatched = [p for p in patterns if p not in pattern_evrs]
+    if unmatched:
+        logging.warning(
+            "matchContextVersions: no installed packages matched patterns: %s",
+            ", ".join(unmatched),
+        )
+    if not pattern_evrs:
+        return solvables
+
+    result = set()
+    for spec in solvables:
+        pinned = False
+        for pattern in patterns:
+            if fnmatch.fnmatch(spec, pattern) and pattern in pattern_evrs:
+                versioned = f"{spec}-{pattern_evrs[pattern][0]}"
+                logging.info(
+                    "matchContextVersions: pinning %s to %s",
+                    spec,
+                    versioned,
+                )
+                result.add(versioned)
+                pinned = True
+                break
+        if not pinned:
+            result.add(spec)
+    return result
 
 
 CONTAINERFILE_SCHEMA = {

@@ -129,6 +129,7 @@ def resolver(
     download_filelists: bool = False,
     zchunk: bool = None,
     assume_provides: list[str] = None,
+    match_context_versions: list[str] = None,
 ):
     packages = set()
     sources = set()
@@ -186,6 +187,13 @@ def resolver(
                     baseurl=[f"file://{repo_path}"],
                 )
             base.fill_sack(load_system_repo=True)
+
+            if match_context_versions:
+                solvables = utils.pin_context_versions(
+                    base.sack.query().installed(),
+                    solvables,
+                    match_context_versions,
+                )
 
             module_base = dnf.module.module_base.ModuleBase(base)
 
@@ -320,6 +328,7 @@ def process_arch(
     upgrade_packages: set[str],
     zchunk: bool = None,
     assume_provides: list[str] = None,
+    match_context_versions: list[str] = None,
 ):
     logging.info("Running solver for %s", arch)
 
@@ -341,6 +350,7 @@ def process_arch(
                     download_filelists=download_filelists,
                     zchunk=zchunk,
                     assume_provides=assume_provides,
+                    match_context_versions=match_context_versions,
                 )
                 break
             except MissingFilelists:
@@ -609,12 +619,16 @@ def main():
 
     # Determine rpmdb source — independent of package extraction.
     containerfile = None
+    is_image_context = True
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
+        is_image_context = False
     elif args.bare or context.get("bare") or args.rpm_ostree_treefile:
         rpmdb = empty_rpmdb()
+        is_image_context = False
     elif args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
         rpmdb = empty_rpmdb()
+        is_image_context = False
     else:
         image = args.image or context.get("image")
         containerfile = (
@@ -679,6 +693,12 @@ def main():
             builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
             cf_pkgs.common |= builddep_resolved
 
+    if config.get("matchContextVersions") and not is_image_context:
+        parser.error(
+            "matchContextVersions requires a context image or containerfile.\n"
+            "It cannot be used with --bare, --local-system, or --rpm-ostree-treefile."
+        )
+
     for arch in sorted(arches):
         packages = set()
         if args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
@@ -718,6 +738,7 @@ def main():
                 | cf_pkgs.upgrade,
                 zchunk=config.get("zchunk"),
                 assume_provides=assume_provides,
+                match_context_versions=config.get("matchContextVersions"),
             )
         )
 

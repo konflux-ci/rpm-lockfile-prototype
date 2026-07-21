@@ -214,6 +214,13 @@ assumeProvides:
   - nvidia-kmod
   - cuda-libs
 
+matchContextVersions:
+  # List of package name glob patterns. When a context image is used, any
+  # requested package matching a pattern will be pinned to the version found
+  # in the context image's rpmdb. This ensures packages like kernel-devel
+  # resolve to the same version as kernel-core already installed in the image.
+  - kernel-*
+
 moduleEnable: []
   # List of module streams that should be enabled during the dependency
   # resolution. The specification uses the same format as `packages` above.
