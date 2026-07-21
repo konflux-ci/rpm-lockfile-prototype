@@ -392,12 +392,12 @@ def pin_context_versions(installed_packages, solvables, patterns):
             if fnmatch.fnmatch(name, pattern):
                 evr = f"{pkg.epoch}:{pkg.version}-{pkg.release}" if pkg.epoch else f"{pkg.version}-{pkg.release}"
                 if pattern not in pattern_evrs:
-                    pattern_evrs[pattern] = evr
-                elif pattern_evrs[pattern] != evr:
+                    pattern_evrs[pattern] = (evr, name)
+                elif pattern_evrs[pattern][0] != evr:
                     raise RuntimeError(
                         f"matchContextVersions: pattern {pattern!r} matches "
                         f"installed packages with different versions "
-                        f"({name}-{pattern_evrs[pattern]} vs {name}-{evr})"
+                        f"({pattern_evrs[pattern][1]}-{pattern_evrs[pattern][0]} vs {name}-{evr})"
                     )
 
     unmatched = [p for p in patterns if p not in pattern_evrs]
@@ -414,7 +414,7 @@ def pin_context_versions(installed_packages, solvables, patterns):
         pinned = False
         for pattern in patterns:
             if fnmatch.fnmatch(spec, pattern) and pattern in pattern_evrs:
-                versioned = f"{spec}-{pattern_evrs[pattern]}"
+                versioned = f"{spec}-{pattern_evrs[pattern][0]}"
                 logging.info(
                     "matchContextVersions: pinning %s to %s",
                     spec,
