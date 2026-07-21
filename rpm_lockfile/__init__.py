@@ -198,6 +198,7 @@ def resolver(
                 base.upgrade(pkg)
             # Mark packages to remove
             for pkg in reinstall_packages:
+                pkg_reinstall_needs_upgrade = False
                 try:
                     base.reinstall(pkg)
                 except dnf.exceptions.PackagesNotInstalledError:
@@ -207,13 +208,10 @@ def resolver(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
                     )
                 except dnf.exceptions.PackagesNotAvailableError:
-                    # The package is not available in the same version as in
-                    # base image. If we are supposed to update it, it's
-                    # probably okay and we don't need to reinstall as a new
-                    # copy will be used for the upgrade. Otherwise report an
-                    # error.
-                    if pkg not in upgrade_packages:
-                        raise
+                    logging.warning("Can not reinstall %s: it needs an upgrade", pkg)
+                    pkg_reinstall_needs_upgrade = True
+                if pkg_reinstall_needs_upgrade:
+                    base.upgrade(pkg)
             # Mark packages for installation
             try:
                 base.install_specs(solvables)
