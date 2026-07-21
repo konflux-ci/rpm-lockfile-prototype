@@ -664,6 +664,20 @@ def main():
             "Add 'packagesFromContainerfile' with the Containerfile path "
             "to your config file to preserve this behavior."
         )
+        try:
+            cf_pkgs = _extract_containerfile_packages(containerfile, context, arches)
+        except Exception:
+            logging.warning(
+                "Failed to extract packages from Containerfile %s; "
+                "falling back to explicitly listed packages only.",
+                containerfile,
+                exc_info=True,
+            )
+
+        if cf_pkgs.builddep:
+            source_dir = Path(containerfile).parent
+            builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
+            cf_pkgs.common |= builddep_resolved
 
     for arch in sorted(arches):
         packages = set()
