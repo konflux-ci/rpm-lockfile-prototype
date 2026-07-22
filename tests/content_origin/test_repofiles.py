@@ -1,3 +1,5 @@
+import pytest
+
 from unittest.mock import patch, mock_open, Mock, ANY
 
 from rpm_lockfile.content_origin import Repo, repofiles
@@ -143,3 +145,61 @@ def test_collect_http_with_global_variables():
 
     assert repos == [REPO]
     origin.session.get.assert_called_once_with(f"{repourl}?x=abcdef", timeout=ANY)
+
+
+REPOFILE_DISABLED = """
+[enabled-repo]
+baseurl = https://example.com/enabled
+
+[disabled-repo]
+baseurl = https://example.com/disabled
+enabled = 0
+"""
+
+REPOFILE_NO_ENABLED_KEY = """
+[implicit-enabled]
+baseurl = https://example.com/implicit
+"""
+
+
+def test_parse_repofile_skips_disabled():
+    origin = repofiles.RepofileOrigin("/test")
+    repos = list(origin.parse_repofile(REPOFILE_DISABLED))
+
+    assert len(repos) == 1
+    assert repos[0].repoid == "enabled-repo"
+
+
+def test_parse_repofile_enabled_by_default():
+    origin = repofiles.RepofileOrigin("/test")
+    repos = list(origin.parse_repofile(REPOFILE_NO_ENABLED_KEY))
+
+    assert len(repos) == 1
+    assert repos[0].repoid == "implicit-enabled"
+
+
+def test_collect_local_glob(tmpdir):
+    (tmpdir / "a.repo").write_text(REPOFILE, encoding="utf-8")
+    (tmpdir / "b.repo").write_text(REPOFILE_NO_ENABLED_KEY, encoding="utf-8")
+
+    origin = repofiles.RepofileOrigin("/test")
+    repos = list(origin.collect_local(str(tmpdir / "*.repo")))
+
+    assert len(repos) == 2
+    repo_ids = {r.repoid for r in repos}
+    assert repo_ids == {"repo-0", "implicit-enabled"}
+
+
+def test_collect_local_glob_no_match():
+    origin = repofiles.RepofileOrigin("/test")
+    with pytest.raises(FileNotFoundError, match="No files matching"):
+        list(origin.collect_local("/nonexistent/path/*.repo"))
+
+
+def test_collect_local_absolute_path(tmpdir):
+    (tmpdir / "test.repo").write_text(REPOFILE, encoding="utf-8")
+
+    origin = repofiles.RepofileOrigin("/other")
+    repos = list(origin.collect_local(str(tmpdir / "test.repo")))
+
+    assert repos == [REPO]

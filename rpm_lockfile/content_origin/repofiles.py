@@ -1,4 +1,5 @@
 import configparser
+import glob
 import os
 
 import requests
@@ -80,13 +81,28 @@ class RepofileOrigin:
         yield from self.parse_repofile(resp.text)
 
     def collect_local(self, url):
-        with open(os.path.join(self.config_dir, url)) as f:
-            yield from self.parse_repofile(f.read())
+        if glob.has_magic(url):
+            if os.path.isabs(url):
+                paths = sorted(glob.glob(url))
+            else:
+                paths = sorted(glob.glob(os.path.join(self.config_dir, url)))
+            paths = [p for p in paths if os.path.isfile(p)]
+            if not paths:
+                raise FileNotFoundError(f"No files matching: {url}")
+            for path in paths:
+                with open(path) as f:
+                    yield from self.parse_repofile(f.read())
+        else:
+            path = url if os.path.isabs(url) else os.path.join(self.config_dir, url)
+            with open(path) as f:
+                yield from self.parse_repofile(f.read())
 
     def parse_repofile(self, contents):
         parser = configparser.ConfigParser(interpolation=None)
         parser.read_string(contents)
 
         for section in parser.sections():
+            if parser.get(section, "enabled", fallback="1") == "0":
+                continue
             options = {"repoid": section} | dict(parser.items(section))
             yield Repo.from_dict(options)
