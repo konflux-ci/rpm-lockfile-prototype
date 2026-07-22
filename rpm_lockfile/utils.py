@@ -18,7 +18,9 @@ RPMDB_PATH = subprocess.run(
     ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
 ).stdout.strip()[1:]
 
-CACHE_PATH = Path.home() / ".cache" / "rpm-lockfile-prototype"
+CACHE_PATH = Path(
+    os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
+) / "rpm-lockfile-prototype"
 
 
 def relative_to(directory, path):
