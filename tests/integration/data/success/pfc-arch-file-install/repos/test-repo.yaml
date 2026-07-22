@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-x86-from-file-1.0-1
+
+  - nvr: test-aarch64-from-file-1.0-1
+
+  - nvr: test-decoy-1.0-1

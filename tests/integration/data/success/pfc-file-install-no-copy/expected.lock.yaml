@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-nocopy-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 77756
+    checksum: sha256:6b82ad3d25e1129ee51d89b17935f2ee755ab8303d0c443c76d3441e0130b234
+    name: test-from-nocopy
+    evr: 1.0-1
+    sourcerpm: test-from-nocopy-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-nocopy-1.0-1.src.rpm
+    repoid: test-repo
+    size: 23363
+    checksum: sha256:264eed8c86075e97d69e78a425cd5f42040bff30c4aada07346cb8192a5e5df3
+    name: test-from-nocopy
+    evr: 1.0-1
+  module_metadata: []

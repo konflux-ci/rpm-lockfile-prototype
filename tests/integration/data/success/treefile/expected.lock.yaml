@@ -1,0 +1,60 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-app-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 32658
+    checksum: sha256:6d69d191e63688e2ca93f8c0d6114cf73affc3a7b864291f93cb4f4d03476a72
+    name: test-app
+    evr: 1.0-1
+    sourcerpm: test-app-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-arch-specific-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 82372
+    checksum: sha256:e44f049f63f1a1fdfe696d499ca52b239b6c157119c26344a49b64ca188bf4fc
+    name: test-arch-specific
+    evr: 1.0-1
+    sourcerpm: test-arch-specific-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 17899
+    checksum: sha256:e3ca3c340759b02d09400e29a1c739e1f2c2bf8c793b2baf7bcebc3f44da5c53
+    name: test-base
+    evr: 1.0-1
+    sourcerpm: test-base-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-from-repo-packages-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 2034
+    checksum: sha256:289f9a1fa39d2bd9a4bd63dbc8a0625b88627ddf834af2436e8b7b76b611f992
+    name: test-from-repo-packages
+    evr: 1.0-1
+    sourcerpm: test-from-repo-packages-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-app-1.0-1.src.rpm
+    repoid: test-repo
+    size: 6803
+    checksum: sha256:ee8a029197f249dd51b673fb93d8d7ac5ed496ee11d5b31d0ab3d452ef4208fb
+    name: test-app
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-arch-specific-1.0-1.src.rpm
+    repoid: test-repo
+    size: 74729
+    checksum: sha256:d93fafc97e52fec7d7e328a477a69dcb99e7649f52b358460635189dcc1a4d89
+    name: test-arch-specific
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.src.rpm
+    repoid: test-repo
+    size: 2327
+    checksum: sha256:6a3850963dc1c535e77b51fcbad730f392c4dad235c1c690a77044e418243fbf
+    name: test-base
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-from-repo-packages-1.0-1.src.rpm
+    repoid: test-repo
+    size: 67041
+    checksum: sha256:6798b8c07f31ff2672456d31a869b6c12346717247155b4d5c83aa4eba899df9
+    name: test-from-repo-packages
+    evr: 1.0-1
+  module_metadata: []

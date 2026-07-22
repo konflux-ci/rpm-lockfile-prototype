@@ -1,0 +1,10 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo/$releasever
+packages:
+  - test-base
+arches:
+  - x86_64
+context:
+  image: registry.access.redhat.com/ubi9/ubi-minimal:latest

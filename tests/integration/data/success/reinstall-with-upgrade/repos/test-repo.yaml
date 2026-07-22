@@ -1,0 +1,5 @@
+packages:
+  - nvr: findutils-1:99.0-1
+    arch: x86_64
+
+  - nvr: test-decoy-1.0-1

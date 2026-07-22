@@ -1,0 +1,34 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-first-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 64940
+    checksum: sha256:d6b736b486ad0135b9a6cbb9d391fd64d8b1db28ca0b00c5c95837ef14e3e5cc
+    name: test-first
+    evr: 1.0-1
+    sourcerpm: test-first-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-second-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 24751
+    checksum: sha256:94879f24295fc715e99f41d9a2b0855c7eb6913dfc201537e4cea23994cb8eaf
+    name: test-second
+    evr: 1.0-1
+    sourcerpm: test-second-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-first-1.0-1.src.rpm
+    repoid: test-repo
+    size: 88732
+    checksum: sha256:0ac36af6e1ddb1fce41f952991529f576e8cf87ceea88ab1127072e5e851ed5c
+    name: test-first
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-second-1.0-1.src.rpm
+    repoid: test-repo
+    size: 3733
+    checksum: sha256:26ad65744bedf7af62ccb9951cfec9863df7b08f1f8f8a6cb8f3786050d84c65
+    name: test-second
+    evr: 1.0-1
+  module_metadata: []

@@ -1,0 +1,4 @@
+packages:
+  - nvr: test-base-1.0-1
+
+  - nvr: test-not-in-containerfile-1.0-1

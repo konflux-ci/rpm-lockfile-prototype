@@ -1,0 +1,9 @@
+ARG REGISTRY=registry.access.redhat.com
+ARG IMAGE_NAME="ubi9/ubi-minimal"
+ARG IMAGE_TAG='latest'
+
+FROM ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} AS builder
+RUN microdnf install -y test-builder-pkg
+
+FROM $REGISTRY/$IMAGE_NAME:$IMAGE_TAG AS runtime
+RUN microdnf install -y test-runtime-pkg

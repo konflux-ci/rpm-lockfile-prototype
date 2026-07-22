@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-relative-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 57484
+    checksum: sha256:2b20805523598ceb6c76d0e9c2ee9cc0b91bd205cd6d9fd617088343aa72fd14
+    name: test-from-relative
+    evr: 1.0-1
+    sourcerpm: test-from-relative-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-relative-1.0-1.src.rpm
+    repoid: test-repo
+    size: 80006
+    checksum: sha256:a1010ed71de52909d01aebe87cc4c3024dbea60dd3578362e393585b2fb21f8e
+    name: test-from-relative
+    evr: 1.0-1
+  module_metadata: []

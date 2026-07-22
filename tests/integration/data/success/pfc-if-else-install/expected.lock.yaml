@@ -1,0 +1,51 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 97013
+    checksum: sha256:abf4a1cedd438c64304defef0ac383a1c43e8c8e3dbac9d92377ae81caf884bd
+    name: test-else-branch
+    evr: 1.0-1
+    sourcerpm: test-else-branch-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.src.rpm
+    repoid: test-repo
+    size: 4642
+    checksum: sha256:7d513a86ec9ebfb3677017dd1a78a5a12bae38ed3b7a68aa83458ebda3d9c65a
+    name: test-else-branch
+    evr: 1.0-1
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 97013
+    checksum: sha256:abf4a1cedd438c64304defef0ac383a1c43e8c8e3dbac9d92377ae81caf884bd
+    name: test-else-branch
+    evr: 1.0-1
+    sourcerpm: test-else-branch-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-x86-branch-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 3481
+    checksum: sha256:e799c21ba607a353f86824fd557356fe72847db94d3c04289721327b96cf93c1
+    name: test-x86-branch
+    evr: 1.0-1
+    sourcerpm: test-x86-branch-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.src.rpm
+    repoid: test-repo
+    size: 4642
+    checksum: sha256:7d513a86ec9ebfb3677017dd1a78a5a12bae38ed3b7a68aa83458ebda3d9c65a
+    name: test-else-branch
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-x86-branch-1.0-1.src.rpm
+    repoid: test-repo
+    size: 65378
+    checksum: sha256:753ac182c8d0bfa6a345b1cbc38eb4db39909fac39f992fba6ea19193f56508a
+    name: test-x86-branch
+    evr: 1.0-1
+  module_metadata: []

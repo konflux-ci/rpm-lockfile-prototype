@@ -1,0 +1,5 @@
+packages:
+  - test-common
+arch-include:
+  x86_64: x86_64-packages.yaml
+  aarch64: aarch64-packages.yaml

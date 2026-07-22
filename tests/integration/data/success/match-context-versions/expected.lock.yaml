@@ -1,0 +1,34 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/findutils-extra-4.8.0-7.el9.x86_64.rpm
+    repoid: test-repo
+    size: 16178
+    checksum: sha256:2bd057821b7da381a1f8482a1af160a4bf6d918b9d4d3d41838bdb2859dda9c2
+    name: findutils-extra
+    evr: 1:4.8.0-7.el9
+    sourcerpm: findutils-extra-4.8.0-7.el9.src.rpm
+  - url: http://localhost:PORT/test-repo/unrelated-pkg-5.0-1.noarch.rpm
+    repoid: test-repo
+    size: 76318
+    checksum: sha256:596d339d769bfce996ae4ae6d6011680828c8e9589da69871bfc4fefeec86c3e
+    name: unrelated-pkg
+    evr: 5.0-1
+    sourcerpm: unrelated-pkg-5.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/findutils-extra-4.8.0-7.el9.src.rpm
+    repoid: test-repo
+    size: 17398
+    checksum: sha256:5c11593c8c560edf1907b178a6c12e321c7e011a9876a2a10e4d2de28169bd0e
+    name: findutils-extra
+    evr: 4.8.0-7.el9
+  - url: http://localhost:PORT/test-repo/unrelated-pkg-5.0-1.src.rpm
+    repoid: test-repo
+    size: 48945
+    checksum: sha256:06cd62be89e321140d635a88bc250c4a0539020301b23d2398e1d35e84ade859
+    name: unrelated-pkg
+    evr: 5.0-1
+  module_metadata: []

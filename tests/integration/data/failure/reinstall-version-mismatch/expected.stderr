@@ -1,0 +1,3 @@
+# Reinstalling when the repo has a different version and the package
+# is not listed for upgrade
+PackagesNotAvailableError

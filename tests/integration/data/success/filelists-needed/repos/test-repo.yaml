@@ -1,0 +1,10 @@
+packages:
+  - nvr: test-app-1.0-1
+    requires:
+      - /usr/share/test-data/config.ini
+
+  - nvr: test-data-provider-1.0-1
+    files:
+      - /usr/share/test-data/config.ini
+
+  - nvr: test-unrelated-1.0-1

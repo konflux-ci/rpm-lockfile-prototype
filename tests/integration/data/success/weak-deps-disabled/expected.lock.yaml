@@ -1,0 +1,47 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-app-1.0-1.x86_64.rpm
+    repoid: test-repo
+    size: 46466
+    checksum: sha256:c21072f7d6fdd53e1392028e10d754746d098ded0e0955d257fde886419d2f4a
+    name: test-app
+    evr: 1.0-1
+    sourcerpm: test-app-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 17899
+    checksum: sha256:e3ca3c340759b02d09400e29a1c739e1f2c2bf8c793b2baf7bcebc3f44da5c53
+    name: test-base
+    evr: 1.0-1
+    sourcerpm: test-base-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-lib-1.0-1.x86_64.rpm
+    repoid: test-repo
+    size: 2054
+    checksum: sha256:64f404a4cf4500918adb216317bf9433b44be32dee9dc516adfeebde286e2ba6
+    name: test-lib
+    evr: 1.0-1
+    sourcerpm: test-lib-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-app-1.0-1.src.rpm
+    repoid: test-repo
+    size: 6803
+    checksum: sha256:ee8a029197f249dd51b673fb93d8d7ac5ed496ee11d5b31d0ab3d452ef4208fb
+    name: test-app
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.src.rpm
+    repoid: test-repo
+    size: 2327
+    checksum: sha256:6a3850963dc1c535e77b51fcbad730f392c4dad235c1c690a77044e418243fbf
+    name: test-base
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-lib-1.0-1.src.rpm
+    repoid: test-repo
+    size: 77461
+    checksum: sha256:3ed0c333cf83998369b53e08e2a69ef9be9ff71d4a6137a1cf0eb8e585cb84bd
+    name: test-lib
+    evr: 1.0-1
+  module_metadata: []

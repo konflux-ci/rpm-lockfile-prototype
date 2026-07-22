@@ -1,0 +1,2 @@
+# Reinstalling a package that exists in the image but not in any repo
+PackagesNotAvailableError

@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-dnf-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 18477
+    checksum: sha256:2054434bcd7b02d67b49c436f29aea47f522545eb6802c6d3af3e960cca44745
+    name: test-from-dnf
+    evr: 1.0-1
+    sourcerpm: test-from-dnf-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-dnf-1.0-1.src.rpm
+    repoid: test-repo
+    size: 13470
+    checksum: sha256:998ffb65c10f19ebaf1d013f1576bced92cfd0363e214b35129c3ff8a05c41b6
+    name: test-from-dnf
+    evr: 1.0-1
+  module_metadata: []

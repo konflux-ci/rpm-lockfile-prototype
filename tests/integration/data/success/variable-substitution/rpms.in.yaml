@@ -1,0 +1,15 @@
+variables:
+  - file: vars.env
+  - inline:
+      INLINE_PKG: test-from-inline
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo/{REPO_SUFFIX}
+packages:
+  - "{FILE_PKG}"
+  - "{INLINE_PKG}"
+arches:
+  - x86_64
+context:
+  bare: true

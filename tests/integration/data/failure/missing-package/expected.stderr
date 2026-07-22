@@ -1,0 +1,2 @@
+# DNF should report the missing package
+missing packages: nonexistent-pkg

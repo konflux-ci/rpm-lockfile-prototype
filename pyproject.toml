@@ -32,6 +32,23 @@ exclude = ["rpm_lockfile/vendor"]
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.pytest.ini_options]
+
+[tool.coverage.run]
+parallel = true
+source = ["rpm_lockfile"]
+relative_files = true
+disable_warnings = ["no-data-collected"]
+
+[tool.coverage.paths]
+source = [
+    "rpm_lockfile/",
+    "/*/site-packages/rpm_lockfile/",
+]
+
+[tool.coverage.report]
+show_missing = true
+
 [project.entry-points."rpm_lockfile.content_origins"]
 repos = "rpm_lockfile.content_origin.repos:RepoOrigin"
 repofiles = "rpm_lockfile.content_origin.repofiles:RepofileOrigin"

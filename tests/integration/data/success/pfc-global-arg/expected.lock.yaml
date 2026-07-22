@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-global-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 48668
+    checksum: sha256:dec2afb0ce0cd5e67776898fe72ae8cd33f6d718cb9148735dabae2c05395bd4
+    name: test-from-global
+    evr: 1.0-1
+    sourcerpm: test-from-global-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-global-1.0-1.src.rpm
+    repoid: test-repo
+    size: 4200
+    checksum: sha256:6223598edb50faf12786507f1c0a5ed419da8fdc58a3bd414ae2f9613356b890
+    name: test-from-global
+    evr: 1.0-1
+  module_metadata: []

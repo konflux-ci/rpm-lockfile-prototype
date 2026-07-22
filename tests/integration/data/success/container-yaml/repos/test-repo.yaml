@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-common-1.0-1
+
+  - nvr: test-x86-only-1.0-1
+
+  - nvr: test-not-aarch64-1.0-1

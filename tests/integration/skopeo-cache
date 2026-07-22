@@ -1,0 +1,107 @@
+#!/bin/bash
+# Caching wrapper for skopeo used in integration tests.
+#
+# Caches the results of `skopeo inspect` and `skopeo copy` commands in
+# $SKOPEO_CACHE_DIR. If the cache entry exists, the result is served from
+# cache without hitting the network. Otherwise, real skopeo is called and
+# the result is stored.
+#
+# Thread-safe: uses atomic moves (mv) to avoid corruption when multiple
+# workers write to the same cache concurrently.
+#
+# Set SKOPEO_CACHE_DIR to a persistent directory to avoid re-downloading
+# images across test runs. If not set, this wrapper is a no-op passthrough
+# to real skopeo.
+
+set -euo pipefail
+
+# Find the real skopeo (skip this script on PATH)
+REAL_SKOPEO=""
+SELF="$(realpath "$0")"
+IFS=: read -ra path_dirs <<< "$PATH"
+for dir in "${path_dirs[@]}"; do
+    candidate="$dir/skopeo"
+    if [[ -x "$candidate" ]] && [[ "$(realpath "$candidate")" != "$SELF" ]]; then
+        REAL_SKOPEO="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$REAL_SKOPEO" ]]; then
+    echo "skopeo-cache: could not find real skopeo on PATH" >&2
+    exit 1
+fi
+
+# If no cache dir configured, just pass through
+if [[ -z "${SKOPEO_CACHE_DIR:-}" ]]; then
+    exec "$REAL_SKOPEO" "$@"
+fi
+
+# Detect the subcommand (inspect or copy) while accounting for
+# --override-arch and other flags before the subcommand.
+# Also collect the cache-relevant arguments (excluding the destination
+# path for copy, which changes every run).
+subcmd=""
+dest_dir=""
+cache_args=""
+args=("$@")
+for i in "${!args[@]}"; do
+    case "${args[$i]}" in
+        inspect)
+            subcmd="inspect"
+            # For inspect, all args are cache-relevant
+            cache_args="$*"
+            break
+            ;;
+        copy)
+            subcmd="copy"
+            # For copy, cache key is everything except the dir: destination
+            for j in "${!args[@]}"; do
+                if [[ "${args[$j]}" == dir:* ]]; then
+                    dest_dir="${args[$j]#dir:}"
+                else
+                    cache_args="$cache_args ${args[$j]}"
+                fi
+            done
+            break
+            ;;
+    esac
+done
+
+cache_key=$(echo "$cache_args" | sha256sum | cut -d' ' -f1)
+
+case "$subcmd" in
+    inspect)
+        cache_file="$SKOPEO_CACHE_DIR/inspect/$cache_key"
+        if [[ -f "$cache_file" ]]; then
+            cat "$cache_file"
+            exit 0
+        fi
+        mkdir -p "$SKOPEO_CACHE_DIR/inspect"
+        tmpfile=$(mktemp "$SKOPEO_CACHE_DIR/inspect/.tmp.XXXXXX")
+        trap 'rm -f "$tmpfile"' EXIT
+        "$REAL_SKOPEO" "$@" | tee "$tmpfile"
+        mv "$tmpfile" "$cache_file"
+        trap - EXIT
+        ;;
+    copy)
+        cache_entry="$SKOPEO_CACHE_DIR/copy/$cache_key"
+        if [[ -d "$cache_entry" ]]; then
+            mkdir -p "$dest_dir"
+            cp -a "$cache_entry/." "$dest_dir/"
+            exit 0
+        fi
+        # Run real skopeo
+        "$REAL_SKOPEO" "$@"
+        # Cache the result atomically
+        mkdir -p "$SKOPEO_CACHE_DIR/copy"
+        tmpdir=$(mktemp -d "$SKOPEO_CACHE_DIR/copy/.tmp.XXXXXX")
+        trap 'rm -rf "$tmpdir"' EXIT
+        cp -a "$dest_dir/." "$tmpdir/"
+        mv "$tmpdir" "$cache_entry" 2>/dev/null || true
+        trap - EXIT
+        ;;
+    *)
+        exec "$REAL_SKOPEO" "$@"
+        ;;
+esac

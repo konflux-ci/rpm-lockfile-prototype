@@ -1,0 +1,2 @@
+# The tool should log that it's pinning findutils-extra to the image version
+pinning findutils-extra to findutils-extra-1:4.8.0-7.el9
