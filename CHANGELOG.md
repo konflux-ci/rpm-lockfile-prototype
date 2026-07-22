@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.27.0] - 2026-07-22
+
+### Added
+
+- New `matchContextVersions` configuration key that accepts a list of package
+  name glob patterns. Matching packages are pinned to the exact version
+  installed in the context image, ensuring the lockfile reflects the image
+  contents.
+
+- New `packagesFromContainerfile` configuration key for explicitly opting in
+  to Containerfile package extraction. This decouples package extraction from
+  `context.containerfile` and works independently of rpmdb mode (including
+  `--bare`). Using `context.containerfile` with an empty `packages` list for
+  implicit extraction is now deprecated and will emit a warning.
+
+- Repo file paths in `contentOrigin` now support glob patterns (e.g.,
+  `repos/*.repo`) and repos with `enabled=0` are automatically skipped.
+
 ## [0.26.0] - 2026-07-17
 
 ### Added
