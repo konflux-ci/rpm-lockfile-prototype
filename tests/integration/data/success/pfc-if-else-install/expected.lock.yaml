@@ -21,13 +21,6 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.noarch.rpm
-    repoid: test-repo
-    size: 97013
-    checksum: sha256:abf4a1cedd438c64304defef0ac383a1c43e8c8e3dbac9d92377ae81caf884bd
-    name: test-else-branch
-    evr: 1.0-1
-    sourcerpm: test-else-branch-1.0-1.src.rpm
   - url: http://localhost:PORT/test-repo/test-x86-branch-1.0-1.noarch.rpm
     repoid: test-repo
     size: 3481
@@ -36,12 +29,6 @@ arches:
     evr: 1.0-1
     sourcerpm: test-x86-branch-1.0-1.src.rpm
   source:
-  - url: http://localhost:PORT/test-repo/test-else-branch-1.0-1.src.rpm
-    repoid: test-repo
-    size: 4642
-    checksum: sha256:7d513a86ec9ebfb3677017dd1a78a5a12bae38ed3b7a68aa83458ebda3d9c65a
-    name: test-else-branch
-    evr: 1.0-1
   - url: http://localhost:PORT/test-repo/test-x86-branch-1.0-1.src.rpm
     repoid: test-repo
     size: 65378
