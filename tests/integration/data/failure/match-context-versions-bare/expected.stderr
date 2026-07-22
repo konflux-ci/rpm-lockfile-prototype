@@ -1,0 +1,2 @@
+# matchContextVersions requires an image context
+matchContextVersions requires a context image or containerfile

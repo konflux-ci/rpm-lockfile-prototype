@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-data-provider-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 54264
+    checksum: sha256:1824f16d287ff0259132e45334c8f56f99d65fa741ad1024205e0ee688522548
+    name: test-data-provider
+    evr: 1.0-1
+    sourcerpm: test-data-provider-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-data-provider-1.0-1.src.rpm
+    repoid: test-repo
+    size: 88939
+    checksum: sha256:f532e483f8ff64a11da3bf6ac48a8147de3a8d4caccea33425c4089acf17183b
+    name: test-data-provider
+    evr: 1.0-1
+  module_metadata: []

@@ -1,0 +1,51 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-common-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 33488
+    checksum: sha256:f744da761b44ab0c00f94f391f3386dee075a81c12c9db4bc1ed6f6e4bf23ed8
+    name: test-common
+    evr: 1.0-1
+    sourcerpm: test-common-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-common-1.0-1.src.rpm
+    repoid: test-repo
+    size: 17508
+    checksum: sha256:f2dff9061e5b23158b3cd4e2aae77f235abd6f127e6227935d3be9f0d9e0b5c4
+    name: test-common
+    evr: 1.0-1
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-common-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 33488
+    checksum: sha256:f744da761b44ab0c00f94f391f3386dee075a81c12c9db4bc1ed6f6e4bf23ed8
+    name: test-common
+    evr: 1.0-1
+    sourcerpm: test-common-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-not-aarch64-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 50836
+    checksum: sha256:3046fe25e2f92d0a514caf3947917fd55f227eb8f024ae635da9f2a8a25042cc
+    name: test-not-aarch64
+    evr: 1.0-1
+    sourcerpm: test-not-aarch64-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-common-1.0-1.src.rpm
+    repoid: test-repo
+    size: 17508
+    checksum: sha256:f2dff9061e5b23158b3cd4e2aae77f235abd6f127e6227935d3be9f0d9e0b5c4
+    name: test-common
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-not-aarch64-1.0-1.src.rpm
+    repoid: test-repo
+    size: 12605
+    checksum: sha256:fd49b5bba9fab84858efac5dab5f4b4a45ce51705a19187754316ca99f81db65
+    name: test-not-aarch64
+    evr: 1.0-1
+  module_metadata: []

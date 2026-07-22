@@ -1,0 +1,11 @@
+flatpak:
+  packages:
+    - test-common
+    - name: test-x86-only
+      platforms:
+        only:
+          - x86_64
+    - name: test-not-aarch64
+      platforms:
+        not:
+          - aarch64

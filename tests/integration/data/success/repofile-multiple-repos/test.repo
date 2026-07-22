@@ -1,0 +1,9 @@
+[main-repo]
+name=Main Repo
+baseurl=http://localhost:PORT/main-repo
+gpgcheck=0
+
+[extras-repo]
+name=Extras Repo
+baseurl=http://localhost:PORT/extras-repo
+gpgcheck=0

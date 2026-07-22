@@ -45,7 +45,7 @@ jobs:
       run: |
         {
           echo 'FROM ${{ matrix.base-image }}'
-          echo 'RUN dnf install -y python3-pip python3-dnf gcc'
+          echo 'RUN dnf install -y python3-pip python3-dnf gcc skopeo'
           echo 'WORKDIR /src'
           echo 'RUN python3 -m pip install -e "." pytest pytest-cov'
           echo 'RUN pytest -v --cov=rpm_lockfile --cov-report=xml:coverage.xml'

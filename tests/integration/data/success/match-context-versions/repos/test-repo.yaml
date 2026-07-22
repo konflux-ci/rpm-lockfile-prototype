@@ -1,0 +1,11 @@
+packages:
+  # Matching version from the image (findutils is 1:4.8.0-7.el9 in the image)
+  - nvr: findutils-extra-1:4.8.0-7.el9
+    arch: x86_64
+
+  # Higher version that would be picked without pinning
+  - nvr: findutils-extra-1:99.0-1
+    arch: x86_64
+
+  # Not matched by the findutils* pattern, gets latest version
+  - nvr: unrelated-pkg-5.0-1

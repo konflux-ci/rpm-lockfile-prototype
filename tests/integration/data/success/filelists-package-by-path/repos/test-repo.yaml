@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-data-provider-1.0-1
+    files:
+      - /usr/share/test-data/config.ini
+
+  - nvr: test-decoy-1.0-1

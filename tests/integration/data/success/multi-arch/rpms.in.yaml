@@ -1,0 +1,19 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packages:
+  - test-common
+  - name: test-x86-only
+    arches:
+      only:
+        - x86_64
+  - name: test-not-aarch64
+    arches:
+      not:
+        - aarch64
+arches:
+  - x86_64
+  - aarch64
+context:
+  bare: true

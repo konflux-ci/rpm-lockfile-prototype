@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Generate an expected.lock.yaml skeleton for a test case.
+
+Reads all repos/*.yaml in the test case directory, computes the checksums
+and sizes for every package, and writes expected.lock.yaml with all packages
+included. Edit the file to remove packages that should not appear in the
+output.
+
+Usage:
+    tests/integration/generate-expected tests/integration/data/success/my-test
+"""
+
+import sys
+from pathlib import Path
+
+# Allow running from the repo root
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tests.integration.repogen import _parse_nvr, _pkg_checksum, _pkg_size, _get_sourcerpm
+
+
+def main():
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <test-case-dir>", file=sys.stderr)
+        sys.exit(1)
+
+    test_dir = Path(sys.argv[1])
+    if not test_dir.is_dir():
+        print(f"Not a directory: {test_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    rpms_in = test_dir / "rpms.in.yaml"
+    if not rpms_in.exists():
+        print(f"No rpms.in.yaml found in {test_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    # Read arches from rpms.in.yaml
+    import yaml
+
+    with open(rpms_in) as f:
+        config = yaml.safe_load(f)
+    arches = config.get("arches", ["x86_64"])
+
+    # Collect all packages from all repos, tracking each package's origin path.
+    # The relative path of the YAML file (minus extension) determines the URL
+    # prefix:
+    #   repos/test-repo.yaml         -> http://localhost:PORT/test-repo/
+    #   repos/test-repo/x86_64.yaml  -> http://localhost:PORT/test-repo/x86_64/
+    #   repos/test-repo/9.yaml       -> http://localhost:PORT/test-repo/9/
+    repos_dir = test_dir / "repos"
+    if not repos_dir.exists():
+        print(f"No repos/ directory in {test_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    # List of (repo_name, url_prefix, pkg_dict) tuples
+    repo_packages = []
+    for repo_yaml in sorted(repos_dir.rglob("*.yaml")):
+        rel = repo_yaml.relative_to(repos_dir).with_suffix("")
+        rel_str = str(rel)
+        repo_name = rel_str.split("/")[0]
+        url_prefix = f"http://localhost:PORT/{rel_str}"
+        with open(repo_yaml) as f:
+            data = yaml.safe_load(f)
+        for pkg in data.get("packages", []):
+            repo_packages.append((repo_name, url_prefix, pkg))
+
+    # Build lockfile
+    lockfile_arches = []
+    for arch in arches:
+        packages = []
+        sources = []
+        seen_sources = set()
+
+        for repo_name, url_prefix, pkg in repo_packages:
+            name, epoch, version, release = _parse_nvr(pkg["nvr"])
+            pkg_arch = pkg.get("arch", "noarch")
+
+            # Skip src packages in the binary list
+            if pkg_arch == "src":
+                continue
+
+            nevra = f"{name}-{epoch}:{version}-{release}.{pkg_arch}"
+            checksum = _pkg_checksum(nevra)
+            size = _pkg_size(nevra)
+            evr = f"{epoch}:{version}-{release}" if epoch else f"{version}-{release}"
+            location = f"{name}-{version}-{release}.{pkg_arch}.rpm"
+
+            packages.append({
+                "url": f"{url_prefix}/{location}",
+                "repoid": repo_name,
+                "size": size,
+                "checksum": f"sha256:{checksum}",
+                "name": name,
+                "evr": evr,
+                "sourcerpm": _get_sourcerpm(pkg),
+            })
+
+            # Add source RPM
+            sourcerpm = _get_sourcerpm(pkg)
+            if sourcerpm and sourcerpm not in seen_sources:
+                seen_sources.add(sourcerpm)
+                src_nvr = sourcerpm[:-len(".src.rpm")]
+                src_name, src_epoch, src_version, src_release = _parse_nvr(src_nvr)
+                src_nevra = f"{src_name}-{src_epoch}:{src_version}-{src_release}.src"
+                src_checksum = _pkg_checksum(src_nevra)
+                src_size = _pkg_size(src_nevra)
+                src_evr = f"{src_epoch}:{src_version}-{src_release}" if src_epoch else f"{src_version}-{src_release}"
+
+                sources.append({
+                    "url": f"{url_prefix}/{sourcerpm}",
+                    "repoid": repo_name,
+                    "size": src_size,
+                    "checksum": f"sha256:{src_checksum}",
+                    "name": src_name,
+                    "evr": src_evr,
+                })
+
+        packages.sort(key=lambda p: p["name"])
+        sources.sort(key=lambda p: p["name"])
+
+        lockfile_arches.append({
+            "arch": arch,
+            "packages": packages,
+            "source": sources,
+            "module_metadata": [],
+        })
+
+    lockfile = {
+        "lockfileVersion": 1,
+        "lockfileVendor": "redhat",
+        "arches": lockfile_arches,
+    }
+
+    out_path = test_dir / "expected.lock.yaml"
+    with open(out_path, "w") as f:
+        yaml.dump(lockfile, f, sort_keys=False, explicit_start=True)
+
+    print(f"Wrote {out_path}")
+    print(f"Contains {sum(len(a['packages']) for a in lockfile_arches)} packages "
+          f"across {len(arches)} arch(es).")
+    print("Edit the file to remove packages that should not appear in the output.")
+
+
+if __name__ == "__main__":
+    main()

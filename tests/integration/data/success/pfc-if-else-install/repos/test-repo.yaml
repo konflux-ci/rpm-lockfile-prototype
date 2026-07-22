@@ -1,0 +1,4 @@
+packages:
+  - nvr: test-x86-branch-1.0-1
+
+  - nvr: test-else-branch-1.0-1

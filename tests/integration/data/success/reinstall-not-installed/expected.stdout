@@ -1,0 +1,2 @@
+# Reinstalling a package that is not in the base image should warn
+Can not reinstall

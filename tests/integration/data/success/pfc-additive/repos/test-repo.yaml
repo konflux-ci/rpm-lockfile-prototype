@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-from-config-1.0-1
+
+  - nvr: test-from-containerfile-1.0-1
+
+  - nvr: test-decoy-1.0-1

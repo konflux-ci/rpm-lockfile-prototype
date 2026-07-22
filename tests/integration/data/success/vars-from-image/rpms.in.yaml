@@ -1,0 +1,11 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo/{version}
+      varsFromImage: registry.access.redhat.com/ubi9/ubi-minimal@sha256:062c52ff973065752b0965787649db2bcf551a6c727a00e95a3eb42cebadbdab
+packages:
+  - test-base
+arches:
+  - x86_64
+context:
+  bare: true

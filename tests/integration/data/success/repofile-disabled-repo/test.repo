@@ -1,0 +1,11 @@
+[enabled-repo]
+name=Enabled Repo
+baseurl=http://localhost:PORT/enabled-repo
+gpgcheck=0
+enabled=1
+
+[disabled-repo]
+name=Disabled Repo
+baseurl=http://localhost:PORT/disabled-repo
+gpgcheck=0
+enabled=0

@@ -1,0 +1,60 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/findutils-99.0-1.x86_64.rpm
+    repoid: test-repo
+    size: 41761
+    checksum: sha256:f16dc7e1623df6fa9421adf3d55a8fb2b43d7c8cab0f3f8a005b2c91387dd889
+    name: findutils
+    evr: 1:99.0-1
+    sourcerpm: findutils-99.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/shadow-utils-4.9-16.el9.x86_64.rpm
+    repoid: test-repo
+    size: 14939
+    checksum: sha256:6dbd57914ec01eb55fe7f47adcd056eb3a800cd9be7e41452d25dec98ceae6f3
+    name: shadow-utils
+    evr: 2:4.9-16.el9
+    sourcerpm: shadow-utils-4.9-16.el9.src.rpm
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 17899
+    checksum: sha256:e3ca3c340759b02d09400e29a1c739e1f2c2bf8c793b2baf7bcebc3f44da5c53
+    name: test-base
+    evr: 1.0-1
+    sourcerpm: test-base-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-from-arg-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 91629
+    checksum: sha256:0ec74d92de9a134e95f8e50423682304559eb939bd636ce488af52b6f2c3d50d
+    name: test-from-arg
+    evr: 1.0-1
+    sourcerpm: test-from-arg-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/findutils-99.0-1.src.rpm
+    repoid: test-repo
+    size: 35999
+    checksum: sha256:9480bc1636fd7dc5a2d2ad4b6278db7d44747a30b43d3f1a01cc66d654d3be07
+    name: findutils
+    evr: 99.0-1
+  - url: http://localhost:PORT/test-repo/shadow-utils-4.9-16.el9.src.rpm
+    repoid: test-repo
+    size: 36398
+    checksum: sha256:9ee29325bfbd5ed18444d8b4dd171fc2a6f48a59c8165487d38293f9b6614d56
+    name: shadow-utils
+    evr: 4.9-16.el9
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.src.rpm
+    repoid: test-repo
+    size: 2327
+    checksum: sha256:6a3850963dc1c535e77b51fcbad730f392c4dad235c1c690a77044e418243fbf
+    name: test-base
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-from-arg-1.0-1.src.rpm
+    repoid: test-repo
+    size: 52669
+    checksum: sha256:64fb0740f19af519bf8c1ba05d5f6886506faef07a4f55efc1d5752b077cdd55
+    name: test-from-arg
+    evr: 1.0-1
+  module_metadata: []

@@ -1,0 +1,8 @@
+packages:
+  - nvr: test-first-run-1.0-1
+
+  - nvr: test-second-run-1.0-1
+
+  - nvr: test-third-run-1.0-1
+
+  - nvr: test-decoy-1.0-1
