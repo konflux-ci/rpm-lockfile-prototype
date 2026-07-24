@@ -64,10 +64,10 @@ def _pkg_checksum(nevra):
 def _primary_xml(packages):
     """Generate primary.xml content from a list of package dicts."""
     parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        ('<?xml version="1.0" encoding="UTF-8"?>\n'
         '<metadata xmlns="http://linux.duke.edu/metadata/common"'
         ' xmlns:rpm="http://linux.duke.edu/metadata/rpm"'
-        f' packages="{len(packages)}">\n'
+        f' packages="{len(packages)}">\n')
     ]
 
     for pkg in packages:
@@ -149,9 +149,9 @@ def _primary_xml(packages):
 def _filelists_xml(packages):
     """Generate filelists.xml content."""
     parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        ('<?xml version="1.0" encoding="UTF-8"?>\n'
         '<filelists xmlns="http://linux.duke.edu/metadata/filelists"'
-        f' packages="{len(packages)}">\n'
+        f' packages="{len(packages)}">\n')
     ]
     for pkg in packages:
         name, epoch, version, release = _parse_nvr(pkg["nvr"])
@@ -175,9 +175,9 @@ def _filelists_xml(packages):
 def _other_xml(packages):
     """Generate other.xml content."""
     parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        ('<?xml version="1.0" encoding="UTF-8"?>\n'
         '<otherdata xmlns="http://linux.duke.edu/metadata/other"'
-        f' packages="{len(packages)}">\n'
+        f' packages="{len(packages)}">\n')
     ]
     for pkg in packages:
         name, epoch, version, release = _parse_nvr(pkg["nvr"])
@@ -211,8 +211,8 @@ def _repomd_xml(records):
     records is a list of (md_type, sha256, size, filename) tuples.
     """
     parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<repomd xmlns="http://linux.duke.edu/metadata/repo">\n'
+        ('<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<repomd xmlns="http://linux.duke.edu/metadata/repo">\n')
     ]
     for md_type, checksum, size, filename in records:
         parts.append(
@@ -263,7 +263,7 @@ def _get_sourcerpm(pkg):
     arch = pkg.get("arch", "noarch")
     if arch == "src":
         return ""
-    name, epoch, version, release = _parse_nvr(pkg["nvr"])
+    name, _epoch, version, release = _parse_nvr(pkg["nvr"])
     return pkg.get("sourcerpm", f"{name}-{version}-{release}.src.rpm")
 
 

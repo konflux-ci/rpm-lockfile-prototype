@@ -25,6 +25,7 @@ from .shell_commands import (
     resolve_bash_expansion,
 )
 
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,7 +44,7 @@ class StagePackages:
     builddep_packages: list[str] = field(default_factory=list)
     module_specs: list[str] = field(default_factory=list)
 
-    def merge(self, other: "StagePackages") -> "StagePackages":
+    def merge(self, other: StagePackages) -> StagePackages:
         """
         Merge another StagePackages into this one, combining packages
         and update targets.
@@ -255,7 +256,6 @@ def extract_packages_from_file_installs(
             - Sorted unique package names (common to all arches).
             - Dict mapping arch to sorted unique package names for that arch only.
     """
-    logger = logging.getLogger(__name__)
     variables = dict(env_vars or {})
     arch_list = arches or []
     redirect_re = re.compile(
@@ -374,7 +374,6 @@ def extract_packages_from_scripts(
     if not source_dir:
         return StagePackages()
 
-    logger = logging.getLogger(__name__)
     script_pattern = re.compile(
         r"(?:^|&&\s*|;\s*)"
         r"(?:(?:(?:/usr)?/bin/)?(?:ba)?sh\s+)?"
@@ -652,7 +651,7 @@ def resolve_builddep_packages(
                     # paths, virtual provides) is valid for resolution.
                     if req and not req.startswith("rpmlib("):
                         resolved.add(req)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - intentionally broad
                 logger.warning(
                     "Failed to extract BuildRequires from %s: %s", path.name, exc
                 )

@@ -1,12 +1,13 @@
 import os
 import tempfile
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 from xml.etree import ElementTree
 
 import pytest
 
 import rpm_lockfile
 from rpm_lockfile import assumed_provides, schema
+
 
 @pytest.mark.parametrize(
     "arch,expected",

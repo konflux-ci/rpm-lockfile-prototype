@@ -1,6 +1,6 @@
 import json
 import subprocess
-from unittest.mock import patch, mock_open, Mock
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
@@ -268,11 +268,10 @@ def test_extract_image_with_undefined_build_arg():
     file = """ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 """
-    with patch("builtins.open", mock_open(read_data=file)):
-        with pytest.raises(
-            RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
-        ):
-            utils.extract_image(file)
+    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
+        RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
+    ):
+        utils.extract_image(file)
 
 
 def test_extract_image_with_partial_undefined_build_args():
@@ -281,11 +280,10 @@ def test_extract_image_with_partial_undefined_build_args():
 ARG NAMESPACE
 FROM ${REGISTRY}/${NAMESPACE}/image
 """
-    with patch("builtins.open", mock_open(read_data=file)):
-        with pytest.raises(
-            RuntimeError, match="ARG 'REGISTRY' is used but has no default value"
-        ):
-            utils.extract_image(file)
+    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
+        RuntimeError, match="ARG 'REGISTRY' is used but has no default value"
+    ):
+        utils.extract_image(file)
 
 
 def test_extract_image_with_mixed_defined_undefined_args():
@@ -294,11 +292,10 @@ def test_extract_image_with_mixed_defined_undefined_args():
 ARG NAMESPACE
 FROM ${REGISTRY}/${NAMESPACE}/image
 """
-    with patch("builtins.open", mock_open(read_data=file)):
-        with pytest.raises(
-            RuntimeError, match="ARG 'NAMESPACE' is used but has no default value"
-        ):
-            utils.extract_image(file)
+    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
+        RuntimeError, match="ARG 'NAMESPACE' is used but has no default value"
+    ):
+        utils.extract_image(file)
 
 
 def test_extract_image_with_unused_undefined_args():

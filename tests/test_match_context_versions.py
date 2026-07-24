@@ -1,7 +1,7 @@
 import logging
+from unittest.mock import Mock
 
 import pytest
-from unittest.mock import Mock
 
 from rpm_lockfile.utils import pin_context_versions
 

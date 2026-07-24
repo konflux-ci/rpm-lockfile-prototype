@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .containerfile_packages import _strip_quotes
 
+logger = logging.getLogger(__name__)
 
 # Path to where local dnf expects to find rpmdb. This is relative to /.
 RPMDB_PATH = subprocess.run(
@@ -43,7 +44,7 @@ def find_containerfile(dir):
 
 def logged_run(cmd, *args, **kwargs):
     logger.info("$ %s", shlex.join(cmd))
-    return subprocess.run(cmd, *args, **kwargs)
+    return subprocess.run(cmd, *args, **kwargs)  # noqa: PLW1510 - check passed via kwargs
 
 
 def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=None):
@@ -145,11 +146,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
 
                 # Resolve to external base image
                 # If this FROM references a previous stage, look up that stage's base
-                if expanded_img.lower() in stage_bases:
-                    baseimg = stage_bases[expanded_img.lower()]
-                else:
-                    # This is an external image
-                    baseimg = expanded_img
+                baseimg = stage_bases.get(expanded_img.lower(), expanded_img)
 
                 # Track this stage's base image
                 stage_name_value = from_match.group("name")

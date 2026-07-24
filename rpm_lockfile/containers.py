@@ -111,14 +111,14 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
         _hardlink_targets = set()
         for layer in manifest["layers"]:
             digest = layer["digest"].split(":", 1)[1]
-            archive = tarfile.open(tmpdir / digest)
-            for member in archive:
-                if not member.islnk():
-                    continue
-                for candidate_path in RPMDB_PATHS:
-                    if Path(member.name).is_relative_to(candidate_path):
-                        _hardlink_targets.add(member.linkname)
-                        break
+            with tarfile.open(tmpdir / digest) as archive:
+                for member in archive:
+                    if not member.islnk():
+                        continue
+                    for candidate_path in RPMDB_PATHS:
+                        if Path(member.name).is_relative_to(candidate_path):
+                            _hardlink_targets.add(member.linkname)
+                            break
 
         def filter_rpmdb(member, path):
             for candidate_path in RPMDB_PATHS:
@@ -133,8 +133,8 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
             digest = layer["digest"].split(":", 1)[1]
             # ...find all files in interesting locations and extract them to
             # the destination cache.
-            archive = tarfile.open(tmpdir / digest)
-            archive.extractall(path=dest_dir, filter=filter_rpmdb)
+            with tarfile.open(tmpdir / digest) as archive:
+                archive.extractall(path=dest_dir, filter=filter_rpmdb)
 
         # Determine which rpmdb paths actually have content on disk.
         # Tracking accepted members in the filter is unreliable:
@@ -184,7 +184,10 @@ def _get_storage_usage(directory):
     representing percentage. Returns None on failure.
     """
     cp = subprocess.run(
-        ["df", "--output=pcent", directory], stdout=subprocess.PIPE, text=True
+        ["df", "--output=pcent", directory],
+        stdout=subprocess.PIPE,
+        text=True,
+        check=False,
     )
     if cp.returncode != 0:
         logger.debug("Failed to check free storage size...")

@@ -1,9 +1,8 @@
+from unittest.mock import ANY, Mock, mock_open, patch
+
 import pytest
 
-from unittest.mock import patch, mock_open, Mock, ANY
-
 from rpm_lockfile.content_origin import Repo, repofiles
-
 
 REPOFILE = """
 [repo-0]
@@ -115,21 +114,23 @@ def test_collect_git_with_vars_from_image(tmpdir):
 
     image = "registry.example.com/image:latest"
 
-    with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
-        with patch("rpm_lockfile.utils.get_file_from_git") as mock_get_file:
-            mock_get_file.return_value = str(tmpdir / repofile)
-            repos = list(
-                origin.collect(
-                    [
-                        {
-                            "giturl": giturl,
-                            "file": repofile,
-                            "gitref": "{vcs-ref}",
-                            "varsFromImage": image,
-                        }
-                    ]
-                )
+    with (
+        patch("rpm_lockfile.utils.get_labels", new=fake_get_labels),
+        patch("rpm_lockfile.utils.get_file_from_git") as mock_get_file,
+    ):
+        mock_get_file.return_value = str(tmpdir / repofile)
+        repos = list(
+            origin.collect(
+                [
+                    {
+                        "giturl": giturl,
+                        "file": repofile,
+                        "gitref": "{vcs-ref}",
+                        "varsFromImage": image,
+                    }
+                ]
             )
+        )
 
     assert repos == [REPO]
     mock_get_file.assert_called_once_with(giturl, "abcdef", "test.repo")

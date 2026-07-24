@@ -258,6 +258,7 @@ def run_test_case(
             cwd=str(tmp_path),
             env=env,
             timeout=120,
+            check=False,
         )
 
         lockfile = None

@@ -43,6 +43,5 @@ def main():
         )
 
     logger.info("Copying cache results to %s", args.outfile)
-    with cache_file.open("rb") as inp:
-        with Path(args.outfile).open("wb") as outp:
-            shutil.copyfileobj(inp, outp)
+    with cache_file.open("rb") as inp, Path(args.outfile).open("wb") as outp:
+        shutil.copyfileobj(inp, outp)

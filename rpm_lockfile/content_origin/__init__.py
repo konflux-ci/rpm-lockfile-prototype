@@ -1,11 +1,11 @@
-from importlib.metadata import entry_points
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 
 
 @dataclass(frozen=True, order=True)
 class Repo:
     repoid: str
-    kwargs: dict() = field(default_factory=dict)
+    kwargs: {} = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data):

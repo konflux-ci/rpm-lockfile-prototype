@@ -1,9 +1,11 @@
-from . import Repo
+import typing
+
 from .. import utils
+from . import Repo
 
 
 class RepoOrigin:
-    schema = {
+    schema: typing.ClassVar[dict] = {
         "type": "object",
         "properties": {
             "repoid": {"type": "string"},

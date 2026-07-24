@@ -5,9 +5,10 @@ Tests for rpm_lockfile.shell_commands.
 import unittest
 
 import pytest
+
 from rpm_lockfile.shell_commands import (
-    ARCH_VALUE_RE,
     ARCH_NEQ_VALUE_RE,
+    ARCH_VALUE_RE,
     analyze_run_commands,
     resolve_bash_expansion,
 )
@@ -77,8 +78,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_kernel_devel_conditional_with_version(self):
         run_values = [
-            "dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
-            " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}"
+            ("dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
+            " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}")
         ]
         result = analyze_run_commands(run_values, env_vars={"KERNEL_VERSION": "5.14.0"})
         self.assertEqual(
@@ -88,8 +89,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_kernel_devel_conditional_without_version(self):
         run_values = [
-            "dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
-            " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}"
+            ("dnf install -y kernel-devel${KERNEL_VERSION:+-}${KERNEL_VERSION}"
+            " kernel-headers${KERNEL_VERSION:+-}${KERNEL_VERSION}")
         ]
         result = analyze_run_commands(run_values, env_vars={})
         self.assertEqual(result.packages, ["kernel-devel", "kernel-headers"])
@@ -156,8 +157,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_subshell_arch_conditional_var(self):
         run_values = [
-            'ARCH_DEP_PKGS=$(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint ; fi) && '
-            "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS"
+            ('ARCH_DEP_PKGS=$(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint ; fi) && '
+            "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS")
         ]
         result = analyze_run_commands(
             run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
@@ -172,8 +173,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_subshell_arch_conditional_var_eq(self):
         run_values = [
-            'SPECIAL=$(if [ "$(uname -m)" == "x86_64" ]; then echo -n intel-pkg ; fi) && '
-            "yum -y install base-pkg $SPECIAL"
+            ('SPECIAL=$(if [ "$(uname -m)" == "x86_64" ]; then echo -n intel-pkg ; fi) && '
+            "yum -y install base-pkg $SPECIAL")
         ]
         result = analyze_run_commands(
             run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
@@ -191,8 +192,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_subshell_arch_conditional_var_go_arch(self):
         run_values = [
-            'SPECIAL=$(if [ "$(go env GOARCH)" == "amd64" ]; then echo -n x86-only ; fi) && '
-            "yum -y install common-pkg $SPECIAL"
+            ('SPECIAL=$(if [ "$(go env GOARCH)" == "amd64" ]; then echo -n x86-only ; fi) && '
+            "yum -y install common-pkg $SPECIAL")
         ]
         result = analyze_run_commands(
             run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
@@ -203,8 +204,8 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_arch_conditional_multiple_arches(self):
         run_values = [
-            "if [ $(arch) = x86_64 ]; then dnf -y install kernel-rt-devel; fi && "
-            "if [ $(arch) = aarch64 ]; then dnf -y install kernel-64k-devel; fi"
+            ("if [ $(arch) = x86_64 ]; then dnf -y install kernel-rt-devel; fi && "
+            "if [ $(arch) = aarch64 ]; then dnf -y install kernel-64k-devel; fi")
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, [])
@@ -215,9 +216,9 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_hosttype_arch_conditional(self):
         run_values = [
-            'PACKAGES="git gzip" && '
+            ('PACKAGES="git gzip" && '
             'if [ $HOSTTYPE = x86_64 ]; then PACKAGES="$PACKAGES realtime-tests"; fi && '
-            "yum install -y $PACKAGES"
+            "yum install -y $PACKAGES")
         ]
         result = analyze_run_commands(run_values)
         self.assertIn("git", result.packages)
@@ -246,12 +247,12 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_double_bracket_conditional_with_quoted_var_install(self):
         run_values = [
-            'if [[ "$ARCH" == "x86_64" ]]; then '
+            ('if [[ "$ARCH" == "x86_64" ]]; then '
             "GRUB_PKG=grub2-efi-x64; SHIM_PKG=shim-x64; "
             'elif [[ "$ARCH" == "aarch64" ]]; then '
             "GRUB_PKG=grub2-efi-aa64; SHIM_PKG=shim-aa64; "
             "fi && "
-            'dnf install -y "$GRUB_PKG" "$SHIM_PKG"'
+            'dnf install -y "$GRUB_PKG" "$SHIM_PKG"')
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, [])
@@ -272,9 +273,9 @@ class TestAnalyzeRunCommands(unittest.TestCase):
 
     def test_file_path_package_specs_are_included(self):
         run_values = [
-            "yum install --setopt=tsflags=nodocs -y "
+            ("yum install --setopt=tsflags=nodocs -y "
             "e2fsprogs xfsprogs util-linux nvme-cli "
-            "/usr/lib/udev/scsi_id /usr/bin/xxd"
+            "/usr/lib/udev/scsi_id /usr/bin/xxd")
         ]
         result = analyze_run_commands(run_values)
         self.assertIn("e2fsprogs", result.packages)
@@ -478,8 +479,8 @@ class TestBuilddepParsing(unittest.TestCase):
 
     def test_build_dep_hyphenated_with_install(self):
         run_values = [
-            "dnf install -y gcc rpm-build && cd assets/tuned/daemon "
-            "&& dnf build-dep tuned.spec -y"
+            ("dnf install -y gcc rpm-build && cd assets/tuned/daemon "
+            "&& dnf build-dep tuned.spec -y")
         ]
         result = analyze_run_commands(run_values)
         self.assertIn("gcc", result.packages)
@@ -516,8 +517,8 @@ class TestVariablePackageManager(unittest.TestCase):
 
     def test_variable_in_conditional(self):
         run_values = [
-            "if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients "
-            "&& ${DNF} clean all && rm -rf /var/cache/dnf/*; fi"
+            ("if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients "
+            "&& ${DNF} clean all && rm -rf /var/cache/dnf/*; fi")
         ]
         result = analyze_run_commands(run_values, env_vars={"DNF": "microdnf"})
         self.assertIn("openssh-clients", result.packages)
