@@ -491,8 +491,7 @@ def logging_setup(debug=False):
 
 @dataclass
 class ContainerfilePackages:
-    common: set[str] = field(default_factory=set)
-    arch_specific: dict[str, set[str]] = field(default_factory=dict)
+    packages: set[str] = field(default_factory=set)
     upgrade: set[str] = field(default_factory=set)
     reinstall: set[str] = field(default_factory=set)
     module_enable: set[str] = field(default_factory=set)
@@ -502,32 +501,27 @@ class ContainerfilePackages:
 def _extract_containerfile_packages(
     containerfile: str,
     context: dict,
-    arches: list[str] | None = None,
+    arch: str | None = None,
 ) -> ContainerfilePackages:
     result = ContainerfilePackages()
 
     cf_path = Path(containerfile)
     source_dir = cf_path.parent
-    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir, arches=arches)
+    stages = analyze_containerfile_stages(cf_path, source_dir=source_dir, arch=arch)
     selected = select_stage(stages, **_get_containerfile_filters(context))
     if selected:
-        result.common.update(selected.packages)
-        for arch, pkgs in selected.arch_packages.items():
-            result.arch_specific.setdefault(arch, set()).update(pkgs)
+        result.packages.update(selected.packages)
         result.upgrade.update(selected.update_targets)
         result.reinstall.update(selected.reinstall_targets)
         result.module_enable.update(selected.module_specs)
         result.builddep = list(selected.builddep_packages)
-    if result.common or result.arch_specific:
+    if result.packages:
         logger.info(
-            "Extracted %d common and %d arch-specific packages from Containerfile",
-            len(result.common),
-            sum(len(v) for v in result.arch_specific.values()),
+            "Extracted %d packages from Containerfile for %s",
+            len(result.packages),
+            arch or "unknown arch",
         )
-        if result.common:
-            logger.debug("Containerfile packages: %s", sorted(result.common))
-        for arch, pkgs in sorted(result.arch_specific.items()):
-            logger.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
+        logger.debug("Containerfile packages: %s", sorted(result.packages))
         if result.upgrade:
             logger.debug("Containerfile upgrade packages: %s", sorted(result.upgrade))
         if result.reinstall:
@@ -616,8 +610,6 @@ def main():
 
     repos = collect_content_origins(config_dir, config["contentOrigin"], variables)
 
-    cf_pkgs = ContainerfilePackages()
-
     # Determine rpmdb source — independent of package extraction.
     containerfile = None
     is_image_context = True
@@ -655,46 +647,22 @@ def main():
         )
 
     # Determine package extraction source — independent of rpmdb mode.
+    # The actual extraction runs per-arch inside the loop below.
     pfc_spec = config.get("packagesFromContainerfile")
+    cf_containerfile = None
+    cf_context = {}
 
     if pfc_spec:
-        pfc_context = {"containerfile": pfc_spec}
-        pfc_path = _get_containerfile_path(config_dir, pfc_context)
-        try:
-            cf_pkgs = _extract_containerfile_packages(pfc_path, pfc_context, arches)
-        except Exception:
-            logger.warning(
-                "Failed to extract packages from Containerfile %s; "
-                "falling back to explicitly listed packages only.",
-                pfc_path,
-                exc_info=True,
-            )
-
-        if cf_pkgs.builddep:
-            source_dir = Path(pfc_path).parent
-            builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
-            cf_pkgs.common |= builddep_resolved
-
+        cf_context = {"containerfile": pfc_spec}
+        cf_containerfile = _get_containerfile_path(config_dir, cf_context)
     elif containerfile and not config.get("packages"):
         logger.warning(
             "Implicit package extraction from Containerfile is deprecated. "
             "Add 'packagesFromContainerfile' with the Containerfile path "
             "to your config file to preserve this behavior."
         )
-        try:
-            cf_pkgs = _extract_containerfile_packages(containerfile, context, arches)
-        except Exception:
-            logger.warning(
-                "Failed to extract packages from Containerfile %s; "
-                "falling back to explicitly listed packages only.",
-                containerfile,
-                exc_info=True,
-            )
-
-        if cf_pkgs.builddep:
-            source_dir = Path(containerfile).parent
-            builddep_resolved = resolve_builddep_packages(cf_pkgs.builddep, source_dir)
-            cf_pkgs.common |= builddep_resolved
+        cf_containerfile = containerfile
+        cf_context = context
 
     if config.get("matchContextVersions") and not is_image_context:
         parser.error(
@@ -713,9 +681,29 @@ def main():
         elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
 
-        # Merge Containerfile-extracted packages
-        packages |= cf_pkgs.common
-        packages |= cf_pkgs.arch_specific.get(arch, set())
+        # Extract packages from Containerfile for this architecture
+        cf_pkgs = ContainerfilePackages()
+        if cf_containerfile:
+            try:
+                cf_pkgs = _extract_containerfile_packages(
+                    cf_containerfile, cf_context, arch
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to extract packages from Containerfile %s; "
+                    "falling back to explicitly listed packages only.",
+                    cf_containerfile,
+                    exc_info=True,
+                )
+
+            if cf_pkgs.builddep:
+                source_dir = Path(cf_containerfile).parent
+                builddep_resolved = resolve_builddep_packages(
+                    cf_pkgs.builddep, source_dir
+                )
+                cf_pkgs.packages |= builddep_resolved
+
+        packages |= cf_pkgs.packages
 
         data["arches"].append(
             process_arch(
