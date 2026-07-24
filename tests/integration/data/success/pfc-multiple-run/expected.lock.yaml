@@ -1,0 +1,47 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-first-run-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 54546
+    checksum: sha256:d83d100d564937cb54a94d582702fe01a9f288ab705e027f4de759af92f1e21a
+    name: test-first-run
+    evr: 1.0-1
+    sourcerpm: test-first-run-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-second-run-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 14614
+    checksum: sha256:7a6ae410fbc4562acaa431a8ab424527db37cf4531886b32fac84f94742cabd6
+    name: test-second-run
+    evr: 1.0-1
+    sourcerpm: test-second-run-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-third-run-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 82688
+    checksum: sha256:9a59787ee43333a2d5f43f5b73817a82478ce78a281f36390fbba7701fe22da0
+    name: test-third-run
+    evr: 1.0-1
+    sourcerpm: test-third-run-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-first-run-1.0-1.src.rpm
+    repoid: test-repo
+    size: 80354
+    checksum: sha256:abfdf62d1444f4c30495d4518b3bf2030f674b795fb71e902f5318c1d1d97b42
+    name: test-first-run
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-second-run-1.0-1.src.rpm
+    repoid: test-repo
+    size: 8283
+    checksum: sha256:51a790556d1027442bc1f41e24ecda69e51eb79de1ac341b608a845ee5b831bb
+    name: test-second-run
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-third-run-1.0-1.src.rpm
+    repoid: test-repo
+    size: 37213
+    checksum: sha256:7100ed80879aad02592ac5b2ddb7d3b0110fbb8ba0a7ffa948b87ab4848aa13d
+    name: test-third-run
+    evr: 1.0-1
+  module_metadata: []

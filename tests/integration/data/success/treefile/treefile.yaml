@@ -1,0 +1,10 @@
+include:
+  - base-treefile.yaml
+packages:
+  - test-app
+packages-x86_64:
+  - test-arch-specific
+repo-packages:
+  - repo: test-repo
+    packages:
+      - test-from-repo-packages

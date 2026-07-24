@@ -1,0 +1,8 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+arches:
+  - x86_64
+context:
+  containerfile: Dockerfile

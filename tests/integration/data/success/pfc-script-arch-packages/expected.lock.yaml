@@ -1,0 +1,51 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-script-common-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 20856
+    checksum: sha256:f14f01347d77701ba5bae1828ba5e63eb08c0e38084001fcd86253b5a5890e08
+    name: test-script-common
+    evr: 1.0-1
+    sourcerpm: test-script-common-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-script-common-1.0-1.src.rpm
+    repoid: test-repo
+    size: 62031
+    checksum: sha256:b46a5695ad72081201c27cfc93a3ae3334e8d0fd678246e075ab641d0d0259df
+    name: test-script-common
+    evr: 1.0-1
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-script-common-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 20856
+    checksum: sha256:f14f01347d77701ba5bae1828ba5e63eb08c0e38084001fcd86253b5a5890e08
+    name: test-script-common
+    evr: 1.0-1
+    sourcerpm: test-script-common-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-script-x86-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 67658
+    checksum: sha256:2e9b0865597483646af4f5056b235870f140ae49772b85aa3111da0b6a7b55c2
+    name: test-script-x86
+    evr: 1.0-1
+    sourcerpm: test-script-x86-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-script-common-1.0-1.src.rpm
+    repoid: test-repo
+    size: 62031
+    checksum: sha256:b46a5695ad72081201c27cfc93a3ae3334e8d0fd678246e075ab641d0d0259df
+    name: test-script-common
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-script-x86-1.0-1.src.rpm
+    repoid: test-repo
+    size: 76925
+    checksum: sha256:395bfb002b3a81d7cffaf6212b15fea9c3a279db2b167c768a16c7964eeb6d0d
+    name: test-script-x86
+    evr: 1.0-1
+  module_metadata: []

@@ -1,0 +1,34 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 17899
+    checksum: sha256:e3ca3c340759b02d09400e29a1c739e1f2c2bf8c793b2baf7bcebc3f44da5c53
+    name: test-base
+    evr: 1.0-1
+    sourcerpm: test-base-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-from-shell-var-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 36126
+    checksum: sha256:35c8df2f95f73211aba048c17a8af46af8bdcbfc78b875e919536a2a331d0296
+    name: test-from-shell-var
+    evr: 1.0-1
+    sourcerpm: test-from-shell-var-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-base-1.0-1.src.rpm
+    repoid: test-repo
+    size: 2327
+    checksum: sha256:6a3850963dc1c535e77b51fcbad730f392c4dad235c1c690a77044e418243fbf
+    name: test-base
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-from-shell-var-1.0-1.src.rpm
+    repoid: test-repo
+    size: 71559
+    checksum: sha256:67b2a511e46a824d825fe2efc168316e0659aa1d6248954a11aa02c7b7fb10ef
+    name: test-from-shell-var
+    evr: 1.0-1
+  module_metadata: []

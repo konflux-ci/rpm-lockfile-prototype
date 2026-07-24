@@ -1,0 +1,10 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packages:
+  - test-app
+arches:
+  - x86_64
+context:
+  bare: true

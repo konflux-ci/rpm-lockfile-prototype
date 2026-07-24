@@ -1,0 +1,38 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-aarch64-from-file-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 14412
+    checksum: sha256:05bc55a20176954d85438e7c9f0658f4042c5909075ba6246e02f97e0628e2f4
+    name: test-aarch64-from-file
+    evr: 1.0-1
+    sourcerpm: test-aarch64-from-file-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-aarch64-from-file-1.0-1.src.rpm
+    repoid: test-repo
+    size: 83050
+    checksum: sha256:430144f224049408ea81d21845632e7b4845fd04279d89265fb7a337f56a6e42
+    name: test-aarch64-from-file
+    evr: 1.0-1
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-x86-from-file-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 5743
+    checksum: sha256:3fe4e455960bb079ec7d2cdf4ce17ea891b658439e06f60321d9b5d86e2d326f
+    name: test-x86-from-file
+    evr: 1.0-1
+    sourcerpm: test-x86-from-file-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-x86-from-file-1.0-1.src.rpm
+    repoid: test-repo
+    size: 74060
+    checksum: sha256:43b3ea2a2cb0d7bf7cff51eaae5c3b2ffaa3e27a497f6c92bcad357ab5262054
+    name: test-x86-from-file
+    evr: 1.0-1
+  module_metadata: []

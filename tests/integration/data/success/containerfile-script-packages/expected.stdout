@@ -1,0 +1,3 @@
+# The implicit extraction from Containerfile (no packagesFromContainerfile key)
+# should emit a deprecation warning.
+Implicit package extraction from Containerfile is deprecated

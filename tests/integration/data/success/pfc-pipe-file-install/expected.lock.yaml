@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-pipe-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 74474
+    checksum: sha256:ec64e0dbff270c4e2b41c90174889bbcf384a5dca239d1ecddc17699139663c2
+    name: test-from-pipe
+    evr: 1.0-1
+    sourcerpm: test-from-pipe-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-pipe-1.0-1.src.rpm
+    repoid: test-repo
+    size: 56960
+    checksum: sha256:0f8e24b7c25877a4d4b9091501557a4f8aa22e14086c45f690016ffd08d94078
+    name: test-from-pipe
+    evr: 1.0-1
+  module_metadata: []

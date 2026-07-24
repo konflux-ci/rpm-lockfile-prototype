@@ -1,0 +1,4 @@
+packages:
+  - nvr: test-from-script-1.0-1
+
+  - nvr: test-not-in-script-1.0-1

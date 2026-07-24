@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-builder-only-1.0-1
+
+  - nvr: test-middleware-only-1.0-1
+
+  - nvr: test-final-only-1.0-1

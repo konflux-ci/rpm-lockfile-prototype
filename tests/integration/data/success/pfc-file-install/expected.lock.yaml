@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-file-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 93851
+    checksum: sha256:6b55b6f65d9c06ef7b078c5bce5d95737b305544e5f544ee91eb1356440a2a8b
+    name: test-from-file
+    evr: 1.0-1
+    sourcerpm: test-from-file-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-file-1.0-1.src.rpm
+    repoid: test-repo
+    size: 40031
+    checksum: sha256:3473da2a7b1a79c55f014474f9b205a67abf577052601a93e307bbeb1734bfef
+    name: test-from-file
+    evr: 1.0-1
+  module_metadata: []

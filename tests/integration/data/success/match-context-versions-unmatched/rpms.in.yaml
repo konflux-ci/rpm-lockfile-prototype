@@ -1,0 +1,12 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packages:
+  - test-base
+matchContextVersions:
+  - "nonexistent-pattern*"
+arches:
+  - x86_64
+context:
+  image: registry.access.redhat.com/ubi9/ubi-minimal@sha256:062c52ff973065752b0965787649db2bcf551a6c727a00e95a3eb42cebadbdab

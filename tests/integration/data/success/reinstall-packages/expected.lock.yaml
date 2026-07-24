@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/findutils-4.8.0-7.el9.x86_64.rpm
+    repoid: test-repo
+    size: 37555
+    checksum: sha256:4ce7ae7bfa1c4f55db25dc904a271a8ff9854caefc5f51592dd79991a8b59a1b
+    name: findutils
+    evr: 1:4.8.0-7.el9
+    sourcerpm: findutils-4.8.0-7.el9.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/findutils-4.8.0-7.el9.src.rpm
+    repoid: test-repo
+    size: 79943
+    checksum: sha256:777d139a1e2f952d008ce6a95165db75afb1d61614730b1a2836b2a5721ce9bf
+    name: findutils
+    evr: 4.8.0-7.el9
+  module_metadata: []

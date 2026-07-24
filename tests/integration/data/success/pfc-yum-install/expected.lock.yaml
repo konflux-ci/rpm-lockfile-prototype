@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-yum-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 37777
+    checksum: sha256:ca3498ff970fbd58a7b94032704b2051ce3344c67e76a9db59e511b76bdaf059
+    name: test-from-yum
+    evr: 1.0-1
+    sourcerpm: test-from-yum-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-yum-1.0-1.src.rpm
+    repoid: test-repo
+    size: 32019
+    checksum: sha256:24171d56d0abebd9b5c0d69d116c62d17157786d78428fe3f2240279f697275b
+    name: test-from-yum
+    evr: 1.0-1
+  module_metadata: []

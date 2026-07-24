@@ -1,0 +1,4 @@
+[test-repo]
+name=Test Repo
+baseurl=http://localhost:PORT/test-repo
+gpgcheck=0

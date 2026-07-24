@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-needs-bash-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 2628
+    checksum: sha256:cc24aa47d6c03926ed7783d89101c7c9f461092ad012b3278d88013d8a1cb1cc
+    name: test-needs-bash
+    evr: 1.0-1
+    sourcerpm: test-needs-bash-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-needs-bash-1.0-1.src.rpm
+    repoid: test-repo
+    size: 11355
+    checksum: sha256:bb3771440341af27f0b79c67148c90be4e1a111a1acedbf1be512f58e92252eb
+    name: test-needs-bash
+    evr: 1.0-1
+  module_metadata: []

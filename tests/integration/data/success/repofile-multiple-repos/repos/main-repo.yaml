@@ -1,0 +1,15 @@
+packages:
+  - nvr: test-base-1.0-1
+
+  - nvr: test-lib-1.0-1
+    arch: x86_64
+    provides:
+      - libtest
+
+  - nvr: test-app-1.0-1
+    arch: x86_64
+    requires:
+      - test-lib
+      - test-base
+    recommends:
+      - test-optional

@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-bash-script-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 26005
+    checksum: sha256:9f3b5494cc776e24168e751f9f9823f72f49359ad13fee784097b338d3eb195d
+    name: test-from-bash-script
+    evr: 1.0-1
+    sourcerpm: test-from-bash-script-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-bash-script-1.0-1.src.rpm
+    repoid: test-repo
+    size: 82605
+    checksum: sha256:3804cfb040a3f35e921d8748eb8225fc8514c6933a71f2be6acfdfad0de9a9ed
+    name: test-from-bash-script
+    evr: 1.0-1
+  module_metadata: []

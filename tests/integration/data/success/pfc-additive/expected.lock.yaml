@@ -1,0 +1,34 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-from-config-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 8198
+    checksum: sha256:f1785ebfb42296899e9a37dcb1d3e53e35ba7420616a09a146bdb9498c684f6e
+    name: test-from-config
+    evr: 1.0-1
+    sourcerpm: test-from-config-1.0-1.src.rpm
+  - url: http://localhost:PORT/test-repo/test-from-containerfile-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 50989
+    checksum: sha256:8469bc890daecdb6208cc1c9dc05e0934145abced1fe4c00c17a81dc8cc91ff5
+    name: test-from-containerfile
+    evr: 1.0-1
+    sourcerpm: test-from-containerfile-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-from-config-1.0-1.src.rpm
+    repoid: test-repo
+    size: 70528
+    checksum: sha256:a2103836df7996e251498f9717fe060b16738e4bb67ffa58338c9c080f7a1c98
+    name: test-from-config
+    evr: 1.0-1
+  - url: http://localhost:PORT/test-repo/test-from-containerfile-1.0-1.src.rpm
+    repoid: test-repo
+    size: 26234
+    checksum: sha256:f572c1873cff7d77306adcff24f6f49bef3740c66c77d7a4e8ead5648eac9fc2
+    name: test-from-containerfile
+    evr: 1.0-1
+  module_metadata: []

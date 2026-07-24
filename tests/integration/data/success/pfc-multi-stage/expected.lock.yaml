@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-middleware-only-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 32398
+    checksum: sha256:b7c83dcf03b1c12ec91b4243d3bbef0566f1946c40f349a5010bd88c0e78d52e
+    name: test-middleware-only
+    evr: 1.0-1
+    sourcerpm: test-middleware-only-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-middleware-only-1.0-1.src.rpm
+    repoid: test-repo
+    size: 80376
+    checksum: sha256:416264947a01f24b4fcc7323e5edaf8b86adf95da71123a3af3aa6292a18a8e8
+    name: test-middleware-only
+    evr: 1.0-1
+  module_metadata: []

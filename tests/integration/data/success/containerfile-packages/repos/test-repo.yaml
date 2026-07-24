@@ -1,0 +1,15 @@
+packages:
+  - nvr: test-base-1.0-1
+
+  - nvr: test-from-arg-1.0-1
+
+  - nvr: test-not-in-dockerfile-1.0-1
+
+  - nvr: findutils-1:99.0-1
+    arch: x86_64
+
+  - nvr: shadow-utils-2:4.9-16.el9
+    arch: x86_64
+
+  - nvr: shadow-utils-2:99.0-1
+    arch: x86_64

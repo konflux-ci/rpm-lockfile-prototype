@@ -1,0 +1,9 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packagesFromContainerfile: Dockerfile
+arches:
+  - x86_64
+context:
+  bare: true

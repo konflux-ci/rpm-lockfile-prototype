@@ -1,0 +1,6 @@
+packages:
+  - nvr: test-continued-a-1.0-1
+
+  - nvr: test-continued-b-1.0-1
+
+  - nvr: test-decoy-1.0-1
