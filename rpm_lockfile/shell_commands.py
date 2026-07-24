@@ -152,9 +152,7 @@ def _is_valid_package_token(token: str) -> bool:
         return False
     if "$" in token:
         return False
-    if token in (">=", "<=", "==", ">", "<", "!="):
-        return False
-    return True
+    return token not in (">=", "<=", "==", ">", "<", "!=")
 
 
 def _normalize_arch_names(arches: list[str]) -> list[str]:
@@ -563,8 +561,12 @@ def _process_command_node(
 
     word_values = [w.word for w in words]
     all_vars = {**ctx.variables, **ctx.shell_vars}
-    resolved_first = resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
-    resolved_word_values = [resolved_first] + word_values[1:] if word_values else word_values
+    resolved_first = (
+        resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
+    )
+    resolved_word_values = (
+        [resolved_first] + word_values[1:] if word_values else word_values
+    )
     action, action_idx = _detect_pkg_action(resolved_word_values, ctx)
     if not action:
         return
@@ -585,8 +587,7 @@ def _process_command_node(
     raw_args = " ".join(pkg_words)
     for pw in pkg_words:
         resolved = resolve_bash_expansion(pw, all_vars_with_arch)
-        for sub in resolved.split():
-            resolved_tokens.append(sub)
+        resolved_tokens.extend(resolved.split())
 
     arch_resolved_tokens: set[str] = set()
     if not arch_context:

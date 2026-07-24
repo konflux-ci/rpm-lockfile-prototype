@@ -45,7 +45,11 @@ def _skopeo_cache_dir(tmp_path_factory):
         os.makedirs(persistent, exist_ok=True)
         return persistent
     import getpass
-    default = Path(tempfile.gettempdir()) / f"rpm-lockfile-test-skopeo-cache-{getpass.getuser()}"
+
+    default = (
+        Path(tempfile.gettempdir())
+        / f"rpm-lockfile-test-skopeo-cache-{getpass.getuser()}"
+    )
     default.mkdir(exist_ok=True)
     return str(default)
 
@@ -67,8 +71,10 @@ class _QuietHTTPHandler(http.server.SimpleHTTPRequestHandler):
 
 def _make_handler(directory):
     """Create an HTTP handler class that serves from the given directory."""
+
     def handler(*args, **kwargs):
         return _QuietHTTPHandler(*args, directory=str(directory), **kwargs)
+
     return handler
 
 
@@ -144,9 +150,14 @@ def prepare_test_case(test_case_name, tmp_path, port):
     for extra in test_case_dir.glob("*"):
         if extra.is_dir():
             continue
-        if extra.name in ("rpms.in.yaml", "expected.lock.yaml",
-                          "expected.stdout", "expected.stderr",
-                          "Containerfile", "Dockerfile"):
+        if extra.name in (
+            "rpms.in.yaml",
+            "expected.lock.yaml",
+            "expected.stdout",
+            "expected.stderr",
+            "Containerfile",
+            "Dockerfile",
+        ):
             continue
         dest = tmp_path / extra.name
         shutil.copy2(extra, dest)
@@ -175,7 +186,8 @@ def _load_expected_patterns(test_case_name, filename):
     if not expected_path.exists():
         return None
     return [
-        line for line in expected_path.read_text().splitlines()
+        line
+        for line in expected_path.read_text().splitlines()
         if line.strip() and not line.strip().startswith("#")
     ]
 
@@ -200,14 +212,21 @@ class RunResult:
 
 
 def run_test_case_ok(
-    test_case_name, tmp_path, cache_dir,
-    _skopeo_wrapper_dir=None, _skopeo_cache_dir=None,
+    test_case_name,
+    tmp_path,
+    cache_dir,
+    _skopeo_wrapper_dir=None,
+    _skopeo_cache_dir=None,
     extra_args=None,
 ):
     """Run a test case, assert it succeeds, and return RunResult."""
     result = run_test_case(
-        test_case_name, tmp_path, cache_dir,
-        _skopeo_wrapper_dir, _skopeo_cache_dir, extra_args,
+        test_case_name,
+        tmp_path,
+        cache_dir,
+        _skopeo_wrapper_dir,
+        _skopeo_cache_dir,
+        extra_args,
     )
     assert result.rc == 0, f"Tool failed with exit code {result.rc}:\n{result.stderr}"
     assert result.lockfile is not None, "Lockfile was not produced"
@@ -215,8 +234,11 @@ def run_test_case_ok(
 
 
 def run_test_case(
-    test_case_name, tmp_path, cache_dir,
-    _skopeo_wrapper_dir=None, _skopeo_cache_dir=None,
+    test_case_name,
+    tmp_path,
+    cache_dir,
+    _skopeo_wrapper_dir=None,
+    _skopeo_cache_dir=None,
     extra_args=None,
 ):
     """Prepare and run a test case.
@@ -258,6 +280,7 @@ def run_test_case(
             cwd=str(tmp_path),
             env=env,
             timeout=120,
+            check=False,
         )
 
         lockfile = None

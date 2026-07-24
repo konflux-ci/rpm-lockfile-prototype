@@ -25,6 +25,7 @@ from .shell_commands import (
     resolve_bash_expansion,
 )
 
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,7 +44,7 @@ class StagePackages:
     builddep_packages: list[str] = field(default_factory=list)
     module_specs: list[str] = field(default_factory=list)
 
-    def merge(self, other: "StagePackages") -> "StagePackages":
+    def merge(self, other: StagePackages) -> StagePackages:
         """
         Merge another StagePackages into this one, combining packages
         and update targets.
@@ -255,7 +256,6 @@ def extract_packages_from_file_installs(
             - Sorted unique package names (common to all arches).
             - Dict mapping arch to sorted unique package names for that arch only.
     """
-    logger = logging.getLogger(__name__)
     variables = dict(env_vars or {})
     arch_list = arches or []
     redirect_re = re.compile(
@@ -374,7 +374,6 @@ def extract_packages_from_scripts(
     if not source_dir:
         return StagePackages()
 
-    logger = logging.getLogger(__name__)
     script_pattern = re.compile(
         r"(?:^|&&\s*|;\s*)"
         r"(?:(?:(?:/usr)?/bin/)?(?:ba)?sh\s+)?"
@@ -466,7 +465,10 @@ def extract_packages_from_scripts(
                 scripts_have_bare_update = True
 
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                [script_body], copy_map, source_dir, env_vars=env_vars,
+                [script_body],
+                copy_map,
+                source_dir,
+                env_vars=env_vars,
                 arches=arches,
             )
             all_packages.update(file_pkgs)
@@ -557,9 +559,7 @@ def analyze_containerfile_stages(
                 base_image = resolve_bash_expansion(m.group("img"), stage_vars)
                 stage_name = m.group("name") or ""
 
-        result = analyze_run_commands(
-            run_values, env_vars=stage_vars, arches=arches
-        )
+        result = analyze_run_commands(run_values, env_vars=stage_vars, arches=arches)
         stage = StagePackages(
             base_image=base_image,
             stage_name=stage_name,
@@ -579,7 +579,10 @@ def analyze_containerfile_stages(
 
         if source_dir:
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                run_values, copy_map, source_dir, env_vars=stage_vars,
+                run_values,
+                copy_map,
+                source_dir,
+                env_vars=stage_vars,
                 arches=arches,
             )
             stage = stage.merge(
@@ -624,7 +627,7 @@ def resolve_builddep_packages(
         ]
 
         if not matching:
-            logging.warning(
+            logger.warning(
                 "No SRPM matching '%s' found in %s, "
                 "builddep packages will not be included in lockfile",
                 pattern,
@@ -633,7 +636,7 @@ def resolve_builddep_packages(
             continue
 
         for path in matching:
-            logging.info("Extracting BuildRequires from %s", path.name)
+            logger.info("Extracting BuildRequires from %s", path.name)
             try:
                 cmd = ["rpm", "-qpR", str(path)]
                 result = subprocess.run(
@@ -643,7 +646,7 @@ def resolve_builddep_packages(
                     check=False,
                 )
                 if result.returncode != 0:
-                    logging.warning("%s failed: %s", " ".join(cmd), result.stderr)
+                    logger.warning("%s failed: %s", " ".join(cmd), result.stderr)
                     continue
                 for line in result.stdout.strip().splitlines():
                     req = line.strip().split()[0] if line.strip() else ""
@@ -652,13 +655,13 @@ def resolve_builddep_packages(
                     # paths, virtual provides) is valid for resolution.
                     if req and not req.startswith("rpmlib("):
                         resolved.add(req)
-            except Exception as exc:
-                logging.warning(
+            except Exception as exc:  # noqa: BLE001 - intentionally broad
+                logger.warning(
                     "Failed to extract BuildRequires from %s: %s", path.name, exc
                 )
 
     if resolved:
-        logging.info(
+        logger.info(
             "Resolved %d builddep packages: %s", len(resolved), sorted(resolved)
         )
     return resolved

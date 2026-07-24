@@ -12,15 +12,17 @@ from pathlib import Path
 
 from .containerfile_packages import _strip_quotes
 
+logger = logging.getLogger(__name__)
 
 # Path to where local dnf expects to find rpmdb. This is relative to /.
 RPMDB_PATH = subprocess.run(
     ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
 ).stdout.strip()[1:]
 
-CACHE_PATH = Path(
-    os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
-) / "rpm-lockfile-prototype"
+CACHE_PATH = (
+    Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    / "rpm-lockfile-prototype"
+)
 
 
 def relative_to(directory, path):
@@ -42,15 +44,15 @@ def find_containerfile(dir):
 
 
 def logged_run(cmd, *args, **kwargs):
-    logging.info("$ %s", shlex.join(cmd))
-    return subprocess.run(cmd, *args, **kwargs)
+    logger.info("$ %s", shlex.join(cmd))
+    return subprocess.run(cmd, *args, **kwargs)  # noqa: PLW1510 - check passed via kwargs
 
 
 def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=None):
     """Find matching image mentioned in the containerfile.
     If no filters are specified, then the last image is returned.
     """
-    logging.debug("Looking for base image in %s", containerfile)
+    logger.debug("Looking for base image in %s", containerfile)
     baseimg = ""
     stages = 0
 
@@ -145,11 +147,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
 
                 # Resolve to external base image
                 # If this FROM references a previous stage, look up that stage's base
-                if expanded_img.lower() in stage_bases:
-                    baseimg = stage_bases[expanded_img.lower()]
-                else:
-                    # This is an external image
-                    baseimg = expanded_img
+                baseimg = stage_bases.get(expanded_img.lower(), expanded_img)
 
                 # Track this stage's base image
                 stage_name_value = from_match.group("name")
@@ -179,7 +177,7 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
 
 def get_file_from_git(repo, ref, file):
     tmp_dir = tempfile.mkdtemp(prefix="rpm-lockfile-checkout-")
-    logging.info("Extracting commit %s from repo %s to %s", ref, repo, tmp_dir)
+    logger.info("Extracting commit %s from repo %s to %s", ref, repo, tmp_dir)
     cmds = [
         ["git", "init"],
         ["git", "remote", "add", "origin", os.path.expandvars(repo)],
@@ -340,7 +338,7 @@ def strip_tag(image_spec):
     """
     repo, tag, digest = split_image(image_spec)
     if tag and digest:
-        logging.info(f"Digest was provided, ignoring tag {tag}")
+        logger.info(f"Digest was provided, ignoring tag {tag}")
     if digest:
         return f"{repo}@{digest}"
     return image_spec
@@ -392,7 +390,11 @@ def pin_context_versions(installed_packages, solvables, patterns):
     for pattern in patterns:
         for name, pkg in installed.items():
             if fnmatch.fnmatch(name, pattern):
-                evr = f"{pkg.epoch}:{pkg.version}-{pkg.release}" if pkg.epoch else f"{pkg.version}-{pkg.release}"
+                evr = (
+                    f"{pkg.epoch}:{pkg.version}-{pkg.release}"
+                    if pkg.epoch
+                    else f"{pkg.version}-{pkg.release}"
+                )
                 if pattern not in pattern_evrs:
                     pattern_evrs[pattern] = (evr, name)
                 elif pattern_evrs[pattern][0] != evr:
@@ -404,7 +406,7 @@ def pin_context_versions(installed_packages, solvables, patterns):
 
     unmatched = [p for p in patterns if p not in pattern_evrs]
     if unmatched:
-        logging.warning(
+        logger.warning(
             "matchContextVersions: no installed packages matched patterns: %s",
             ", ".join(unmatched),
         )
@@ -417,7 +419,7 @@ def pin_context_versions(installed_packages, solvables, patterns):
         for pattern in patterns:
             if fnmatch.fnmatch(spec, pattern) and pattern in pattern_evrs:
                 versioned = f"{spec}-{pattern_evrs[pattern][0]}"
-                logging.info(
+                logger.info(
                     "matchContextVersions: pinning %s to %s",
                     spec,
                     versioned,

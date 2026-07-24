@@ -6,7 +6,6 @@ import jsonschema
 
 from . import content_origin, utils
 
-
 STRINGS = {
     "anyOf": [
         {"type": "string"},

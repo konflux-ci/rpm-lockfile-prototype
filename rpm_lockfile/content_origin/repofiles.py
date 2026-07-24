@@ -1,11 +1,12 @@
 import configparser
 import glob
 import os
+import typing
 
 import requests
 
-from . import Repo
 from .. import utils
+from . import Repo
 
 """
 The user specifies URL pointing to a .repo file in the input file. This module
@@ -18,7 +19,7 @@ repo level options are passed over to DNF.
 
 
 class RepofileOrigin:
-    schema = {
+    schema: typing.ClassVar[dict] = {
         "oneOf": [
             {"type": "string"},
             {

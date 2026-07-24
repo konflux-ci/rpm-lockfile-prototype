@@ -84,7 +84,10 @@ def test_collect_global_vars_overridden_by_source(tmpdir):
     with patch("rpm_lockfile.utils.get_labels", new=fake_get_labels):
         repos = list(
             origin.collect(
-                [TEMPLATE_CONFIG | {"varsFromImage": "registry.example.com/image:latest"}]
+                [
+                    TEMPLATE_CONFIG
+                    | {"varsFromImage": "registry.example.com/image:latest"}
+                ]
             )
         )
     assert repos == [EXPANDED_REPO]

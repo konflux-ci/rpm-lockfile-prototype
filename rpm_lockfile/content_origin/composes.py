@@ -1,10 +1,11 @@
 import os
+import typing
 
 import productmd
 import requests
 
-from . import Repo
 from .. import schema
+from . import Repo
 
 """
 This allows users to specify composes by ID or by CTS filters.
@@ -17,7 +18,7 @@ The composes must have URL stored in CTS in order for this to work.
 
 
 class ComposeOrigin:
-    schema = {
+    schema: typing.ClassVar[dict] = {
         "anyOf": [
             {
                 "type": "object",
@@ -53,7 +54,7 @@ class ComposeOrigin:
 
     def collect(self, sources):
         for spec in sources:
-            key = list(spec.keys())[0]
+            key = next(iter(spec.keys()))
             collector = getattr(self, f"collect_by_{key}")
             yield from collector(spec[key])
 

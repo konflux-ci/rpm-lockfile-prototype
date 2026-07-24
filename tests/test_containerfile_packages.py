@@ -469,7 +469,6 @@ class TestSelectStage(unittest.TestCase):
 
 
 class TestResolveBuilddepPackages(unittest.TestCase):
-
     def test_from_srpm(self):
         """
         resolve_builddep_packages should extract BuildRequires from
@@ -491,8 +490,12 @@ class TestResolveBuilddepPackages(unittest.TestCase):
             self.assertEqual(
                 result,
                 {
-                    "gcc", "openssl-devel", "/usr/bin/perl",
-                    "python3dist(setuptools)", "pkgconfig(libcrypto)", "make",
+                    "gcc",
+                    "openssl-devel",
+                    "/usr/bin/perl",
+                    "python3dist(setuptools)",
+                    "pkgconfig(libcrypto)",
+                    "make",
                 },
             )
             mock_run.assert_called_once()

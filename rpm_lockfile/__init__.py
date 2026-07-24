@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import argparse
@@ -28,7 +26,13 @@ except ImportError:
 import yaml
 
 from . import assumed_provides, containers, content_origin, schema, utils
-from .containerfile_packages import analyze_containerfile_stages, resolve_builddep_packages, select_stage
+from .containerfile_packages import (
+    analyze_containerfile_stages,
+    resolve_builddep_packages,
+    select_stage,
+)
+
+logger = logging.getLogger(__name__)
 
 CONTAINERFILE_HELP = """
 Load installed packages from base image specified in Containerfile and make
@@ -127,164 +131,161 @@ def resolver(
     install_weak_deps: bool,
     upgrade_packages: set[str],
     download_filelists: bool = False,
-    zchunk: bool = None,
-    assume_provides: list[str] = None,
-    match_context_versions: list[str] = None,
+    zchunk: bool | None = None,
+    assume_provides: list[str] | None = None,
+    match_context_versions: list[str] | None = None,
 ):
     packages = set()
     sources = set()
     module_metadata = []
 
-    with tempfile.TemporaryDirectory() as cache_dir:
-        with dnf.Base() as base:
-            # Configure base
-            conf = base.conf
+    with tempfile.TemporaryDirectory() as cache_dir, dnf.Base() as base:
+        # Configure base
+        conf = base.conf
 
-            if install_weak_deps is not None:
-                conf.install_weak_deps = install_weak_deps
+        if install_weak_deps is not None:
+            conf.install_weak_deps = install_weak_deps
 
-            if zchunk is not None:
-                conf.zchunk = zchunk
+        if zchunk is not None:
+            conf.zchunk = zchunk
 
-            if download_filelists:
-                conf.optional_metadata_types = ["filelists"]
-            conf.installroot = str(root_dir)
-            conf.cachedir = os.getenv(
-                "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
+        if download_filelists:
+            conf.optional_metadata_types = ["filelists"]
+        conf.installroot = str(root_dir)
+        conf.cachedir = os.getenv(
+            "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
+        )
+        conf.logdir = mkdir(os.path.join(cache_dir, "log"))
+        conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
+        conf.substitutions["arch"] = arch
+        conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
+        conf.substitutions["releasever"] = "unknown"
+        try:
+            releasever = dnf.rpm.detect_releasever(root_dir)
+            if releasever:
+                logger.debug("Setting releasever to %s", releasever)
+                conf.substitutions["releasever"] = releasever
+            else:
+                logger.warning("Failed to detect $releasever")
+        except dnf.exceptions.Error as exc:
+            logger.warning("Failed to detect $releasever: %s", exc)
+        # Configure repos
+        for repo in repos:
+            base.repos.add_new_repo(
+                libdnf.conf.ConfigParser.substitute(repo.repoid, conf.substitutions),
+                conf,
+                **repo.kwargs,
             )
-            conf.logdir = mkdir(os.path.join(cache_dir, "log"))
-            conf.persistdir = mkdir(os.path.join(cache_dir, "dnf"))
-            conf.substitutions["arch"] = arch
-            conf.substitutions["basearch"] = dnf.rpm.basearch(arch)
-            conf.substitutions["releasever"] = "unknown"
+        if assume_provides:
+            logger.info(
+                "Adding assumed provides repo: %s",
+                ", ".join(assume_provides),
+            )
+            repo_path = assumed_provides.create_repo(cache_dir, assume_provides)
+            base.repos.add_new_repo(
+                assumed_provides.REPO_ID,
+                conf,
+                baseurl=[f"file://{repo_path}"],
+            )
+        base.fill_sack(load_system_repo=True)
+
+        if match_context_versions:
+            solvables = utils.pin_context_versions(
+                base.sack.query().installed(),
+                solvables,
+                match_context_versions,
+            )
+
+        module_base = dnf.module.module_base.ModuleBase(base)
+
+        # Enable and disable modules as requested
+        module_base.disable(module_disable)
+        module_base.enable(module_enable)
+
+        # Mark packages to upgrade
+        for pkg in upgrade_packages:
+            base.upgrade(pkg)
+        # Mark packages to remove
+        for pkg in reinstall_packages:
             try:
-                releasever = dnf.rpm.detect_releasever(root_dir)
-                if releasever:
-                    logging.debug("Setting releasever to %s", releasever)
-                    conf.substitutions["releasever"] = releasever
+                base.reinstall(pkg)
+            except dnf.exceptions.PackagesNotInstalledError:
+                logger.warning("Can not reinstall %s: it is not installed", pkg)
+            except dnf.exceptions.PackageNotFoundError:
+                raise RuntimeError(
+                    f"Can not reinstall {pkg}: no package matched in configured repo"
+                )
+            except dnf.exceptions.PackagesNotAvailableError:
+                # The package is not available in the same version as in
+                # base image. If we are supposed to update it, it's
+                # probably okay and we don't need to reinstall as a new
+                # copy will be used for the upgrade. Otherwise report an
+                # error.
+                if pkg not in upgrade_packages:
+                    raise
+        # Mark packages for installation
+        try:
+            base.install_specs(solvables)
+        except dnf.exceptions.MarkingErrors as exc:
+            if any(spec.startswith("/") for spec in exc.no_match_pkg_specs):
+                # User specified a package by absolute path, and we did not
+                # download filelists. Let's try again.
+                raise MissingFilelists()
+            logger.error(exc.value)
+            raise RuntimeError(f"DNF error: {exc}")
+        # And resolve the transaction
+        try:
+            base.resolve(allow_erasing=allow_erasing)
+        except dnf.exceptions.DepsolveError:
+            if not download_filelists:
+                # Retry with filelists — they may provide file-level
+                # dependencies needed to validate the transaction.
+                raise MissingFilelists()
+            raise
+
+        modular_packages = {
+            nevra
+            for module in module_base.get_modules("*")[0]
+            for nevra in module.getArtifacts()
+        }
+        modular_repos = set()
+
+        # These packages would be installed
+        for pkg in base.transaction.install_set:
+            if pkg.name.startswith(assumed_provides.PACKAGE_PREFIX):
+                continue
+            if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
+                modular_repos.add(pkg.repoid)
+            packages.add(PackageItem.from_dnf(pkg))
+            # Find the corresponding source package
+            if not no_sources:
+                n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
+                results = base.sack.query().filter(
+                    name=n, version=v, release=r, arch="src"
+                )
+                if len(results) == 0:
+                    logger.warning("No sources found for %s", pkg)
                 else:
-                    logging.warning("Failed to detect $releasever")
-            except dnf.exceptions.Error as exc:
-                logging.warning("Failed to detect $releasever: %s", exc)
-            # Configure repos
-            for repo in repos:
-                base.repos.add_new_repo(
-                    libdnf.conf.ConfigParser.substitute(
-                        repo.repoid, conf.substitutions
+                    src = results[0]
+                    sources.add(PackageItem.from_dnf(src))
+
+        for repoid in modular_repos:
+            repo = base.repos[repoid]
+            modulemd_path = repo.get_metadata_path("modules")
+            if not modulemd_path:
+                raise RuntimeError(
+                    "Modular package is coming from a repo with no modular metadata"
+                )
+            module_metadata.append(
+                {
+                    "url": repo.remote_location(
+                        "repodata/" + os.path.basename(modulemd_path)
                     ),
-                    conf,
-                    **repo.kwargs,
-                )
-            if assume_provides:
-                logging.info(
-                    "Adding assumed provides repo: %s",
-                    ", ".join(assume_provides),
-                )
-                repo_path = assumed_provides.create_repo(cache_dir, assume_provides)
-                base.repos.add_new_repo(
-                    assumed_provides.REPO_ID,
-                    conf,
-                    baseurl=[f"file://{repo_path}"],
-                )
-            base.fill_sack(load_system_repo=True)
-
-            if match_context_versions:
-                solvables = utils.pin_context_versions(
-                    base.sack.query().installed(),
-                    solvables,
-                    match_context_versions,
-                )
-
-            module_base = dnf.module.module_base.ModuleBase(base)
-
-            # Enable and disable modules as requested
-            module_base.disable(module_disable)
-            module_base.enable(module_enable)
-
-            # Mark packages to upgrade
-            for pkg in upgrade_packages:
-                base.upgrade(pkg)
-            # Mark packages to remove
-            for pkg in reinstall_packages:
-                try:
-                    base.reinstall(pkg)
-                except dnf.exceptions.PackagesNotInstalledError:
-                    logging.warning("Can not reinstall %s: it is not installed", pkg)
-                except dnf.exceptions.PackageNotFoundError:
-                    raise RuntimeError(
-                        f"Can not reinstall {pkg}: no package matched in configured repo"
-                    )
-                except dnf.exceptions.PackagesNotAvailableError:
-                    # The package is not available in the same version as in
-                    # base image. If we are supposed to update it, it's
-                    # probably okay and we don't need to reinstall as a new
-                    # copy will be used for the upgrade. Otherwise report an
-                    # error.
-                    if pkg not in upgrade_packages:
-                        raise
-            # Mark packages for installation
-            try:
-                base.install_specs(solvables)
-            except dnf.exceptions.MarkingErrors as exc:
-                if any(spec.startswith("/") for spec in exc.no_match_pkg_specs):
-                    # User specified a package by absolute path, and we did not
-                    # download filelists. Let's try again.
-                    raise MissingFilelists()
-                logging.error(exc.value)
-                raise RuntimeError(f"DNF error: {exc}")
-            # And resolve the transaction
-            try:
-                base.resolve(allow_erasing=allow_erasing)
-            except dnf.exceptions.DepsolveError:
-                if not download_filelists:
-                    # Retry with filelists — they may provide file-level
-                    # dependencies needed to validate the transaction.
-                    raise MissingFilelists()
-                raise
-
-            modular_packages = set(
-                nevra
-                for module in module_base.get_modules("*")[0]
-                for nevra in module.getArtifacts()
+                    "repoid": repo.id,
+                    "size": os.stat(modulemd_path).st_size,
+                    "checksum": f"sha256:{utils.hash_file(modulemd_path)}",
+                }
             )
-            modular_repos = set()
-
-            # These packages would be installed
-            for pkg in base.transaction.install_set:
-                if pkg.name.startswith(assumed_provides.PACKAGE_PREFIX):
-                    continue
-                if f"{pkg.name}-{pkg.e}:{pkg.v}-{pkg.r}.{pkg.a}" in modular_packages:
-                    modular_repos.add(pkg.repoid)
-                packages.add(PackageItem.from_dnf(pkg))
-                # Find the corresponding source package
-                if not no_sources:
-                    n, v, r = strip_suffix(pkg.sourcerpm, ".src.rpm").rsplit("-", 2)
-                    results = base.sack.query().filter(
-                        name=n, version=v, release=r, arch="src"
-                    )
-                    if len(results) == 0:
-                        logging.warning("No sources found for %s", pkg)
-                    else:
-                        src = results[0]
-                        sources.add(PackageItem.from_dnf(src))
-
-            for repoid in modular_repos:
-                repo = base.repos[repoid]
-                modulemd_path = repo.get_metadata_path("modules")
-                if not modulemd_path:
-                    raise RuntimeError(
-                        "Modular package is coming from a repo with no modular metadata"
-                    )
-                module_metadata.append(
-                    {
-                        "url": repo.remote_location(
-                            "repodata/" + os.path.basename(modulemd_path)
-                        ),
-                        "repoid": repo.id,
-                        "size": os.stat(modulemd_path).st_size,
-                        "checksum": f"sha256:{utils.hash_file(modulemd_path)}",
-                    }
-                )
 
     return packages, sources, module_metadata
 
@@ -326,11 +327,11 @@ def process_arch(
     no_sources: bool,
     install_weak_deps: bool,
     upgrade_packages: set[str],
-    zchunk: bool = None,
-    assume_provides: list[str] = None,
-    match_context_versions: list[str] = None,
+    zchunk: bool | None = None,
+    assume_provides: list[str] | None = None,
+    match_context_versions: list[str] | None = None,
 ):
-    logging.info("Running solver for %s", arch)
+    logger.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
         for download_filelists in [False, True]:
@@ -354,7 +355,7 @@ def process_arch(
                 )
                 break
             except MissingFilelists:
-                logging.error(
+                logger.error(
                     "Dependency error indicates we may be missing filelists. Let's try "
                     "again with filelists."
                 )
@@ -363,7 +364,7 @@ def process_arch(
         "arch": arch,
         "packages": [p.as_dict() for p in sorted(packages)],
         "source": [s.as_dict() for s in sorted(sources)],
-        "module_metadata": list(sorted(module_metadata, key=lambda x: x["url"])),
+        "module_metadata": sorted(module_metadata, key=lambda x: x["url"]),
     }
 
 
@@ -518,27 +519,27 @@ def _extract_containerfile_packages(
         result.module_enable.update(selected.module_specs)
         result.builddep = list(selected.builddep_packages)
     if result.common or result.arch_specific:
-        logging.info(
+        logger.info(
             "Extracted %d common and %d arch-specific packages from Containerfile",
             len(result.common),
             sum(len(v) for v in result.arch_specific.values()),
         )
         if result.common:
-            logging.debug("Containerfile packages: %s", sorted(result.common))
+            logger.debug("Containerfile packages: %s", sorted(result.common))
         for arch, pkgs in sorted(result.arch_specific.items()):
-            logging.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
+            logger.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
         if result.upgrade:
-            logging.debug(
-                "Containerfile upgrade packages: %s", sorted(result.upgrade)
-            )
+            logger.debug("Containerfile upgrade packages: %s", sorted(result.upgrade))
         if result.reinstall:
-            logging.debug(
+            logger.debug(
                 "Containerfile reinstall packages: %s", sorted(result.reinstall)
             )
         if result.module_enable:
-            logging.debug("Containerfile module enable: %s", sorted(result.module_enable))
+            logger.debug(
+                "Containerfile module enable: %s", sorted(result.module_enable)
+            )
         if result.builddep:
-            logging.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
+            logger.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
 
     return result
 
@@ -579,7 +580,7 @@ def main():
     variables = utils.load_variables(config.pop("variables", []), config_dir)
 
     if variables:
-        logging.info("Substitution variables: %s", ", ".join(sorted(variables)))
+        logger.info("Substitution variables: %s", ", ".join(sorted(variables)))
         for key in (
             "packages",
             "reinstallPackages",
@@ -623,10 +624,12 @@ def main():
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
         is_image_context = False
-    elif args.bare or context.get("bare") or args.rpm_ostree_treefile:
-        rpmdb = empty_rpmdb()
-        is_image_context = False
-    elif args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
+    elif (
+        args.bare
+        or context.get("bare")
+        or args.rpm_ostree_treefile
+        or context.get("rpmOstreeTreefile")
+    ):
         rpmdb = empty_rpmdb()
         is_image_context = False
     else:
@@ -660,7 +663,7 @@ def main():
         try:
             cf_pkgs = _extract_containerfile_packages(pfc_path, pfc_context, arches)
         except Exception:
-            logging.warning(
+            logger.warning(
                 "Failed to extract packages from Containerfile %s; "
                 "falling back to explicitly listed packages only.",
                 pfc_path,
@@ -673,7 +676,7 @@ def main():
             cf_pkgs.common |= builddep_resolved
 
     elif containerfile and not config.get("packages"):
-        logging.warning(
+        logger.warning(
             "Implicit package extraction from Containerfile is deprecated. "
             "Add 'packagesFromContainerfile' with the Containerfile path "
             "to your config file to preserve this behavior."
@@ -681,7 +684,7 @@ def main():
         try:
             cf_pkgs = _extract_containerfile_packages(containerfile, context, arches)
         except Exception:
-            logging.warning(
+            logger.warning(
                 "Failed to extract packages from Containerfile %s; "
                 "falling back to explicitly listed packages only.",
                 containerfile,
