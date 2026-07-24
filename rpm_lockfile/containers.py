@@ -10,6 +10,8 @@ from pathlib import Path
 
 from . import utils
 
+logger = logging.getLogger(__name__)
+
 # Known locations for rpmdb inside the image; files/lib is for
 # Flatpak runtime images.
 RPMDB_PATHS = [
@@ -28,7 +30,7 @@ USAGE_THRESHOLD = 80
 def _copy_image(baseimage, arch, destdir):
     """Download image into given location."""
     if not utils.check_image_spec(baseimage):
-        logging.warning(
+        logger.warning(
             """
             Image specification is missing registry. Skopeo will use some
             registry as a default. If the build system uses a different one,
@@ -71,7 +73,7 @@ def setup_rpmdb(dest_dir, baseimage, arch):
         # into the cache.
         _online_setup_rpmdb(cache, image, arch)
     else:
-        logging.info("Using already downloaded rpmdb")
+        logger.info("Using already downloaded rpmdb")
 
     # Copy the cache to the correct destination directory. Use
     # symlinks=True to preserve symlinks as-is. The cache may contain
@@ -127,7 +129,7 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
 
         # One layer at a time...
         for layer in manifest["layers"]:
-            logging.info("Extracting rpmdb from layer %s", layer["digest"])
+            logger.info("Extracting rpmdb from layer %s", layer["digest"])
             digest = layer["digest"].split(":", 1)[1]
             # ...find all files in interesting locations and extract them to
             # the destination cache.
@@ -154,7 +156,7 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
             # ignored, resulting in lock file that includes packages that are
             # already installed.
             dbpath = dbpaths.pop()
-            logging.debug("Creating rpmdb symlink %s -> %s", utils.RPMDB_PATH, dbpath)
+            logger.debug("Creating rpmdb symlink %s -> %s", utils.RPMDB_PATH, dbpath)
             os.makedirs(
                 os.path.dirname(os.path.join(dest_dir, utils.RPMDB_PATH)),
                 exist_ok=True,
@@ -173,7 +175,7 @@ def _maybe_cleanup(directory):
     """
     usage = _get_storage_usage(directory)
     if usage and usage >= USAGE_THRESHOLD:
-        logging.info("Storage is %d%% full. Cleaning up cached rpmdb.", usage)
+        logger.info("Storage is %d%% full. Cleaning up cached rpmdb.", usage)
         shutil.rmtree(directory)
 
 
@@ -185,7 +187,7 @@ def _get_storage_usage(directory):
         ["df", "--output=pcent", directory], stdout=subprocess.PIPE, text=True
     )
     if cp.returncode != 0:
-        logging.debug("Failed to check free storage size...")
+        logger.debug("Failed to check free storage size...")
     else:
         m = re.search(r"\b(\d+)%", cp.stdout)
         if m:

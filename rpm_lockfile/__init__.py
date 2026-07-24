@@ -160,12 +160,12 @@ def resolver(
             try:
                 releasever = dnf.rpm.detect_releasever(root_dir)
                 if releasever:
-                    logging.debug("Setting releasever to %s", releasever)
+                    logger.debug("Setting releasever to %s", releasever)
                     conf.substitutions["releasever"] = releasever
                 else:
-                    logging.warning("Failed to detect $releasever")
+                    logger.warning("Failed to detect $releasever")
             except dnf.exceptions.Error as exc:
-                logging.warning("Failed to detect $releasever: %s", exc)
+                logger.warning("Failed to detect $releasever: %s", exc)
             # Configure repos
             for repo in repos:
                 base.repos.add_new_repo(
@@ -176,7 +176,7 @@ def resolver(
                     **repo.kwargs,
                 )
             if assume_provides:
-                logging.info(
+                logger.info(
                     "Adding assumed provides repo: %s",
                     ", ".join(assume_provides),
                 )
@@ -209,7 +209,7 @@ def resolver(
                 try:
                     base.reinstall(pkg)
                 except dnf.exceptions.PackagesNotInstalledError:
-                    logging.warning("Can not reinstall %s: it is not installed", pkg)
+                    logger.warning("Can not reinstall %s: it is not installed", pkg)
                 except dnf.exceptions.PackageNotFoundError:
                     raise RuntimeError(
                         f"Can not reinstall {pkg}: no package matched in configured repo"
@@ -230,7 +230,7 @@ def resolver(
                     # User specified a package by absolute path, and we did not
                     # download filelists. Let's try again.
                     raise MissingFilelists()
-                logging.error(exc.value)
+                logger.error(exc.value)
                 raise RuntimeError(f"DNF error: {exc}")
             # And resolve the transaction
             try:
@@ -263,7 +263,7 @@ def resolver(
                         name=n, version=v, release=r, arch="src"
                     )
                     if len(results) == 0:
-                        logging.warning("No sources found for %s", pkg)
+                        logger.warning("No sources found for %s", pkg)
                     else:
                         src = results[0]
                         sources.add(PackageItem.from_dnf(src))
@@ -330,7 +330,7 @@ def process_arch(
     assume_provides: list[str] = None,
     match_context_versions: list[str] = None,
 ):
-    logging.info("Running solver for %s", arch)
+    logger.info("Running solver for %s", arch)
 
     with rpmdb(arch) as root_dir:
         for download_filelists in [False, True]:
@@ -354,7 +354,7 @@ def process_arch(
                 )
                 break
             except MissingFilelists:
-                logging.error(
+                logger.error(
                     "Dependency error indicates we may be missing filelists. Let's try "
                     "again with filelists."
                 )
@@ -518,27 +518,27 @@ def _extract_containerfile_packages(
         result.module_enable.update(selected.module_specs)
         result.builddep = list(selected.builddep_packages)
     if result.common or result.arch_specific:
-        logging.info(
+        logger.info(
             "Extracted %d common and %d arch-specific packages from Containerfile",
             len(result.common),
             sum(len(v) for v in result.arch_specific.values()),
         )
         if result.common:
-            logging.debug("Containerfile packages: %s", sorted(result.common))
+            logger.debug("Containerfile packages: %s", sorted(result.common))
         for arch, pkgs in sorted(result.arch_specific.items()):
-            logging.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
+            logger.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
         if result.upgrade:
-            logging.debug(
+            logger.debug(
                 "Containerfile upgrade packages: %s", sorted(result.upgrade)
             )
         if result.reinstall:
-            logging.debug(
+            logger.debug(
                 "Containerfile reinstall packages: %s", sorted(result.reinstall)
             )
         if result.module_enable:
-            logging.debug("Containerfile module enable: %s", sorted(result.module_enable))
+            logger.debug("Containerfile module enable: %s", sorted(result.module_enable))
         if result.builddep:
-            logging.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
+            logger.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
 
     return result
 
@@ -579,7 +579,7 @@ def main():
     variables = utils.load_variables(config.pop("variables", []), config_dir)
 
     if variables:
-        logging.info("Substitution variables: %s", ", ".join(sorted(variables)))
+        logger.info("Substitution variables: %s", ", ".join(sorted(variables)))
         for key in (
             "packages",
             "reinstallPackages",
@@ -660,7 +660,7 @@ def main():
         try:
             cf_pkgs = _extract_containerfile_packages(pfc_path, pfc_context, arches)
         except Exception:
-            logging.warning(
+            logger.warning(
                 "Failed to extract packages from Containerfile %s; "
                 "falling back to explicitly listed packages only.",
                 pfc_path,
@@ -673,7 +673,7 @@ def main():
             cf_pkgs.common |= builddep_resolved
 
     elif containerfile and not config.get("packages"):
-        logging.warning(
+        logger.warning(
             "Implicit package extraction from Containerfile is deprecated. "
             "Add 'packagesFromContainerfile' with the Containerfile path "
             "to your config file to preserve this behavior."
@@ -681,7 +681,7 @@ def main():
         try:
             cf_pkgs = _extract_containerfile_packages(containerfile, context, arches)
         except Exception:
-            logging.warning(
+            logger.warning(
                 "Failed to extract packages from Containerfile %s; "
                 "falling back to explicitly listed packages only.",
                 containerfile,

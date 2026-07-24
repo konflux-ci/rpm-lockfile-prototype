@@ -7,6 +7,8 @@ from pathlib import Path
 
 from . import utils
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -26,7 +28,7 @@ def main():
             input_hash.update(chunk)
 
     input_digest = input_hash.hexdigest()
-    logging.info("Using %s as cache key", input_digest)
+    logger.info("Using %s as cache key", input_digest)
 
     cache_file = utils.CACHE_PATH / "results" / f"{input_digest}.yaml"
     cache_file.parent.mkdir(exist_ok=True, parents=True)
@@ -34,13 +36,13 @@ def main():
     cmd = os.environ.get("RPM_LOCKFILE_PROTOTYPE_CMD", "rpm-lockfile-prototype")
 
     if not cache_file.exists():
-        logging.info("Cached results do not exist, running resolver")
+        logger.info("Cached results do not exist, running resolver")
         utils.logged_run(
             [cmd, args.infile, "--outfile", str(cache_file)] + rest,
             check=True,
         )
 
-    logging.info("Copying cache results to %s", args.outfile)
+    logger.info("Copying cache results to %s", args.outfile)
     with cache_file.open("rb") as inp:
         with Path(args.outfile).open("wb") as outp:
             shutil.copyfileobj(inp, outp)

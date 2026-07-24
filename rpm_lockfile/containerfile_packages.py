@@ -624,7 +624,7 @@ def resolve_builddep_packages(
         ]
 
         if not matching:
-            logging.warning(
+            logger.warning(
                 "No SRPM matching '%s' found in %s, "
                 "builddep packages will not be included in lockfile",
                 pattern,
@@ -633,7 +633,7 @@ def resolve_builddep_packages(
             continue
 
         for path in matching:
-            logging.info("Extracting BuildRequires from %s", path.name)
+            logger.info("Extracting BuildRequires from %s", path.name)
             try:
                 cmd = ["rpm", "-qpR", str(path)]
                 result = subprocess.run(
@@ -643,7 +643,7 @@ def resolve_builddep_packages(
                     check=False,
                 )
                 if result.returncode != 0:
-                    logging.warning("%s failed: %s", " ".join(cmd), result.stderr)
+                    logger.warning("%s failed: %s", " ".join(cmd), result.stderr)
                     continue
                 for line in result.stdout.strip().splitlines():
                     req = line.strip().split()[0] if line.strip() else ""
@@ -653,12 +653,12 @@ def resolve_builddep_packages(
                     if req and not req.startswith("rpmlib("):
                         resolved.add(req)
             except Exception as exc:
-                logging.warning(
+                logger.warning(
                     "Failed to extract BuildRequires from %s: %s", path.name, exc
                 )
 
     if resolved:
-        logging.info(
+        logger.info(
             "Resolved %d builddep packages: %s", len(resolved), sorted(resolved)
         )
     return resolved
