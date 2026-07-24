@@ -38,7 +38,6 @@ class StagePackages:
     stage_name: str = ""
     packages: list[str] = field(default_factory=list)
     has_update: bool = False
-    arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
@@ -49,17 +48,11 @@ class StagePackages:
         Merge another StagePackages into this one, combining packages
         and update targets.
         """
-        merged_arch = dict(self.arch_packages)
-        for arch, pkgs in other.arch_packages.items():
-            existing = set(merged_arch.get(arch, []))
-            existing.update(pkgs)
-            merged_arch[arch] = sorted(existing)
         return StagePackages(
             base_image=self.base_image or other.base_image,
             stage_name=self.stage_name or other.stage_name,
             packages=sorted(set(self.packages + other.packages)),
             has_update=self.has_update or other.has_update,
-            arch_packages=merged_arch,
             update_targets=sorted(set(self.update_targets + other.update_targets)),
             reinstall_targets=sorted(
                 set(self.reinstall_targets + other.reinstall_targets)
@@ -230,8 +223,8 @@ def extract_packages_from_file_installs(
     copy_map: dict[str, str],
     source_dir: Path,
     env_vars: dict[str, str] | None = None,
-    arches: list[str] | None = None,
-) -> tuple[list[str], dict[str, list[str]]]:
+    arch: str | None = None,
+) -> list[str]:
     """
     Extract package names from install commands that read packages from
     a file via stdin redirect or pipe.
@@ -241,23 +234,19 @@ def extract_packages_from_file_installs(
         grep -vE '^(#|$)' /tmp/pkgs.txt | xargs dnf install -y
         cat /tmp/pkgs.txt | xargs dnf install -y
 
-    When the file path contains an arch keyword like $(arch), resolves
-    it per-architecture and returns arch-specific packages separately.
+    When the file path contains an arch keyword like $(arch), substitutes
+    the current architecture to resolve the correct file.
 
     Arg(s):
         run_values (list[str]): RUN command bodies or joined script lines.
         copy_map (dict[str, str]): Container path to source path mapping.
         source_dir (Path): Source tree root.
         env_vars (dict[str, str] | None): Variables for path resolution.
-        arches (list[str] | None): Architectures to resolve for arch-specific
-            file paths.
+        arch (str | None): Architecture being resolved.
     Return Value(s):
-        tuple[list[str], dict[str, list[str]]]:
-            - Sorted unique package names (common to all arches).
-            - Dict mapping arch to sorted unique package names for that arch only.
+        list[str]: Sorted unique package names.
     """
     variables = dict(env_vars or {})
-    arch_list = arches or []
     redirect_re = re.compile(
         r"""
         (?:xargs\s+(?:\S+\s+)*)?    # optional xargs with optional flags
@@ -279,7 +268,6 @@ def extract_packages_from_file_installs(
         re.VERBOSE,
     )
     packages: set[str] = set()
-    arch_packages: dict[str, set[str]] = {}
 
     for run_body in run_values:
         for cmd in re.split(r"&&|;", run_body):
@@ -301,24 +289,23 @@ def extract_packages_from_file_installs(
                 continue
 
             if has_arch_keyword:
-                for arch in arch_list:
-                    arch_path = resolved_path
-                    for kw in ARCH_SUBSHELL_KEYWORDS:
-                        arch_path = arch_path.replace(kw, arch)
-                    source_file = _resolve_file_from_copy_map(
-                        arch_path, copy_map, source_dir
-                    )
-                    if not source_file:
-                        continue
-                    logger.info(
-                        f"Extracting arch-specific packages from {source_file} for {arch}"
-                    )
-                    try:
-                        arch_packages.setdefault(arch, set()).update(
-                            _read_packages_from_file(source_file)
-                        )
-                    except OSError:
-                        continue
+                if not arch:
+                    continue
+                arch_path = resolved_path
+                for kw in ARCH_SUBSHELL_KEYWORDS:
+                    arch_path = arch_path.replace(kw, arch)
+                source_file = _resolve_file_from_copy_map(
+                    arch_path, copy_map, source_dir
+                )
+                if not source_file:
+                    continue
+                logger.info(
+                    f"Extracting packages from {source_file} for {arch}"
+                )
+                try:
+                    packages.update(_read_packages_from_file(source_file))
+                except OSError:
+                    continue
             else:
                 source_file = _resolve_file_from_copy_map(
                     resolved_path, copy_map, source_dir
@@ -334,8 +321,7 @@ def extract_packages_from_file_installs(
                 except OSError:
                     continue
 
-    arch_result = {arch: sorted(pkgs) for arch, pkgs in sorted(arch_packages.items())}
-    return sorted(packages), arch_result
+    return sorted(packages)
 
 
 def extract_packages_from_scripts(
@@ -343,7 +329,7 @@ def extract_packages_from_scripts(
     source_dir: Path | None = None,
     copy_map: dict[str, str] | None = None,
     env_vars: dict[str, str] | None = None,
-    arches: list[str] | None = None,
+    arch: str | None = None,
 ) -> StagePackages:
     """
     Find shell scripts invoked in RUN commands and extract yum/dnf
@@ -365,11 +351,11 @@ def extract_packages_from_scripts(
         copy_map (dict[str, str] | None): Container path to source path
             mapping from COPY/ADD instructions.
         env_vars (dict[str, str] | None): Variables for path resolution.
-        arches (list[str] | None): Architectures being resolved, passed
-            through for arch-conditional subshell detection.
+        arch (str | None): Architecture being resolved, used for
+            evaluating arch-conditional blocks.
     Return Value(s):
-        StagePackages: Extracted packages, update targets, arch-specific
-            packages, and update flag from scripts.
+        StagePackages: Extracted packages, update targets, and update
+            flag from scripts.
     """
     if not source_dir:
         return StagePackages()
@@ -383,7 +369,6 @@ def extract_packages_from_scripts(
     all_packages: set[str] = set()
     all_updates: set[str] = set()
     all_reinstalls: set[str] = set()
-    all_arch_packages: dict[str, set[str]] = {}
     all_builddep: set[str] = set()
     all_modules: set[str] = set()
     scripts_have_bare_update: bool = False
@@ -453,10 +438,8 @@ def extract_packages_from_scripts(
                     joined_lines.append(stripped)
             script_body = "\n".join(line for line in joined_lines if line.strip())
 
-            result = analyze_run_commands([script_body], arches=arches)
+            result = analyze_run_commands([script_body], arch=arch)
             all_packages.update(result.packages)
-            for arch, arch_pkgs in result.arch_packages.items():
-                all_arch_packages.setdefault(arch, set()).update(arch_pkgs)
             all_updates.update(result.update_targets)
             all_reinstalls.update(result.reinstall_targets)
             all_builddep.update(result.builddep_packages)
@@ -464,23 +447,18 @@ def extract_packages_from_scripts(
             if result.has_update:
                 scripts_have_bare_update = True
 
-            file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
+            file_pkgs = extract_packages_from_file_installs(
                 [script_body],
                 copy_map,
                 source_dir,
                 env_vars=env_vars,
-                arches=arches,
+                arch=arch,
             )
             all_packages.update(file_pkgs)
-            for arch, arch_pkgs in file_arch_pkgs.items():
-                all_arch_packages.setdefault(arch, set()).update(arch_pkgs)
 
     return StagePackages(
         packages=sorted(all_packages),
         has_update=scripts_have_bare_update,
-        arch_packages={
-            arch: sorted(pkgs) for arch, pkgs in sorted(all_arch_packages.items())
-        },
         update_targets=sorted(all_updates),
         reinstall_targets=sorted(all_reinstalls),
         builddep_packages=sorted(all_builddep),
@@ -491,7 +469,7 @@ def extract_packages_from_scripts(
 def analyze_containerfile_stages(
     containerfile_path: Path,
     source_dir: Path | None = None,
-    arches: list[str] | None = None,
+    arch: str | None = None,
 ) -> list[StagePackages]:
     """
     Parse a Containerfile and return per-stage package analysis.
@@ -504,16 +482,16 @@ def analyze_containerfile_stages(
     Also detects shell scripts invoked in RUN commands and extracts
     packages from them if the script file exists in source_dir.
 
-    Packages inside arch-conditional blocks (if [ $(arch) = X ]) are
-    returned separately so they can be resolved only for the matching
-    architecture.
+    Architecture-conditional blocks are evaluated against the given
+    arch parameter; matching packages are included, non-matching ones
+    are skipped.
 
     Arg(s):
         containerfile_path (Path): Path to the Containerfile/Dockerfile.
         source_dir (Path | None): Source tree root to locate script files
             referenced in RUN commands.
-        arches (list[str] | None): Architectures being resolved, passed
-            through for arch-conditional subshell detection.
+        arch (str | None): Architecture being resolved, used for
+            evaluating arch-conditional blocks.
     Return Value(s):
         list[StagePackages]: Per-stage package analysis.
     """
@@ -559,7 +537,9 @@ def analyze_containerfile_stages(
                 base_image = resolve_bash_expansion(m.group("img"), stage_vars)
                 stage_name = m.group("name") or ""
 
-        result = analyze_run_commands(run_values, env_vars=stage_vars, arches=arches)
+        result = analyze_run_commands(
+            run_values, env_vars=stage_vars, arch=arch
+        )
         stage = StagePackages(
             base_image=base_image,
             stage_name=stage_name,
@@ -573,20 +553,20 @@ def analyze_containerfile_stages(
                 source_dir=source_dir,
                 copy_map=copy_map,
                 env_vars=stage_vars,
-                arches=arches,
+                arch=arch,
             )
         )
 
         if source_dir:
-            file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
+            file_pkgs = extract_packages_from_file_installs(
                 run_values,
                 copy_map,
                 source_dir,
                 env_vars=stage_vars,
-                arches=arches,
+                arch=arch,
             )
             stage = stage.merge(
-                StagePackages(packages=file_pkgs, arch_packages=file_arch_pkgs)
+                StagePackages(packages=file_pkgs)
             )
 
         stages.append(stage)
