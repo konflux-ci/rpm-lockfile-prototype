@@ -79,9 +79,7 @@ class TestAssumeProvides:
 
             ns = {"repo": "http://linux.duke.edu/metadata/repo"}
             tree = ElementTree.parse(repomd_path)
-            data_types = {
-                el.get("type") for el in tree.findall("repo:data", ns)
-            }
+            data_types = {el.get("type") for el in tree.findall("repo:data", ns)}
             assert "primary" in data_types
             assert "filelists" in data_types
             assert "other" in data_types

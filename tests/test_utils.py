@@ -268,8 +268,11 @@ def test_extract_image_with_undefined_build_arg():
     file = """ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 """
-    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
-        RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
+    with (
+        patch("builtins.open", mock_open(read_data=file)),
+        pytest.raises(
+            RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
+        ),
     ):
         utils.extract_image(file)
 
@@ -280,8 +283,11 @@ def test_extract_image_with_partial_undefined_build_args():
 ARG NAMESPACE
 FROM ${REGISTRY}/${NAMESPACE}/image
 """
-    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
-        RuntimeError, match="ARG 'REGISTRY' is used but has no default value"
+    with (
+        patch("builtins.open", mock_open(read_data=file)),
+        pytest.raises(
+            RuntimeError, match="ARG 'REGISTRY' is used but has no default value"
+        ),
     ):
         utils.extract_image(file)
 
@@ -292,8 +298,11 @@ def test_extract_image_with_mixed_defined_undefined_args():
 ARG NAMESPACE
 FROM ${REGISTRY}/${NAMESPACE}/image
 """
-    with patch("builtins.open", mock_open(read_data=file)), pytest.raises(
-        RuntimeError, match="ARG 'NAMESPACE' is used but has no default value"
+    with (
+        patch("builtins.open", mock_open(read_data=file)),
+        pytest.raises(
+            RuntimeError, match="ARG 'NAMESPACE' is used but has no default value"
+        ),
     ):
         utils.extract_image(file)
 
@@ -468,7 +477,9 @@ def test_get_labels_from_containerfile(tmpdir):
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", "--no-tags", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+        ["skopeo", "inspect", "--no-tags", f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
     )
 
 
@@ -506,7 +517,9 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
 
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
-        ["skopeo", "inspect", "--no-tags", f"docker://{image}"], check=True, stdout=subprocess.PIPE
+        ["skopeo", "inspect", "--no-tags", f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
     )
 
 
@@ -528,7 +541,7 @@ def test_hash_file(content, hash, tmp_path):
     [
         ("FOO=bar\nBAZ=qux\n", {"FOO": "bar", "BAZ": "qux"}),
         ("FOO=bar\n\n# comment\nBAZ=qux\n", {"FOO": "bar", "BAZ": "qux"}),
-        ('FOO="bar baz"\nQUX=\'hello\'\n', {"FOO": "bar baz", "QUX": "hello"}),
+        ("FOO=\"bar baz\"\nQUX='hello'\n", {"FOO": "bar baz", "QUX": "hello"}),
         ("FOO=bar=baz\n", {"FOO": "bar=baz"}),
         ("  FOO = bar  \n", {"FOO": "bar"}),
         ("NO_EQUALS_LINE\nFOO=bar\n", {"FOO": "bar"}),
@@ -639,8 +652,13 @@ def test_get_labels_with_base_vars():
 def test_get_labels_base_vars_overridden_by_source():
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
-        obj = {"varsFromImage": "registry.example.com/image:latest", "architecture": "override-me"}
-        result = utils.get_labels(obj, "/top", base_vars={"architecture": "ppc64le", "custom": "kept"})
+        obj = {
+            "varsFromImage": "registry.example.com/image:latest",
+            "architecture": "override-me",
+        }
+        result = utils.get_labels(
+            obj, "/top", base_vars={"architecture": "ppc64le", "custom": "kept"}
+        )
     assert result["architecture"] == "x86_64"
     assert result["custom"] == "kept"
     assert result["vcs-ref"] == "abcdef"

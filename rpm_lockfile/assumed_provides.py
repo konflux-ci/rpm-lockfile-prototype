@@ -17,10 +17,12 @@ PACKAGE_PREFIX = "_assumed-provides-"
 def _primary_xml(entries):
     """Return primary.xml content for the given provide entries."""
     parts = [
-        ('<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<metadata xmlns="http://linux.duke.edu/metadata/common"'
-        ' xmlns:rpm="http://linux.duke.edu/metadata/rpm"'
-        f' packages="{len(entries)}">\n')
+        (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<metadata xmlns="http://linux.duke.edu/metadata/common"'
+            ' xmlns:rpm="http://linux.duke.edu/metadata/rpm"'
+            f' packages="{len(entries)}">\n'
+        )
     ]
     for entry in entries:
         name = f"{PACKAGE_PREFIX}{entry}"
@@ -58,9 +60,11 @@ def _primary_xml(entries):
 def _filelists_xml(entries):
     """Return filelists.xml content."""
     parts = [
-        ('<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<filelists xmlns="http://linux.duke.edu/metadata/filelists"'
-        f' packages="{len(entries)}">\n')
+        (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<filelists xmlns="http://linux.duke.edu/metadata/filelists"'
+            f' packages="{len(entries)}">\n'
+        )
     ]
     for entry in entries:
         pkg_id = hashlib.sha256(entry.encode()).hexdigest()
@@ -78,9 +82,11 @@ def _filelists_xml(entries):
 def _other_xml(entries):
     """Return other.xml content."""
     parts = [
-        ('<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<otherdata xmlns="http://linux.duke.edu/metadata/other"'
-        f' packages="{len(entries)}">\n')
+        (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<otherdata xmlns="http://linux.duke.edu/metadata/other"'
+            f' packages="{len(entries)}">\n'
+        )
     ]
     for entry in entries:
         pkg_id = hashlib.sha256(entry.encode()).hexdigest()
@@ -111,8 +117,10 @@ def _repomd_xml(records):
     *records* is a list of (md_type, sha256, size, filename) tuples.
     """
     parts = [
-        ('<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<repomd xmlns="http://linux.duke.edu/metadata/repo">\n')
+        (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<repomd xmlns="http://linux.duke.edu/metadata/repo">\n'
+        )
     ]
     for md_type, checksum, size, filename in records:
         parts.append(

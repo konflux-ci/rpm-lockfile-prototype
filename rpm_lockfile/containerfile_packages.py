@@ -465,7 +465,10 @@ def extract_packages_from_scripts(
                 scripts_have_bare_update = True
 
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                [script_body], copy_map, source_dir, env_vars=env_vars,
+                [script_body],
+                copy_map,
+                source_dir,
+                env_vars=env_vars,
                 arches=arches,
             )
             all_packages.update(file_pkgs)
@@ -556,9 +559,7 @@ def analyze_containerfile_stages(
                 base_image = resolve_bash_expansion(m.group("img"), stage_vars)
                 stage_name = m.group("name") or ""
 
-        result = analyze_run_commands(
-            run_values, env_vars=stage_vars, arches=arches
-        )
+        result = analyze_run_commands(run_values, env_vars=stage_vars, arches=arches)
         stage = StagePackages(
             base_image=base_image,
             stage_name=stage_name,
@@ -578,7 +579,10 @@ def analyze_containerfile_stages(
 
         if source_dir:
             file_pkgs, file_arch_pkgs = extract_packages_from_file_installs(
-                run_values, copy_map, source_dir, env_vars=stage_vars,
+                run_values,
+                copy_map,
+                source_dir,
+                env_vars=stage_vars,
                 arches=arches,
             )
             stage = stage.merge(

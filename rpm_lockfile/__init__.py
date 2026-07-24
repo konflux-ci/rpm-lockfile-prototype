@@ -172,9 +172,7 @@ def resolver(
         # Configure repos
         for repo in repos:
             base.repos.add_new_repo(
-                libdnf.conf.ConfigParser.substitute(
-                    repo.repoid, conf.substitutions
-                ),
+                libdnf.conf.ConfigParser.substitute(repo.repoid, conf.substitutions),
                 conf,
                 **repo.kwargs,
             )
@@ -531,15 +529,15 @@ def _extract_containerfile_packages(
         for arch, pkgs in sorted(result.arch_specific.items()):
             logger.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
         if result.upgrade:
-            logger.debug(
-                "Containerfile upgrade packages: %s", sorted(result.upgrade)
-            )
+            logger.debug("Containerfile upgrade packages: %s", sorted(result.upgrade))
         if result.reinstall:
             logger.debug(
                 "Containerfile reinstall packages: %s", sorted(result.reinstall)
             )
         if result.module_enable:
-            logger.debug("Containerfile module enable: %s", sorted(result.module_enable))
+            logger.debug(
+                "Containerfile module enable: %s", sorted(result.module_enable)
+            )
         if result.builddep:
             logger.debug("Containerfile builddep patterns: %s", sorted(result.builddep))
 
@@ -626,7 +624,12 @@ def main():
     if args.local_system or context.get("localSystem"):
         rpmdb = local_rpmdb()
         is_image_context = False
-    elif args.bare or context.get("bare") or args.rpm_ostree_treefile or context.get("rpmOstreeTreefile"):
+    elif (
+        args.bare
+        or context.get("bare")
+        or args.rpm_ostree_treefile
+        or context.get("rpmOstreeTreefile")
+    ):
         rpmdb = empty_rpmdb()
         is_image_context = False
     else:

@@ -30,7 +30,10 @@ FAILURE_CASES = sorted(d.name for d in FAILURE_DIR.iterdir() if d.is_dir())
 
 def _check_output(test_case, result):
     """Check stdout and stderr against expected patterns if defined."""
-    for stream_name, loader in [("stdout", load_expected_stdout), ("stderr", load_expected_stderr)]:
+    for stream_name, loader in [
+        ("stdout", load_expected_stdout),
+        ("stderr", load_expected_stderr),
+    ]:
         patterns = loader(test_case)
         if patterns is None:
             continue

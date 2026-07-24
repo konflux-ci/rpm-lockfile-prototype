@@ -47,9 +47,7 @@ class TestPinContextVersions:
         ]
         solvables = {"kernel-devel", "glibc-devel", "gcc"}
 
-        result = pin_context_versions(
-            installed, solvables, ["kernel-*", "glibc*"]
-        )
+        result = pin_context_versions(installed, solvables, ["kernel-*", "glibc*"])
 
         assert "kernel-devel-5.14.0-570.120.1.el9_6" in result
         assert "glibc-devel-2.34-100.el9" in result

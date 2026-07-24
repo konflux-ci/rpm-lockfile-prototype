@@ -19,9 +19,10 @@ RPMDB_PATH = subprocess.run(
     ["rpm", "--eval", "%_dbpath"], stdout=subprocess.PIPE, check=True, encoding="utf-8"
 ).stdout.strip()[1:]
 
-CACHE_PATH = Path(
-    os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
-) / "rpm-lockfile-prototype"
+CACHE_PATH = (
+    Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    / "rpm-lockfile-prototype"
+)
 
 
 def relative_to(directory, path):
@@ -389,7 +390,11 @@ def pin_context_versions(installed_packages, solvables, patterns):
     for pattern in patterns:
         for name, pkg in installed.items():
             if fnmatch.fnmatch(name, pattern):
-                evr = f"{pkg.epoch}:{pkg.version}-{pkg.release}" if pkg.epoch else f"{pkg.version}-{pkg.release}"
+                evr = (
+                    f"{pkg.epoch}:{pkg.version}-{pkg.release}"
+                    if pkg.epoch
+                    else f"{pkg.version}-{pkg.release}"
+                )
                 if pattern not in pattern_evrs:
                     pattern_evrs[pattern] = (evr, name)
                 elif pattern_evrs[pattern][0] != evr:

@@ -561,8 +561,12 @@ def _process_command_node(
 
     word_values = [w.word for w in words]
     all_vars = {**ctx.variables, **ctx.shell_vars}
-    resolved_first = resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
-    resolved_word_values = [resolved_first] + word_values[1:] if word_values else word_values
+    resolved_first = (
+        resolve_bash_expansion(word_values[0], all_vars) if word_values else ""
+    )
+    resolved_word_values = (
+        [resolved_first] + word_values[1:] if word_values else word_values
+    )
     action, action_idx = _detect_pkg_action(resolved_word_values, ctx)
     if not action:
         return
