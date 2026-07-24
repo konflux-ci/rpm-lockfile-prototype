@@ -1,0 +1,10 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packagesFromContainerfile: Dockerfile
+arches:
+  - x86_64
+  - s390x
+context:
+  bare: true

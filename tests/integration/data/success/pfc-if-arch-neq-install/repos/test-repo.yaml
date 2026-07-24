@@ -1,0 +1,4 @@
+packages:
+  - nvr: test-common-1.0-1
+
+  - nvr: test-not-s390x-1.0-1
