@@ -39,7 +39,7 @@ def main():
 
     with open(rpms_in) as f:
         config = yaml.safe_load(f)
-    arches = config.get("arches", ["x86_64"])
+    arches = sorted(config.get("arches", ["x86_64"]))
 
     # Collect all packages from all repos, tracking each package's origin path.
     # The relative path of the YAML file (minus extension) determines the URL
