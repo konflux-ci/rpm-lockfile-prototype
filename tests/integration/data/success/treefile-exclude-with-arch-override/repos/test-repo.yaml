@@ -1,0 +1,10 @@
+packages:
+  - nvr: test-base-1.0-1
+
+  - nvr: test-app-1.0-1
+
+  - nvr: test-arch-specific-1.0-1
+
+  - nvr: test-from-repo-packages-1.0-1
+
+  - nvr: test-not-in-treefile-1.0-1

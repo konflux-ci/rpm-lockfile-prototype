@@ -383,7 +383,25 @@ def collect_content_origins(config_dir, origins, variables=None):
 def read_packages_from_treefile(arch, treefile):
     # Reference: https://coreos.github.io/rpm-ostree/treefile/
     # TODO this should move to a separate module
+    packages, arch_packages, excludes = _read_packages_from_treefile(arch, treefile)
+    # exclude-packages removes from generic packages only; arch-specific
+    # packages (packages-$basearch) are explicit per-arch overrides and
+    # are not subject to exclusion.
+    return (packages - excludes) | arch_packages
+
+
+def _read_packages_from_treefile(arch, treefile):
+    """Recursively collect packages and exclude-packages from a treefile.
+
+    Returns a tuple of (packages, arch_packages, exclude_packages) so that
+    exclude-packages entries from all levels of the include chain are
+    accumulated and applied against the generic package set only.
+    Arch-specific packages (packages-$basearch) are kept separate so they
+    are not affected by exclude-packages.
+    """
     packages = set()
+    arch_packages = set()
+    excludes = set()
     with open(treefile) as f:
         data = yaml.safe_load(f)
 
@@ -395,22 +413,31 @@ def read_packages_from_treefile(arch, treefile):
         )
 
         for path in treefiles_to_include:
-            packages.update(
-                read_packages_from_treefile(
+            child_pkgs, child_arch_pkgs, child_excludes = (
+                _read_packages_from_treefile(
                     arch, os.path.join(os.path.dirname(treefile), path)
                 )
             )
+            packages.update(child_pkgs)
+            arch_packages.update(child_arch_pkgs)
+            excludes.update(child_excludes)
 
         if arch_include := data.get("arch-include", {}).get(arch):
-            packages.update(
-                read_packages_from_treefile(
+            child_pkgs, child_arch_pkgs, child_excludes = (
+                _read_packages_from_treefile(
                     arch, os.path.join(os.path.dirname(treefile), arch_include)
                 )
             )
+            packages.update(child_pkgs)
+            arch_packages.update(child_arch_pkgs)
+            excludes.update(child_excludes)
 
-        for key in ("packages", f"packages-{arch}"):
-            for entry in data.get(key, []):
-                packages.update(entry.split())
+        for entry in data.get("packages", []):
+            packages.update(entry.split())
+
+        arch_key = f"packages-{arch}"
+        for entry in data.get(arch_key, []):
+            arch_packages.update(entry.split())
 
         for entry in data.get("repo-packages", []):
             # The repo should not be needed, as the packages should be present
@@ -418,9 +445,11 @@ def read_packages_from_treefile(arch, treefile):
             for e in entry.get("packages", []):
                 packages.update(e.split())
 
+        for entry in data.get("exclude-packages", []):
+            excludes.update(entry.split())
+
         # TODO conditional-include
-        # TODO exclude-packages might be needed here
-    return packages
+    return packages, arch_packages, excludes
 
 
 def _arch_matches(spec, arch):

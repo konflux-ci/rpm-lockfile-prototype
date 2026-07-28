@@ -1,0 +1,9 @@
+include:
+  - base-treefile.yaml
+packages:
+  - test-app
+packages-x86_64:
+  # Re-add test-base only for x86_64 despite the global exclusion
+  - test-base
+exclude-packages:
+  - test-base
