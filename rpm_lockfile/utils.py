@@ -25,10 +25,42 @@ CACHE_PATH = (
 )
 
 
+def find_git_root(path):
+    """Return the git repository root containing path, or None if not in a repo."""
+    resolved = Path(path).resolve()
+    for candidate in [resolved, *resolved.parents]:
+        if (candidate / ".git").exists():
+            return str(candidate)
+    return None
+
+
+def check_in_git_repo(resolved_path, config_dir):
+    """Raise if config_dir is inside a git repo and resolved_path escapes it.
+
+    When the config file lives inside a git repository, all file references
+    must stay within that repository. This prevents a malicious config from
+    reading host files (e.g. secrets mounted into CI) by using absolute paths
+    or ../ traversal.
+
+    Does nothing if config_dir is not inside a git repository.
+    """
+    git_root = find_git_root(config_dir)
+    if git_root is None:
+        return
+    git_root = Path(git_root).resolve()
+    resolved = Path(resolved_path).resolve()
+    if not resolved.is_relative_to(git_root):
+        raise ValueError(
+            f"{resolved_path!r} is outside the git repository at {git_root}"
+        )
+
+
 def relative_to(directory, path):
     """os.path.join() that gracefully handles None"""
     if path:
-        return os.path.join(directory, path)
+        resolved = os.path.join(directory, path)
+        check_in_git_repo(resolved, directory)
+        return resolved
     return None
 
 
@@ -216,7 +248,7 @@ def load_variables_file(filepath, config_dir):
     blank lines and lines starting with # are skipped, optional quotes on
     values are stripped.
     """
-    resolved = os.path.join(config_dir, filepath)
+    resolved = relative_to(config_dir, filepath)
     variables = {}
     with open(resolved) as f:
         for line in f:
@@ -318,7 +350,7 @@ def _get_containerfile_labels(containerfile, config_dir):
         extra_args = None
 
     return _get_image_labels(
-        extract_image(os.path.join(config_dir, fp), **filters, extra_args=extra_args)
+        extract_image(relative_to(config_dir, fp), **filters, extra_args=extra_args)
     )
 
 

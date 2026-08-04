@@ -537,7 +537,10 @@ def test_get_labels_from_containerfile(tmpdir):
     containerfile = tmpdir / "Containerfile"
     containerfile.write_text(f"FROM {image}\nRUN date\n", encoding="utf-8")
 
-    with patch("subprocess.run") as mock_run:
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("rpm_lockfile.utils.find_git_root", return_value=None),
+    ):
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels({"varsFromContainerfile": "Containerfile"}, tmpdir)
 
@@ -574,7 +577,10 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
         encoding="utf-8",
     )
 
-    with patch("subprocess.run") as mock_run:
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("rpm_lockfile.utils.find_git_root", return_value=None),
+    ):
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels(
             {"varsFromContainerfile": {"file": "Containerfile"} | filter},
@@ -597,7 +603,10 @@ def test_get_labels_from_containerfile_with_argfile(tmpdir):
     argfile = tmpdir / "build-args.env"
     argfile.write_text(f"BASE_IMAGE={image}\n", encoding="utf-8")
 
-    with patch("subprocess.run") as mock_run:
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("rpm_lockfile.utils.find_git_root", return_value=None),
+    ):
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels(
             {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
@@ -624,7 +633,10 @@ def test_get_labels_from_containerfile_argfile_overrides_default(tmpdir):
     argfile = tmpdir / "build-args.env"
     argfile.write_text(f"BASE_IMAGE={override_image}\n", encoding="utf-8")
 
-    with patch("subprocess.run") as mock_run:
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("rpm_lockfile.utils.find_git_root", return_value=None),
+    ):
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels(
             {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
@@ -673,6 +685,70 @@ def test_load_variables_file(content, expected, tmp_path):
 def test_load_variables_file_missing(tmp_path):
     with pytest.raises(FileNotFoundError):
         utils.load_variables_file("nonexistent.conf", str(tmp_path))
+
+
+class TestFindGitRoot:
+    def test_finds_root_from_subdirectory(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+        subdir = tmp_path / "sub"
+        subdir.mkdir()
+        assert utils.find_git_root(str(subdir)) == str(tmp_path)
+
+    def test_finds_root_when_config_dir_is_git_root(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+        assert utils.find_git_root(str(tmp_path)) == str(tmp_path)
+
+    def test_returns_none_when_not_in_git_repo(self, tmp_path):
+        assert utils.find_git_root(str(tmp_path)) is None
+
+
+class TestCheckInGitRepo:
+    def test_allows_path_inside_repo(self, tmp_path):
+        git_root = str(tmp_path)
+        target = str(tmp_path / "subdir" / "file.txt")
+        with patch("rpm_lockfile.utils.find_git_root", return_value=git_root):
+            # Should not raise
+            utils.check_in_git_repo(target, git_root)
+
+    def test_allows_path_when_not_in_git_repo(self, tmp_path):
+        target = "/etc/passwd"
+        with patch("rpm_lockfile.utils.find_git_root", return_value=None):
+            # No git repo — no restriction
+            utils.check_in_git_repo(target, str(tmp_path))
+
+    def test_blocks_absolute_path_outside_repo(self, tmp_path):
+        git_root = str(tmp_path)
+        with (
+            patch("rpm_lockfile.utils.find_git_root", return_value=git_root),
+            pytest.raises(ValueError, match="outside the git repository"),
+        ):
+            utils.check_in_git_repo("/etc/passwd", git_root)
+
+    def test_blocks_traversal_outside_repo(self, tmp_path):
+        git_root = str(tmp_path)
+        config_dir = str(tmp_path / "config")
+        target = str(tmp_path / "config" / ".." / ".." / "etc" / "passwd")
+        with (
+            patch("rpm_lockfile.utils.find_git_root", return_value=git_root),
+            pytest.raises(ValueError, match="outside the git repository"),
+        ):
+            utils.check_in_git_repo(target, config_dir)
+
+    def test_relative_to_enforces_git_boundary(self, tmp_path):
+        git_root = str(tmp_path)
+        with (
+            patch("rpm_lockfile.utils.find_git_root", return_value=git_root),
+            pytest.raises(ValueError, match="outside the git repository"),
+        ):
+            utils.relative_to(git_root, "/etc/passwd")
+
+    def test_load_variables_file_enforces_git_boundary(self, tmp_path):
+        git_root = str(tmp_path)
+        with (
+            patch("rpm_lockfile.utils.find_git_root", return_value=git_root),
+            pytest.raises(ValueError, match="outside the git repository"),
+        ):
+            utils.load_variables_file("/etc/passwd", git_root)
 
 
 @pytest.mark.parametrize(
