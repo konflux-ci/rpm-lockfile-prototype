@@ -1,0 +1,13 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo/{version}
+      varsFromContainerfile:
+        file: Containerfile
+        argFile: build-args.env
+packages:
+  - test-base
+arches:
+  - x86_64
+context:
+  bare: true

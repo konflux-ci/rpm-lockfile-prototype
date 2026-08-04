@@ -469,6 +469,14 @@ def _get_containerfile_filters(context):
     return {}
 
 
+def _get_containerfile_extra_args(config_dir, context):
+    """Load extra build args from argFile if specified in the containerfile config."""
+    cf = context.get("containerfile")
+    if isinstance(cf, dict) and cf.get("argFile"):
+        return utils.load_variables_file(cf["argFile"], config_dir)
+    return None
+
+
 def logging_setup(debug=False):
 
     class ExcludeErrorsFilter(logging.Filter):
@@ -651,7 +659,11 @@ def main():
             )
         rpmdb = image_rpmdb(
             image
-            or utils.extract_image(containerfile, **_get_containerfile_filters(context))
+            or utils.extract_image(
+                containerfile,
+                **_get_containerfile_filters(context),
+                extra_args=_get_containerfile_extra_args(config_dir, context),
+            )
         )
 
     # Determine package extraction source — independent of rpmdb mode.

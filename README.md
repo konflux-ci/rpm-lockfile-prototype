@@ -289,6 +289,11 @@ containerfile:
   stageName: builder
   # Get base image that contains a match for the given regular expression.
   imagePattern: example.com
+  # Path to a KEY=VALUE file (relative to the config file) whose values
+  # override ARG defaults when resolving the base image. Same format as
+  # podman/docker --build-arg-file. Useful when the Containerfile uses
+  # ARGs with no default or with a placeholder value.
+  argFile: build-args.env
 ```
 
 If multiple filters for selecting stage are set, the first one to match is

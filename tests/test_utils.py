@@ -318,6 +318,72 @@ FROM ${BASE_IMAGE}
         assert result == "registry.io/base:latest"
 
 
+def test_extract_image_extra_args_override_default():
+    """extra_args override ARG defaults declared in the Containerfile."""
+    file = """ARG BASE_IMAGE=registry.io/default:latest
+FROM ${BASE_IMAGE}
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        result = utils.extract_image(
+            file, extra_args={"BASE_IMAGE": "registry.io/override:latest"}
+        )
+        assert result == "registry.io/override:latest"
+
+
+def test_extract_image_extra_args_supply_missing_default():
+    """extra_args can provide a value for an ARG with no default."""
+    file = """ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        result = utils.extract_image(
+            file,
+            extra_args={
+                "BASE_IMAGE": "registry.redhat.io/rhel9/rhel-bootc:latest@sha256:4140526fa1f9bec23eb35065dbb33ef8ed4d48039c024d3f04dc5a54b86f3e58"
+            },
+        )
+        assert result == "registry.redhat.io/rhel9/rhel-bootc:latest@sha256:4140526fa1f9bec23eb35065dbb33ef8ed4d48039c024d3f04dc5a54b86f3e58"
+
+
+def test_extract_image_extra_args_partial_override():
+    """extra_args can override some ARGs while others use their Containerfile defaults."""
+    file = """ARG REGISTRY=registry.io
+ARG NAMESPACE=default
+FROM ${REGISTRY}/${NAMESPACE}/base:latest
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        result = utils.extract_image(
+            file, extra_args={"NAMESPACE": "custom"}
+        )
+        assert result == "registry.io/custom/base:latest"
+
+
+def test_extract_image_extra_args_unused_key_ignored():
+    """extra_args keys not referenced in the Containerfile are silently ignored."""
+    file = """ARG BASE_IMAGE=registry.io/base:latest
+FROM ${BASE_IMAGE}
+"""
+    with patch("builtins.open", mock_open(read_data=file)):
+        result = utils.extract_image(
+            file, extra_args={"UNRELATED": "something", "BASE_IMAGE": "registry.io/override:latest"}
+        )
+        assert result == "registry.io/override:latest"
+
+
+def test_extract_image_extra_args_missing_arg_still_raises():
+    """If an ARG is referenced but supplied neither in Containerfile nor extra_args, raise."""
+    file = """ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+"""
+    with (
+        patch("builtins.open", mock_open(read_data=file)),
+        pytest.raises(
+            RuntimeError, match="ARG 'BASE_IMAGE' is used but has no default value"
+        ),
+    ):
+        utils.extract_image(file, extra_args={"OTHER": "value"})
+
+
 @pytest.mark.parametrize(
     "file,stage_num,stage_name,image_pattern,expected",
     [
@@ -518,6 +584,56 @@ def test_get_labels_from_containerfile_stage(tmpdir, filter):
     assert labels == INSPECT_OUTPUT["Labels"]
     mock_run.assert_called_once_with(
         ["skopeo", "inspect", "--no-tags", f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+
+
+def test_get_labels_from_containerfile_with_argfile(tmpdir):
+    """argFile values are passed as extra_args to resolve ARGs with no default."""
+    image = "registry.example.com/image:latest"
+    containerfile = tmpdir / "Containerfile"
+    containerfile.write_text("ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nRUN date\n", encoding="utf-8")
+    argfile = tmpdir / "build-args.env"
+    argfile.write_text(f"BASE_IMAGE={image}\n", encoding="utf-8")
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        labels = utils.get_labels(
+            {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
+            tmpdir,
+        )
+
+    assert labels == INSPECT_OUTPUT["Labels"]
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", "--no-tags", f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+
+
+def test_get_labels_from_containerfile_argfile_overrides_default(tmpdir):
+    """argFile values take precedence over ARG defaults in the Containerfile."""
+    default_image = "registry.example.com/default:latest"
+    override_image = "registry.example.com/override:latest"
+    containerfile = tmpdir / "Containerfile"
+    containerfile.write_text(
+        f"ARG BASE_IMAGE={default_image}\nFROM ${{BASE_IMAGE}}\nRUN date\n",
+        encoding="utf-8",
+    )
+    argfile = tmpdir / "build-args.env"
+    argfile.write_text(f"BASE_IMAGE={override_image}\n", encoding="utf-8")
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        labels = utils.get_labels(
+            {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
+            tmpdir,
+        )
+
+    assert labels == INSPECT_OUTPUT["Labels"]
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", "--no-tags", f"docker://{override_image}"],
         check=True,
         stdout=subprocess.PIPE,
     )
