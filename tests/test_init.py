@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 import pytest
 
 import rpm_lockfile
-from rpm_lockfile import assumed_provides, schema
+from rpm_lockfile import _get_containerfile_extra_args, assumed_provides, schema
 
 
 @pytest.mark.parametrize(
@@ -125,3 +125,65 @@ class TestPackagesFromContainerfileSchema:
             "packagesFromContainerfile": "Containerfile",
         }
         schema.validate(config)
+
+
+class TestContainerfileArgFileSchema:
+    def test_accepts_argfile_in_context_containerfile(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "context": {
+                "containerfile": {
+                    "file": "Containerfile",
+                    "argFile": "build-args.env",
+                }
+            },
+        }
+        schema.validate(config)
+
+    def test_accepts_argfile_in_packages_from_containerfile(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "packagesFromContainerfile": {
+                "file": "Containerfile",
+                "argFile": "build-args.env",
+            },
+        }
+        schema.validate(config)
+
+    def test_rejects_unknown_property(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "context": {
+                "containerfile": {
+                    "file": "Containerfile",
+                    "unknownKey": "value",
+                }
+            },
+        }
+        with pytest.raises(SystemExit):
+            schema.validate(config)
+
+
+class TestGetContainerfileExtraArgs:
+    def test_returns_none_when_no_containerfile(self, tmp_path):
+        assert _get_containerfile_extra_args(str(tmp_path), {}) is None
+
+    def test_returns_none_when_containerfile_is_string(self, tmp_path):
+        context = {"containerfile": "Containerfile"}
+        assert _get_containerfile_extra_args(str(tmp_path), context) is None
+
+    def test_returns_none_when_no_argfile_key(self, tmp_path):
+        context = {"containerfile": {"file": "Containerfile", "stageNum": 1}}
+        assert _get_containerfile_extra_args(str(tmp_path), context) is None
+
+    def test_loads_argfile_when_specified(self, tmp_path):
+        argfile = tmp_path / "build-args.env"
+        argfile.write_text("BASE_IMAGE=registry.example.com/image:latest\n")
+        context = {"containerfile": {"file": "Containerfile", "argFile": "build-args.env"}}
+        result = _get_containerfile_extra_args(str(tmp_path), context)
+        assert result == {"BASE_IMAGE": "registry.example.com/image:latest"}
+
+    def test_raises_if_argfile_missing(self, tmp_path):
+        context = {"containerfile": {"file": "Containerfile", "argFile": "nonexistent.env"}}
+        with pytest.raises(FileNotFoundError):
+            _get_containerfile_extra_args(str(tmp_path), context)

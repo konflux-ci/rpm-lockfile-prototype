@@ -48,9 +48,19 @@ def logged_run(cmd, *args, **kwargs):
     return subprocess.run(cmd, *args, **kwargs)  # noqa: PLW1510 - check passed via kwargs
 
 
-def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=None):
+def extract_image(
+    containerfile,
+    stage_num=None,
+    stage_name=None,
+    image_pattern=None,
+    extra_args=None,
+):
     """Find matching image mentioned in the containerfile.
     If no filters are specified, then the last image is returned.
+
+    extra_args is an optional dict of build-arg values that override any
+    defaults declared in the Containerfile's ARG instructions, equivalent
+    to passing --build-arg or --build-arg-file to podman/docker build.
     """
     logger.debug("Looking for base image in %s", containerfile)
     baseimg = ""
@@ -140,9 +150,10 @@ def extract_image(containerfile, stage_num=None, stage_name=None, image_pattern=
                 in_stage = True
                 raw_img = from_match.group("img")
 
-                # Expand variables using both global and stage args
-                # Stage args override global args
-                all_args = {**global_args, **stage_args}
+                # Expand variables: global args < stage args < extra_args
+                # extra_args (from an argfile) take highest precedence,
+                # matching podman/docker --build-arg-file behaviour.
+                all_args = {**global_args, **stage_args, **(extra_args or {})}
                 expanded_img = expand_vars(raw_img, all_args)
 
                 # Resolve to external base image
@@ -299,11 +310,16 @@ def _get_containerfile_labels(containerfile, config_dir):
             "stage_name": containerfile.get("stageName"),
             "image_pattern": containerfile.get("imagePattern"),
         }
+        arg_file = containerfile.get("argFile")
+        extra_args = load_variables_file(arg_file, config_dir) if arg_file else None
     else:
         fp = containerfile
         filters = {}
+        extra_args = None
 
-    return _get_image_labels(extract_image(os.path.join(config_dir, fp), **filters))
+    return _get_image_labels(
+        extract_image(os.path.join(config_dir, fp), **filters, extra_args=extra_args)
+    )
 
 
 def split_image(image_spec):
@@ -442,6 +458,7 @@ CONTAINERFILE_SCHEMA = {
                 "stageNum": {"type": "number"},
                 "stageName": {"type": "string"},
                 "imagePattern": {"type": "string"},
+                "argFile": {"type": "string"},
             },
             "additionalProperties": False,
             "required": ["file"],
