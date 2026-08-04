@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.28.0] - 2026-08-04
+
+### Added
+
+- New `argFile` option for resolving ARG-based base images in Containerfiles.
+  When Containerfile `FROM` instructions use build arguments (e.g.,
+  `FROM $BASE_IMAGE`), an `argFile` can be provided to supply the argument
+  values needed to resolve the base image.
+
+- The cache directory now respects `XDG_CACHE_HOME`, following the XDG Base
+  Directory Specification. This allows overriding the cache location via the
+  environment variable.
+
 ## [0.27.0] - 2026-07-22
 
 ### Added
