@@ -74,7 +74,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         run_values = ["dnf install -y gcc-${GCC_VERSION} gcc-c++-${GCC_VERSION}"]
         result = analyze_run_commands(run_values, env_vars={"GCC_VERSION": "12"})
         self.assertEqual(result.packages, ["gcc-12", "gcc-c++-12"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_kernel_devel_conditional_with_version(self):
         run_values = [
@@ -87,7 +86,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         self.assertEqual(
             result.packages, ["kernel-devel-5.14.0", "kernel-headers-5.14.0"]
         )
-        self.assertEqual(result.arch_packages, {})
 
     def test_kernel_devel_conditional_without_version(self):
         run_values = [
@@ -98,29 +96,27 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values, env_vars={})
         self.assertEqual(result.packages, ["kernel-devel", "kernel-headers"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_unresolved_var_skipped(self):
         run_values = ["dnf install -y gcc-${UNKNOWN} make"]
         result = analyze_run_commands(run_values, env_vars={})
         self.assertEqual(result.packages, ["make"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_no_env_vars_backward_compatible(self):
         run_values = ['INSTALL_PKGS="wget tar" && dnf install -y ${INSTALL_PKGS} git']
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["git", "tar", "wget"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_arch_conditional_x86_64(self):
         run_values = [
             "dnf install -y make && if [ $(arch) = x86_64 ]; then dnf -y install kernel-rt-devel kernel-rt-modules; fi"
         ]
-        result = analyze_run_commands(run_values)
-        self.assertEqual(result.packages, ["make"])
+        result = analyze_run_commands(run_values, arch="x86_64")
         self.assertEqual(
-            result.arch_packages, {"x86_64": ["kernel-rt-devel", "kernel-rt-modules"]}
+            result.packages, ["kernel-rt-devel", "kernel-rt-modules", "make"]
         )
+        result = analyze_run_commands(run_values, arch="aarch64")
+        self.assertEqual(result.packages, ["make"])
 
     def test_reinstall_packages_parsed(self):
         run_values = ["dnf -y reinstall tzdata && dnf clean all"]
@@ -149,7 +145,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["gcc", "gcc-c++"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_if_not_yum_install(self):
         run_values = [
@@ -157,7 +152,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         ]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["prometheus-promu"])
-        self.assertEqual(result.arch_packages, {})
 
     def test_subshell_arch_conditional_var(self):
         run_values = [
@@ -166,16 +160,15 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 "yum -y install pciutils hwdata kmod $ARCH_DEP_PKGS"
             )
         ]
-        result = analyze_run_commands(
-            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
-        )
-        self.assertNotIn("mstflint", result.packages)
+        result = analyze_run_commands(run_values, arch="x86_64")
+        self.assertIn("mstflint", result.packages)
         self.assertIn("pciutils", result.packages)
         self.assertIn("hwdata", result.packages)
         self.assertIn("kmod", result.packages)
-        for a in ("x86_64", "aarch64", "ppc64le"):
-            self.assertIn("mstflint", result.arch_packages.get(a, []))
-        self.assertNotIn("s390x", result.arch_packages)
+
+        result = analyze_run_commands(run_values, arch="s390x")
+        self.assertNotIn("mstflint", result.packages)
+        self.assertIn("pciutils", result.packages)
 
     def test_subshell_arch_conditional_var_eq(self):
         run_values = [
@@ -184,19 +177,19 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 "yum -y install base-pkg $SPECIAL"
             )
         ]
-        result = analyze_run_commands(
-            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
-        )
+        result = analyze_run_commands(run_values, arch="x86_64")
+        self.assertIn("intel-pkg", result.packages)
+        self.assertIn("base-pkg", result.packages)
+
+        result = analyze_run_commands(run_values, arch="s390x")
         self.assertNotIn("intel-pkg", result.packages)
         self.assertIn("base-pkg", result.packages)
-        self.assertEqual(result.arch_packages, {"x86_64": ["intel-pkg"]})
 
     def test_subshell_no_arch_condition(self):
         run_values = ["EXTRA=$(echo extra-pkg) && yum -y install base-pkg $EXTRA"]
         result = analyze_run_commands(run_values)
         self.assertIn("extra-pkg", result.packages)
         self.assertIn("base-pkg", result.packages)
-        self.assertEqual(result.arch_packages, {})
 
     def test_subshell_arch_conditional_var_go_arch(self):
         run_values = [
@@ -205,12 +198,13 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 "yum -y install common-pkg $SPECIAL"
             )
         ]
-        result = analyze_run_commands(
-            run_values, arches=["x86_64", "s390x", "ppc64le", "aarch64"]
-        )
+        result = analyze_run_commands(run_values, arch="x86_64")
+        self.assertIn("x86-only", result.packages)
+        self.assertIn("common-pkg", result.packages)
+
+        result = analyze_run_commands(run_values, arch="s390x")
         self.assertNotIn("x86-only", result.packages)
         self.assertIn("common-pkg", result.packages)
-        self.assertEqual(result.arch_packages, {"x86_64": ["x86-only"]})
 
     def test_arch_conditional_multiple_arches(self):
         run_values = [
@@ -219,12 +213,11 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 "if [ $(arch) = aarch64 ]; then dnf -y install kernel-64k-devel; fi"
             )
         ]
-        result = analyze_run_commands(run_values)
-        self.assertEqual(result.packages, [])
-        self.assertEqual(
-            result.arch_packages,
-            {"aarch64": ["kernel-64k-devel"], "x86_64": ["kernel-rt-devel"]},
-        )
+        result = analyze_run_commands(run_values, arch="x86_64")
+        self.assertEqual(result.packages, ["kernel-rt-devel"])
+
+        result = analyze_run_commands(run_values, arch="aarch64")
+        self.assertEqual(result.packages, ["kernel-64k-devel"])
 
     def test_hosttype_arch_conditional(self):
         run_values = [
@@ -234,11 +227,13 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 "yum install -y $PACKAGES"
             )
         ]
-        result = analyze_run_commands(run_values)
+        result = analyze_run_commands(run_values, arch="x86_64")
         self.assertIn("git", result.packages)
         self.assertIn("gzip", result.packages)
+        self.assertIn("realtime-tests", result.packages)
+
+        result = analyze_run_commands(run_values, arch="aarch64")
         self.assertNotIn("realtime-tests", result.packages)
-        self.assertEqual(result.arch_packages.get("x86_64"), ["realtime-tests"])
 
     def test_glob_package_pattern_with_resolved_var(self):
         """
@@ -248,7 +243,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         run_values = ['dnf install -y "golang-*$VERSION*"']
         result = analyze_run_commands(run_values, env_vars={"VERSION": "1.26"})
         self.assertIn("golang-*1.26*", result.packages)
-        self.assertEqual(result.arch_packages, {})
 
     def test_glob_package_pattern_without_var(self):
         """
@@ -257,7 +251,6 @@ class TestAnalyzeRunCommands(unittest.TestCase):
         run_values = ["dnf install -y python3*"]
         result = analyze_run_commands(run_values)
         self.assertIn("python3*", result.packages)
-        self.assertEqual(result.arch_packages, {})
 
     def test_double_bracket_conditional_with_quoted_var_install(self):
         run_values = [
@@ -270,13 +263,13 @@ class TestAnalyzeRunCommands(unittest.TestCase):
                 'dnf install -y "$GRUB_PKG" "$SHIM_PKG"'
             )
         ]
-        result = analyze_run_commands(run_values)
-        self.assertEqual(result.packages, [])
+        result = analyze_run_commands(run_values, arch="x86_64")
         self.assertEqual(
-            result.arch_packages.get("x86_64"), ["grub2-efi-x64", "shim-x64"]
+            result.packages, ["grub2-efi-x64", "shim-x64"]
         )
+        result = analyze_run_commands(run_values, arch="aarch64")
         self.assertEqual(
-            result.arch_packages.get("aarch64"), ["grub2-efi-aa64", "shim-aa64"]
+            result.packages, ["grub2-efi-aa64", "shim-aa64"]
         )
 
     def test_version_constraints_stripped(self):
@@ -353,65 +346,97 @@ class TestListArchConditional(unittest.TestCase):
     patterns in list nodes.
     """
 
-    def test_neq_or_extracts_arch_packages(self):
+    def test_neq_or_installs_on_matching_arch(self):
         """
         ``[ $(arch) != x86_64 ] || dnf install -y pkg`` installs only on x86_64.
         """
         result = analyze_run_commands(
-            ["[ $(arch) != x86_64 ] || dnf install -y special-pkg"]
+            ["[ $(arch) != x86_64 ] || dnf install -y special-pkg"],
+            arch="x86_64",
+        )
+        self.assertIn("special-pkg", result.packages)
+
+        result = analyze_run_commands(
+            ["[ $(arch) != x86_64 ] || dnf install -y special-pkg"],
+            arch="aarch64",
         )
         self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"x86_64": ["special-pkg"]})
 
-    def test_eq_and_extracts_arch_packages(self):
+    def test_eq_and_installs_on_matching_arch(self):
         """
         ``[ $(arch) = x86_64 ] && dnf install -y pkg`` installs only on x86_64.
         """
         result = analyze_run_commands(
-            ["[ $(arch) = x86_64 ] && dnf install -y special-pkg"]
+            ["[ $(arch) = x86_64 ] && dnf install -y special-pkg"],
+            arch="x86_64",
+        )
+        self.assertIn("special-pkg", result.packages)
+
+        result = analyze_run_commands(
+            ["[ $(arch) = x86_64 ] && dnf install -y special-pkg"],
+            arch="aarch64",
         )
         self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"x86_64": ["special-pkg"]})
 
     def test_double_bracket_neq_or(self):
         """
         ``[[ $(arch) != aarch64 ]] || yum install -y arm-pkg`` with [[ ]] preprocessing.
         """
         result = analyze_run_commands(
-            ["[[ $(arch) != aarch64 ]] || yum install -y arm-pkg"]
+            ["[[ $(arch) != aarch64 ]] || yum install -y arm-pkg"],
+            arch="aarch64",
+        )
+        self.assertIn("arm-pkg", result.packages)
+
+    def test_eq_or_installs_on_non_matching_arch(self):
+        """
+        ``[ $(arch) = x86_64 ] || dnf install -y pkg`` means "all except x86_64".
+        """
+        result = analyze_run_commands(
+            ["[ $(arch) = x86_64 ] || dnf install -y pkg"],
+            arch="aarch64",
+        )
+        self.assertIn("pkg", result.packages)
+
+        result = analyze_run_commands(
+            ["[ $(arch) = x86_64 ] || dnf install -y pkg"],
+            arch="x86_64",
         )
         self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"aarch64": ["arm-pkg"]})
 
-    def test_eq_or_treated_as_unconditional(self):
+    def test_neq_and_installs_on_non_matching_arch(self):
         """
-        ``[ $(arch) = x86_64 ] || dnf install -y pkg`` means "all except x86_64"
-        which needs the full arch set — treated as unconditional.
+        ``[ $(arch) != x86_64 ] && dnf install -y pkg`` means "all except x86_64".
         """
-        result = analyze_run_commands(["[ $(arch) = x86_64 ] || dnf install -y pkg"])
+        result = analyze_run_commands(
+            ["[ $(arch) != x86_64 ] && dnf install -y pkg"],
+            arch="aarch64",
+        )
         self.assertIn("pkg", result.packages)
-        self.assertEqual(result.arch_packages, {})
 
-    def test_neq_and_treated_as_unconditional(self):
-        """
-        ``[ $(arch) != x86_64 ] && dnf install -y pkg`` means "all except x86_64"
-        — treated as unconditional.
-        """
-        result = analyze_run_commands(["[ $(arch) != x86_64 ] && dnf install -y pkg"])
-        self.assertIn("pkg", result.packages)
-        self.assertEqual(result.arch_packages, {})
+        result = analyze_run_commands(
+            ["[ $(arch) != x86_64 ] && dnf install -y pkg"],
+            arch="x86_64",
+        )
+        self.assertEqual(result.packages, [])
 
     def test_arch_context_only_applies_to_next_command(self):
         """
         In ``[ test ] || cmd1 && cmd2``, only cmd1 gets the arch context.
         """
         result = analyze_run_commands(
-            [
-                "[ $(arch) != x86_64 ] || dnf install -y special-pkg && dnf install -y common-pkg"
-            ]
+            ["[ $(arch) != x86_64 ] || dnf install -y special-pkg && dnf install -y common-pkg"],
+            arch="x86_64",
         )
         self.assertIn("common-pkg", result.packages)
-        self.assertEqual(result.arch_packages, {"x86_64": ["special-pkg"]})
+        self.assertIn("special-pkg", result.packages)
+
+        result = analyze_run_commands(
+            ["[ $(arch) != x86_64 ] || dnf install -y special-pkg && dnf install -y common-pkg"],
+            arch="aarch64",
+        )
+        self.assertIn("common-pkg", result.packages)
+        self.assertNotIn("special-pkg", result.packages)
 
     def test_regular_or_fallback_unchanged(self):
         """
@@ -422,17 +447,16 @@ class TestListArchConditional(unittest.TestCase):
         )
         self.assertIn("preferred-pkg", result.packages)
         self.assertIn("fallback-pkg", result.packages)
-        self.assertEqual(result.arch_packages, {})
 
     def test_uname_m_neq_or(self):
         """
         ``[ $(uname -m) != s390x ] || dnf install -y s390x-pkg``
         """
         result = analyze_run_commands(
-            ["[ $(uname -m) != s390x ] || dnf install -y s390x-pkg"]
+            ["[ $(uname -m) != s390x ] || dnf install -y s390x-pkg"],
+            arch="s390x",
         )
-        self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"s390x": ["s390x-pkg"]})
+        self.assertIn("s390x-pkg", result.packages)
 
     def test_go_env_goarch_neq_or(self):
         """
@@ -440,26 +464,21 @@ class TestListArchConditional(unittest.TestCase):
         Go arch name ``amd64`` is normalized to RPM name ``x86_64``.
         """
         result = analyze_run_commands(
-            ['[ $(go env GOARCH) != "amd64" ] || yum install -y special-pkg']
+            ['[ $(go env GOARCH) != "amd64" ] || yum install -y special-pkg'],
+            arch="x86_64",
         )
-        self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"x86_64": ["special-pkg"]})
+        self.assertIn("special-pkg", result.packages)
 
     def test_go_env_goarch_neq_or_subshell(self):
         """
         ``[ $(go env GOARCH) != "amd64" ] || (yum install -y pkg1 pkg2 && other)``
-        — subshell grouping after ``||`` should still extract arch packages.
         Go arch name ``amd64`` is normalized to RPM name ``x86_64``.
         """
         result = analyze_run_commands(
-            [
-                '[ $(go env GOARCH) != "amd64" ] || (yum install -y llvm-toolset cmake3 gcc-c++ && tar zfx cross.tar.gz)'
-            ]
+            ['[ $(go env GOARCH) != "amd64" ] || (yum install -y llvm-toolset cmake3 gcc-c++ && tar zfx cross.tar.gz)'],
+            arch="x86_64",
         )
-        self.assertEqual(result.packages, [])
-        self.assertEqual(
-            result.arch_packages, {"x86_64": ["cmake3", "gcc-c++", "llvm-toolset"]}
-        )
+        self.assertEqual(result.packages, ["cmake3", "gcc-c++", "llvm-toolset"])
 
     def test_goarch_var_neq_or(self):
         """
@@ -467,10 +486,10 @@ class TestListArchConditional(unittest.TestCase):
         Go arch name ``arm64`` is normalized to RPM name ``aarch64``.
         """
         result = analyze_run_commands(
-            ['[ $GOARCH != "arm64" ] || dnf install -y arm-only-pkg']
+            ['[ $GOARCH != "arm64" ] || dnf install -y arm-only-pkg'],
+            arch="aarch64",
         )
-        self.assertEqual(result.packages, [])
-        self.assertEqual(result.arch_packages, {"aarch64": ["arm-only-pkg"]})
+        self.assertIn("arm-only-pkg", result.packages)
 
 
 class TestBuilddepParsing(unittest.TestCase):
@@ -488,7 +507,6 @@ class TestBuilddepParsing(unittest.TestCase):
         run_values = ["dnf install -y gcc make && dnf builddep -y pkcs11-helper*"]
         result = analyze_run_commands(run_values)
         self.assertEqual(result.packages, ["gcc", "make"])
-        self.assertEqual(result.arch_packages, {})
         self.assertEqual(result.builddep_packages, ["pkcs11-helper*"])
 
     def test_build_dep_hyphenated(self):

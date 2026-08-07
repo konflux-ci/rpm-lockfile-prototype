@@ -4,8 +4,9 @@ Shell command parsing for RPM package extraction.
 Provides bashlex-based AST walking to extract package names from
 yum/dnf install, update, and reinstall commands in RUN bodies and
 shell scripts.
-Handles variable assignments, arch-conditional blocks, subshell
-expansions, and bash-to-POSIX preprocessing.
+Handles variable assignments, subshell expansions, and bash-to-POSIX
+preprocessing. Architecture-conditional blocks are evaluated against
+a single target architecture passed as a parameter.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from rpm_lockfile.vendor import bashlex
 
@@ -61,7 +63,6 @@ class RunCommandResult:
     """
 
     packages: list[str] = field(default_factory=list)
-    arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     has_update: bool = False
     reinstall_targets: list[str] = field(default_factory=list)
@@ -76,11 +77,9 @@ class _WalkContext:
     """
 
     variables: dict[str, str] = field(default_factory=dict)
-    known_arches: frozenset[str] = field(default_factory=frozenset)
+    arch: str | None = None
     shell_vars: dict[str, str] = field(default_factory=dict)
-    arch_shell_vars: dict[str, dict[str, str]] = field(default_factory=dict)
     packages: set[str] = field(default_factory=set)
-    arch_packages: dict[str, set[str]] = field(default_factory=dict)
     update_targets: set[str] = field(default_factory=set)
     has_update: bool = False
     reinstall_targets: set[str] = field(default_factory=set)
@@ -124,12 +123,6 @@ def _has_arch_test(text: str) -> bool:
     return any(kw in text for kw in ARCH_KEYWORDS)
 
 
-def _extract_arch_values(text: str) -> list[str]:
-    """
-    Extract architecture names from conditional expressions.
-    """
-    return ARCH_VALUE_RE.findall(text)
-
 
 def _preprocess_for_bashlex(text: str) -> str:
     """
@@ -163,35 +156,55 @@ def _normalize_arch_names(arches: list[str]) -> list[str]:
     return [_GO_TO_RPM_ARCH.get(a, a) for a in arches]
 
 
-def _extract_condition_arch(node) -> list[str]:
+class _ConditionArches(NamedTuple):
+    """Arches extracted from an if/elif condition.
+
+    ``eq`` lists arches matched with ``=`` / ``==`` (the body runs on
+    these arches).  ``neq`` lists arches matched with ``!=`` (the body
+    runs on every arch *except* these).
+    """
+
+    eq: list[str]
+    neq: list[str]
+
+
+def _extract_condition_arch(node) -> _ConditionArches:
     """
     Extract architecture names from an if/elif condition node.
 
     Looks for patterns like ``[ $(arch) = x86_64 ]`` or
     ``[ $ARCH = aarch64 ]`` in the condition's command parts.
     Handles ``||`` conditions by collecting arches from all branches.
+
+    Also detects ``!=`` (not-equal) patterns and returns them separately
+    so the caller can compute the complement against the known arch set.
     """
     if not hasattr(node, "parts"):
-        return []
-    arches: list[str] = []
+        return _ConditionArches([], [])
+    eq_arches: list[str] = []
+    neq_arches: list[str] = []
     for part in node.parts:
         if hasattr(part, "parts"):
             words = [p.word for p in part.parts if hasattr(p, "word")]
             text = " ".join(words)
             if _has_arch_test(text):
-                arches.extend(_normalize_arch_names(_extract_arch_values(text)))
-    return arches
+                eq_arches.extend(
+                    _normalize_arch_names(ARCH_VALUE_RE.findall(text))
+                )
+                neq_arches.extend(
+                    _normalize_arch_names(ARCH_NEQ_VALUE_RE.findall(text))
+                )
+    return _ConditionArches(eq_arches, neq_arches)
 
 
-def _extract_list_arch_context(test_node, operator: str) -> list[str] | None:
+def _eval_list_arch_test(test_node, operator: str, current_arch: str | None) -> bool | None:
     """
-    Compute effective arch context from a ``[ test ] || cmd`` or
-    ``[ test ] && cmd`` pattern.
+    Evaluate whether a ``[ test ] || cmd`` or ``[ test ] && cmd``
+    pattern means the command should run on the current architecture.
 
-    Handles:
-        ``[ $(arch) != X ] || cmd`` -> [X] (double negation = only on X)
-        ``[ $(arch) = X ] && cmd``  -> [X] (direct match = only on X)
-        Other combos need full arch set -> returns None (unconditional).
+    Return Value(s):
+        True if the command should run, False if it should be skipped,
+        None if the test is not an architecture test (treat as unconditional).
     """
     if not hasattr(test_node, "parts"):
         return None
@@ -202,25 +215,35 @@ def _extract_list_arch_context(test_node, operator: str) -> list[str] | None:
     if not _has_arch_test(text):
         return None
 
-    neq_arches = ARCH_NEQ_VALUE_RE.findall(text)
-    eq_arches = ARCH_VALUE_RE.findall(text)
+    if current_arch is None:
+        return None
 
-    if neq_arches and operator == "||":
-        return _normalize_arch_names(neq_arches)
-    if eq_arches and operator == "&&":
-        return _normalize_arch_names(eq_arches)
+    neq_arches = _normalize_arch_names(ARCH_NEQ_VALUE_RE.findall(text))
+    eq_arches = _normalize_arch_names(ARCH_VALUE_RE.findall(text))
 
-    logger = logging.getLogger(__name__)
-    logger.debug(
-        f"Unsupported arch-conditional pattern (needs full arch set): {text} {operator} cmd"
-    )
+    if operator == "||":
+        # [ test ] || cmd  — cmd runs when test fails
+        # [ $(arch) != X ] || cmd  — test fails when arch IS X → run on X
+        # [ $(arch) = X ] || cmd   — test fails when arch is NOT X → run on all except X
+        if neq_arches:
+            return current_arch in neq_arches
+        if eq_arches:
+            return current_arch not in eq_arches
+    elif operator == "&&":
+        # [ test ] && cmd  — cmd runs when test succeeds
+        # [ $(arch) = X ] && cmd   — test succeeds when arch IS X → run on X
+        # [ $(arch) != X ] && cmd  — test succeeds when arch is NOT X → run on all except X
+        if eq_arches:
+            return current_arch in eq_arches
+        if neq_arches:
+            return current_arch not in neq_arches
+
     return None
 
 
 def _walk_list_node(
     node,
     ctx: _WalkContext,
-    arch_context: list[str] | None = None,
     in_conditional: bool = False,
 ):
     """
@@ -241,34 +264,34 @@ def _walk_list_node(
         op_node = parts[i + 1]
         if not hasattr(op_node, "op") or op_node.op not in ("||", "&&"):
             continue
-        arch_ctx = _extract_list_arch_context(part, op_node.op)
-        if arch_ctx is None:
+        should_run = _eval_list_arch_test(part, op_node.op, ctx.arch)
+        if should_run is None:
             continue
         consumed.add(i)
         consumed.add(i + 1)
         consumed.add(i + 2)
-        _walk_nodes([parts[i + 2]], ctx, arch_ctx, in_conditional=False)
+        if should_run:
+            _walk_nodes([parts[i + 2]], ctx, in_conditional=False)
 
     remaining = [p for idx, p in enumerate(parts) if idx not in consumed]
     if remaining:
-        _walk_nodes(remaining, ctx, arch_context, in_conditional)
+        _walk_nodes(remaining, ctx, in_conditional)
 
 
 def _walk_nodes(
     nodes: list,
     ctx: _WalkContext,
-    arch_context: list[str] | None = None,
     in_conditional: bool = False,
 ):
     """
-    Recursively walk bashlex AST nodes, extracting package names,
-    variable assignments, and arch-conditional context.
+    Recursively walk bashlex AST nodes, extracting package names
+    and variable assignments.
     """
     for node in nodes:
         kind = node.kind
 
         if kind == "list":
-            _walk_list_node(node, ctx, arch_context, in_conditional)
+            _walk_list_node(node, ctx, in_conditional)
 
         elif kind == "compound":
             for child in node.list:
@@ -280,7 +303,7 @@ def _walk_nodes(
                         for p in child.parts
                         if hasattr(p, "kind") and p.kind in ("list", "command")
                     ]
-                    _walk_nodes(body_nodes, ctx, arch_context, in_conditional)
+                    _walk_nodes(body_nodes, ctx, in_conditional)
                 elif child.kind == "function":
                     body_nodes = [
                         p
@@ -288,19 +311,19 @@ def _walk_nodes(
                         if hasattr(p, "kind") and p.kind == "compound"
                     ]
                     for body in body_nodes:
-                        _walk_nodes([body], ctx, arch_context, in_conditional)
+                        _walk_nodes([body], ctx, in_conditional)
                 else:
-                    _walk_nodes([child], ctx, arch_context, in_conditional)
+                    _walk_nodes([child], ctx, in_conditional)
 
         elif kind == "command":
-            _process_command_node(node, ctx, arch_context, in_conditional)
+            _process_command_node(node, ctx, in_conditional)
 
         elif kind == "pipeline":
             cmd_nodes = [
                 p for p in node.parts if hasattr(p, "kind") and p.kind == "command"
             ]
             for cmd_node in cmd_nodes:
-                _process_command_node(cmd_node, ctx, arch_context, in_conditional)
+                _process_command_node(cmd_node, ctx, in_conditional)
 
         elif kind == "if":
             _walk_if_node(node, ctx)
@@ -310,16 +333,22 @@ def _walk_nodes(
                 p for p in node.parts if hasattr(p, "kind") and p.kind == "compound"
             ]
             for body in body_nodes:
-                _walk_nodes([body], ctx, arch_context, in_conditional)
+                _walk_nodes([body], ctx, in_conditional)
 
 
 def _walk_if_node(node, ctx: _WalkContext):
     """
-    Walk an IfNode, detecting arch conditionals in if/elif branches.
+    Walk an IfNode, evaluating arch conditionals against the current
+    architecture. Non-arch conditionals are walked unconditionally
+    (both branches) since we can't evaluate them statically.
     Also walks condition nodes for commands (e.g. ``if ! yum install``).
     """
     parts = list(node.parts)
     i = 0
+    # Track whether any if/elif branch matched the current arch.
+    # If so, the else branch should be skipped. None means no arch
+    # condition was seen (non-arch if).
+    arch_branch_matched: bool | None = None
     while i < len(parts):
         part = parts[i]
         if not hasattr(part, "word"):
@@ -336,19 +365,43 @@ def _walk_if_node(node, ctx: _WalkContext):
                         body = parts[j + 1]
                     break
 
-            arch_ctx = None
-            if condition:
-                arch_ctx = _extract_condition_arch(condition) or None
-                _walk_nodes(
-                    [condition], ctx, arch_ctx, in_conditional=not bool(arch_ctx)
-                )
-
-            if body:
-                _walk_nodes([body], ctx, arch_ctx, in_conditional=not bool(arch_ctx))
+            cond = _extract_condition_arch(condition) if condition else _ConditionArches([], [])
+            if cond.eq or cond.neq:
+                # This is an arch-conditional branch.
+                if cond.eq:
+                    matches = ctx.arch in _normalize_arch_names(cond.eq) if ctx.arch else False
+                else:
+                    # != condition: matches everything except the listed arches
+                    matches = ctx.arch not in _normalize_arch_names(cond.neq) if ctx.arch else False
+                if arch_branch_matched is None:
+                    arch_branch_matched = False
+                if matches:
+                    arch_branch_matched = True
+                    if condition:
+                        _walk_nodes([condition], ctx, in_conditional=False)
+                    if body:
+                        _walk_nodes([body], ctx, in_conditional=False)
+                # else: skip this branch entirely
+            else:
+                # Not an arch condition — walk both condition and body
+                # as we can't evaluate statically.
+                if condition:
+                    _walk_nodes([condition], ctx, in_conditional=True)
+                if body:
+                    _walk_nodes([body], ctx, in_conditional=True)
 
         elif word == "else":
             if i + 1 < len(parts) and hasattr(parts[i + 1], "kind"):
-                _walk_nodes([parts[i + 1]], ctx, None, in_conditional=True)
+                if arch_branch_matched is True:
+                    # An arch branch matched; skip the else.
+                    pass
+                elif arch_branch_matched is False:
+                    # Arch conditions were present but none matched;
+                    # the else branch applies to this arch.
+                    _walk_nodes([parts[i + 1]], ctx, in_conditional=False)
+                else:
+                    # No arch conditions at all — walk else as conditional.
+                    _walk_nodes([parts[i + 1]], ctx, in_conditional=True)
 
         i += 1
 
@@ -356,7 +409,6 @@ def _walk_if_node(node, ctx: _WalkContext):
 def _process_assignments(
     assignments: list,
     ctx: _WalkContext,
-    arch_context: list[str] | None,
     in_conditional: bool,
 ):
     """
@@ -374,27 +426,11 @@ def _process_assignments(
         )
 
         if has_cmdsub:
-            extracted = _extract_subshell_packages(var_value)
+            extracted = _extract_subshell_packages(var_value, ctx.arch)
             if extracted:
-                target_arches = _extract_subshell_arch_condition(
-                    var_value, ctx.known_arches
-                )
-                if target_arches:
-                    per_arch = ctx.arch_shell_vars.setdefault(var_name, {})
-                    for arch in target_arches:
-                        if arch in per_arch:
-                            per_arch[arch] = f"{per_arch[arch]} {extracted}"
-                        else:
-                            per_arch[arch] = extracted
-                else:
-                    ctx.shell_vars[var_name] = extracted
-        elif arch_context:
-            per_arch = ctx.arch_shell_vars.setdefault(var_name, {})
-            for arch in arch_context:
-                if arch in per_arch:
-                    per_arch[arch] = f"{per_arch[arch]} {var_value}"
-                else:
-                    per_arch[arch] = var_value
+                ctx.shell_vars[var_name] = extracted
+            else:
+                ctx.shell_vars[var_name] = ""
         else:
             all_vars = {**ctx.variables, **ctx.shell_vars}
             resolved = resolve_bash_expansion(var_value, all_vars)
@@ -440,65 +476,14 @@ def _detect_pkg_action(
     return None, -1
 
 
-def _resolve_arch_specific_tokens(
-    pkg_words: list[str],
-    raw_args: str,
-    all_vars: dict[str, str],
-    ctx: _WalkContext,
-) -> set[str]:
-    """
-    Resolve arch-specific variable expansions and add per-arch packages.
-
-    Return Value(s):
-        set[str]: Tokens already classified as arch-specific (to exclude
-            from the common package list).
-    """
-    arch_resolved: set[str] = set()
-    if not ctx.arch_shell_vars:
-        return arch_resolved
-
-    used_arch_vars: dict[str, dict[str, str]] = {}
-    for var_name, per_arch in ctx.arch_shell_vars.items():
-        if f"${var_name}" in raw_args or f"${{{var_name}}}" in raw_args:
-            used_arch_vars[var_name] = per_arch
-
-    if not used_arch_vars:
-        return arch_resolved
-
-    no_arch_vars = dict.fromkeys(used_arch_vars, "")
-    common_resolved_tokens = set()
-    for pw in pkg_words:
-        r = resolve_bash_expansion(pw, {**all_vars, **no_arch_vars})
-        common_resolved_tokens.update(r.split())
-
-    all_arches: set[str] = set()
-    for per_arch in used_arch_vars.values():
-        all_arches.update(per_arch.keys())
-    for arch in all_arches:
-        arch_var_vals = {vn: pa.get(arch, "") for vn, pa in used_arch_vars.items()}
-        for pw in pkg_words:
-            r = resolve_bash_expansion(pw, {**all_vars, **arch_var_vals})
-            for token in r.split():
-                if (
-                    _is_valid_package_token(token)
-                    and token not in common_resolved_tokens
-                ):
-                    ctx.arch_packages.setdefault(arch, set()).add(token)
-                    arch_resolved.add(token)
-
-    return arch_resolved
-
-
 def _classify_package_tokens(
     resolved_tokens: list[str],
-    arch_resolved_tokens: set[str],
     action: str,
     ctx: _WalkContext,
-    arch_context: list[str] | None,
 ):
     """
-    Classify resolved tokens into packages, update targets, or
-    arch-specific packages.
+    Classify resolved tokens into packages, update targets, reinstall
+    targets, builddep packages, or module specs.
     """
     skip_next = False
     for token in resolved_tokens:
@@ -522,16 +507,11 @@ def _classify_package_tokens(
 
         if not _is_valid_package_token(token):
             continue
-        if token in arch_resolved_tokens:
-            continue
 
         if action == "update":
             ctx.update_targets.add(token)
         elif action == "reinstall":
             ctx.reinstall_targets.add(token)
-        elif arch_context:
-            for arch in arch_context:
-                ctx.arch_packages.setdefault(arch, set()).add(token)
         else:
             ctx.packages.add(token)
 
@@ -539,7 +519,6 @@ def _classify_package_tokens(
 def _process_command_node(
     node,
     ctx: _WalkContext,
-    arch_context: list[str] | None = None,
     in_conditional: bool = False,
 ):
     """
@@ -554,7 +533,7 @@ def _process_command_node(
         elif part.kind == "word":
             words.append(part)
 
-    _process_assignments(assignments, ctx, arch_context, in_conditional)
+    _process_assignments(assignments, ctx, in_conditional)
 
     if not words:
         return
@@ -572,82 +551,61 @@ def _process_command_node(
         return
 
     pkg_words = word_values[action_idx + 1 :]
-    combined_arch_vals = {
-        k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()
-    }
-    all_vars_with_arch = {
-        **all_vars,
-        **{
-            k: resolve_bash_expansion(v, all_vars)
-            for k, v in combined_arch_vals.items()
-        },
-    }
 
     resolved_tokens: list[str] = []
-    raw_args = " ".join(pkg_words)
     for pw in pkg_words:
-        resolved = resolve_bash_expansion(pw, all_vars_with_arch)
+        resolved = resolve_bash_expansion(pw, all_vars)
         resolved_tokens.extend(resolved.split())
 
-    arch_resolved_tokens: set[str] = set()
-    if not arch_context:
-        arch_resolved_tokens = _resolve_arch_specific_tokens(
-            pkg_words, raw_args, all_vars, ctx
-        )
-
-    _classify_package_tokens(
-        resolved_tokens, arch_resolved_tokens, action, ctx, arch_context
-    )
+    _classify_package_tokens(resolved_tokens, action, ctx)
 
 
-def _extract_subshell_arch_condition(
-    subshell_body: str, known_arches: frozenset[str]
-) -> list[str] | None:
+def _eval_subshell_arch_condition(
+    subshell_body: str, current_arch: str | None
+) -> bool:
     """
-    Detect architecture conditions inside a subshell body and return
-    the list of arches where the subshell produces output.
+    Evaluate whether a subshell with an architecture condition produces
+    output for the current architecture.
 
     Arg(s):
         subshell_body (str): Text inside a $(...) subshell, e.g.
             'if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint; fi'
-        known_arches (frozenset[str]): Full set of architectures being
-            resolved, used for complement computation on != patterns.
+        current_arch (str | None): Architecture being resolved.
     Return Value(s):
-        list[str] | None: Target arches (RPM names), or None if no
-            arch condition detected or pattern is ambiguous.
+        bool: True if the subshell produces output for this arch.
     """
     if not _has_arch_test(subshell_body):
-        return None
+        return True
 
-    if not known_arches:
-        return None
+    if not current_arch:
+        return True
 
-    neq_arches = ARCH_NEQ_VALUE_RE.findall(subshell_body)
-    eq_arches = ARCH_VALUE_RE.findall(subshell_body)
+    neq_arches = _normalize_arch_names(ARCH_NEQ_VALUE_RE.findall(subshell_body))
+    eq_arches = _normalize_arch_names(ARCH_VALUE_RE.findall(subshell_body))
 
     if neq_arches and eq_arches:
-        return None
+        return True
 
     if neq_arches:
-        excluded = set(_normalize_arch_names(neq_arches))
-        target = sorted(known_arches - excluded)
-        return target if target else None
+        return current_arch not in neq_arches
 
     if eq_arches:
-        if len(eq_arches) > 1:
-            return None
-        return _normalize_arch_names(eq_arches)
+        return current_arch in eq_arches
 
-    return None
+    return True
 
 
-def _extract_subshell_packages(subshell_body: str) -> str:
+def _extract_subshell_packages(subshell_body: str, current_arch: str | None = None) -> str:
     """
-    Extract package names from echo commands inside a $(...) subshell.
+    Extract package names from echo commands inside a $(...) subshell,
+    evaluating any architecture condition against the current arch.
 
     Handles patterns like:
         $(if [ "$(uname -m)" != "s390x" ]; then echo -n mstflint; fi)
     """
+    if not _eval_subshell_arch_condition(subshell_body, current_arch):
+        return ""
+
     packages: list[str] = []
     for match in re.finditer(r"\becho\s+(?:-\w+\s+)*([\w\s-]+)", subshell_body):
         tokens = match.group(1).strip().split()
@@ -664,7 +622,7 @@ def _extract_subshell_packages(subshell_body: str) -> str:
 def _parse_and_walk(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
-    arches: list[str] | None = None,
+    arch: str | None = None,
 ) -> _WalkContext:
     """
     Single pass: preprocess, parse with bashlex, and walk all RUN bodies.
@@ -672,15 +630,15 @@ def _parse_and_walk(
     Arg(s):
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
-        arches (list[str] | None): Architectures being resolved, used for
-            complement computation in subshell arch conditions.
+        arch (str | None): Architecture being resolved, used for
+            evaluating arch-conditional blocks.
     Return Value(s):
         _WalkContext: Walk context with accumulated packages and state.
     """
     logger = logging.getLogger(__name__)
     ctx = _WalkContext(
         variables=dict(env_vars or {}),
-        known_arches=frozenset(arches) if arches else frozenset(),
+        arch=arch,
     )
 
     for run_body in run_values:
@@ -692,7 +650,6 @@ def _parse_and_walk(
             continue
 
         ctx.shell_vars = {}
-        ctx.arch_shell_vars = {}
         _walk_nodes(ast_nodes, ctx)
 
     return ctx
@@ -701,7 +658,7 @@ def _parse_and_walk(
 def analyze_run_commands(
     run_values: list[str],
     env_vars: dict[str, str] | None = None,
-    arches: list[str] | None = None,
+    arch: str | None = None,
 ) -> RunCommandResult:
     """
     Single-pass analysis of RUN command bodies.
@@ -709,18 +666,15 @@ def analyze_run_commands(
     Arg(s):
         run_values (list[str]): RUN command bodies.
         env_vars (dict[str, str] | None): Variables from ARG/ENV directives.
-        arches (list[str] | None): Architectures being resolved, used for
-            complement computation in subshell arch conditions.
+        arch (str | None): Architecture being resolved, used for
+            evaluating arch-conditional blocks.
     Return Value(s):
-        RunCommandResult: Sorted packages, arch-specific packages,
-            update targets, builddep patterns, and module specs.
+        RunCommandResult: Sorted packages, update targets, builddep
+            patterns, and module specs.
     """
-    ctx = _parse_and_walk(run_values, env_vars, arches)
+    ctx = _parse_and_walk(run_values, env_vars, arch)
     return RunCommandResult(
         packages=sorted(ctx.packages),
-        arch_packages={
-            arch: sorted(pkgs) for arch, pkgs in sorted(ctx.arch_packages.items())
-        },
         update_targets=sorted(ctx.update_targets),
         has_update=ctx.has_update,
         reinstall_targets=sorted(ctx.reinstall_targets),
