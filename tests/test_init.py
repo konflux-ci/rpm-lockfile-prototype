@@ -6,7 +6,13 @@ from xml.etree import ElementTree
 import pytest
 
 import rpm_lockfile
-from rpm_lockfile import _get_containerfile_extra_args, assumed_provides, schema
+from rpm_lockfile import (
+    _apply_excludes,
+    _get_containerfile_extra_args,
+    assumed_provides,
+    schema,
+    utils,
+)
 
 
 @pytest.mark.parametrize(
@@ -162,6 +168,76 @@ class TestContainerfileArgFileSchema:
         }
         with pytest.raises(SystemExit):
             schema.validate(config)
+
+
+class TestExcludePackages:
+    def test_schema_accepts_exclude_packages(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "excludePackages": ["centos-pkg", "okd-only-pkg"],
+        }
+        schema.validate(config)
+
+    def test_schema_rejects_invalid_type(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "excludePackages": "not-a-list",
+        }
+        with pytest.raises(SystemExit):
+            schema.validate(config)
+
+    def test_schema_rejects_empty_string_item(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "excludePackages": [""],
+        }
+        with pytest.raises(SystemExit):
+            schema.validate(config)
+
+    def test_schema_accepts_with_packages_from_containerfile(self):
+        config = {
+            "contentOrigin": {"repos": []},
+            "packagesFromContainerfile": "Containerfile",
+            "excludePackages": ["centos-release"],
+        }
+        schema.validate(config)
+
+    def test_apply_excludes_removes_from_install(self):
+        pkgs = {"bash", "tar", "okd-only-pkg"}
+        result = _apply_excludes(pkgs, {"okd-only-pkg"})
+        assert result == {"bash", "tar"}
+
+    def test_apply_excludes_removes_from_reinstall(self):
+        pkgs = {"bash", "centos-release-nfv-openvswitch"}
+        result = _apply_excludes(pkgs, {"centos-release-nfv-openvswitch"})
+        assert result == {"bash"}
+
+    def test_apply_excludes_removes_from_upgrade(self):
+        pkgs = {"bash", "okd-only-pkg", "tar"}
+        result = _apply_excludes(pkgs, {"okd-only-pkg"})
+        assert result == {"bash", "tar"}
+
+    def test_apply_excludes_empty_excludes_is_noop(self):
+        pkgs = {"bash", "tar"}
+        result = _apply_excludes(pkgs, set())
+        assert result == {"bash", "tar"}
+
+    def test_apply_excludes_nonexistent_entry_is_safe(self):
+        pkgs = {"bash", "tar"}
+        result = _apply_excludes(pkgs, {"not-installed"})
+        assert result == {"bash", "tar"}
+
+    def test_exclude_packages_variable_substitution(self):
+        variables = {"OKD_PKG": "centos-release-nfv-openvswitch"}
+        items = ["{OKD_PKG}", "another-pkg"]
+        result = utils.subst_vars_in_list(items, variables)
+        assert result == ["centos-release-nfv-openvswitch", "another-pkg"]
+
+    def test_exclude_packages_variable_substitution_no_match_unchanged(self):
+        variables = {"OTHER": "something"}
+        items = ["{OKD_PKG}"]
+        result = utils.subst_vars_in_list(items, variables)
+        assert result == ["{OKD_PKG}"]
 
 
 class TestGetContainerfileExtraArgs:
