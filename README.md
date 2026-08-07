@@ -200,12 +200,33 @@ packages:
       not:
       - s390x
 
+packagesFromContainerfile:
+  # Automatically extract package names from RUN dnf/yum/microdnf install
+  # commands in a Containerfile and add them to the install set. Can be a
+  # plain path (string) or an object for more control.
+  file: Containerfile
+  # Get packages from a specific stage by order (1-based), name, or image pattern.
+  stageNum: 1
+  stageName: builder
+  imagePattern: example.com
+  # Path to a KEY=VALUE file whose values override ARG defaults when resolving
+  # the base image. Same format as podman/docker --build-arg-file.
+  argFile: build-args.env
+
 reinstallPackages: []
   # List of rpms already provided in the base image, but which should be
   # reinstalled. Same specification as `packages` above.
 
 upgradePackages: []
   # List of rpms to update. Same specification as `packages` above.
+
+excludePackages:
+  # List of rpm names to remove from the install, reinstall, and upgrade sets
+  # before resolution. Useful when packagesFromContainerfile extracts packages
+  # that are guarded by OS checks (e.g. OKD/CentOS-only blocks) and are not
+  # available in the target repos. Only plain package names are supported.
+  - centos-release-nfv-openvswitch
+  - centos-release-openstack-zed
 
 assumeProvides:
   # List of package names or RPM capabilities that should be treated as
@@ -268,9 +289,10 @@ variables:
 ```
 
 The `{var}` placeholders are replaced everywhere: `packages`, `reinstallPackages`,
-`upgradePackages`, `moduleEnable`, `moduleDisable`, `assumeProvides`, `context.image`,
-and in `contentOrigin` URLs (where they merge with any per-source `varsFromImage` or
-`varsFromContainerfile` labels; the per-source values take precedence over globals).
+`upgradePackages`, `excludePackages`, `moduleEnable`, `moduleDisable`, `assumeProvides`,
+`context.image`, and in `contentOrigin` URLs (where they merge with any per-source
+`varsFromImage` or `varsFromContainerfile` labels; the per-source values take precedence
+over globals).
 
 The configuration file can specify a containerfile to extract a base image from
 either in the `context` section or in `varsFromContainerfile` inside
