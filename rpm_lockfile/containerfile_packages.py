@@ -25,6 +25,8 @@ from .shell_commands import (
     resolve_bash_expansion,
 )
 
+_ESCAPED_DOLLAR_SENTINEL = "\0"
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +79,45 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
+def _parse_env_assignments(value: str) -> list[tuple[str, str]]:
+    """
+    Parse an ENV instruction into name/value assignments.
+
+    Supports both the preferred ``ENV key=value [key=value ...]`` form
+    and the legacy ``ENV key value`` form. ``shlex`` preserves spaces in
+    quoted or escaped values while separating modern assignments.
+    """
+    # ``shlex`` removes the backslash from ``\$``. Protect escaped dollar
+    # signs so that later environment expansion can distinguish them from
+    # variable references.
+    protected_value = value.strip().replace(r"\$", _ESCAPED_DOLLAR_SENTINEL)
+    try:
+        tokens = shlex.split(protected_value)
+    except ValueError as exc:
+        logger.warning("Failed to parse ENV instruction %r: %s", value, exc)
+        return []
+
+    if not tokens:
+        return []
+
+    # The legacy form assigns the entire remainder of the instruction to
+    # the first key, even when that remainder resembles more assignments.
+    if "=" not in tokens[0]:
+        if len(tokens) < 2 or not re.fullmatch(r"\w+", tokens[0]):
+            logger.warning("Malformed ENV instruction %r: invalid variable name", value)
+            return []
+        return [(tokens[0], " ".join(tokens[1:]))]
+
+    assignments: list[tuple[str, str]] = []
+    for token in tokens:
+        var_name, separator, raw_value = token.partition("=")
+        if not separator or not re.fullmatch(r"\w+", var_name):
+            logger.warning("Malformed ENV instruction %r: invalid token %r", value, token)
+            return []
+        assignments.append((var_name, raw_value))
+    return assignments
+
+
 def collect_stage_vars(
     entries: list[dict], inherited_vars: dict[str, str] | None = None
 ) -> dict[str, str]:
@@ -112,12 +153,17 @@ def collect_stage_vars(
                     )
 
         elif instruction == "ENV":
-            env_match = re.match(r"^(\w+)(?:=|\s+)(.*)", value.strip())
-            if env_match:
-                var_name = env_match.group(1)
-                variables[var_name] = resolve_bash_expansion(
-                    _strip_quotes(env_match.group(2).strip()), variables
+            # Docker resolves every value in an ENV instruction against the
+            # environment as it existed before that instruction. New values
+            # become visible to subsequent instructions, not sibling entries.
+            previous_variables = dict(variables)
+            resolved_assignments = {
+                var_name: resolve_bash_expansion(raw_value, previous_variables).replace(
+                    _ESCAPED_DOLLAR_SENTINEL, "$"
                 )
+                for var_name, raw_value in _parse_env_assignments(value)
+            }
+            variables.update(resolved_assignments)
 
     return variables
 
