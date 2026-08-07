@@ -66,7 +66,8 @@ class RunCommandResult:
     has_update: bool = False
     reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
-    module_specs: list[str] = field(default_factory=list)
+    module_enable: list[str] = field(default_factory=list)
+    module_disable: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -85,7 +86,9 @@ class _WalkContext:
     has_update: bool = False
     reinstall_targets: set[str] = field(default_factory=set)
     builddep_packages: set[str] = field(default_factory=set)
-    module_specs: set[str] = field(default_factory=set)
+    module_enable: set[str] = field(default_factory=set)
+    module_disable: set[str] = field(default_factory=set)
+    command_str: str = ""
 
 
 def resolve_bash_expansion(text: str, variables: dict[str, str]) -> str:
@@ -431,8 +434,22 @@ def _detect_pkg_action(
         if wl == "module":
             for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
                 sub_wl = sub_w.lower()
-                if sub_wl in ("install", "enable"):
-                    return "module", sub_idx
+                if sub_wl == "install":
+                    return "module_install", sub_idx
+                if sub_wl == "enable":
+                    return "module_enable", sub_idx
+                if sub_wl == "disable":
+                    return "module_disable", sub_idx
+                if not sub_wl.startswith("-"):
+                    break
+            return None, -1
+        if wl in ("groupinstall", "group-install"):
+            return "groupinstall", idx
+        if wl == "group":
+            for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
+                sub_wl = sub_w.lower()
+                if sub_wl in ("install", "localinstall"):
+                    return "groupinstall", sub_idx
                 if not sub_wl.startswith("-"):
                     break
             return None, -1
@@ -489,6 +506,17 @@ def _resolve_arch_specific_tokens(
     return arch_resolved
 
 
+def _add_package(pkg: str, ctx: _WalkContext, arch_context: list[str] | None) -> None:
+    """
+    Add a package spec to the arch-specific or common package set.
+    """
+    if arch_context:
+        for arch in arch_context:
+            ctx.arch_packages.setdefault(arch, set()).add(pkg)
+    else:
+        ctx.packages.add(pkg)
+
+
 def _classify_package_tokens(
     resolved_tokens: list[str],
     arch_resolved_tokens: set[str],
@@ -515,9 +543,24 @@ def _classify_package_tokens(
                 ctx.builddep_packages.add(token)
             continue
 
-        if action == "module":
+        if action == "module_enable":
             if _is_valid_package_token(token) and ":" in token:
-                ctx.module_specs.add(token)
+                ctx.module_enable.add(token)
+            continue
+
+        if action == "module_install":
+            if _is_valid_package_token(token) and ":" in token and token not in arch_resolved_tokens:
+                _add_package(f"@{token}", ctx, arch_context)
+            continue
+
+        if action == "module_disable":
+            if _is_valid_package_token(token):
+                ctx.module_disable.add(token)
+            continue
+
+        if action == "groupinstall":
+            if _is_valid_package_token(token) and token not in arch_resolved_tokens:
+                _add_package(f"@{token}", ctx, arch_context)
             continue
 
         if not _is_valid_package_token(token):
@@ -529,11 +572,8 @@ def _classify_package_tokens(
             ctx.update_targets.add(token)
         elif action == "reinstall":
             ctx.reinstall_targets.add(token)
-        elif arch_context:
-            for arch in arch_context:
-                ctx.arch_packages.setdefault(arch, set()).add(token)
         else:
-            ctx.packages.add(token)
+            _add_package(token, ctx, arch_context)
 
 
 def _process_command_node(
@@ -571,7 +611,8 @@ def _process_command_node(
     if not action:
         return
 
-    pkg_words = word_values[action_idx + 1 :]
+    pkg_word_nodes = words[action_idx + 1 :]
+    pkg_words = [w.word for w in pkg_word_nodes]
     combined_arch_vals = {
         k: " ".join(per_arch.values()) for k, per_arch in ctx.arch_shell_vars.items()
     }
@@ -585,9 +626,22 @@ def _process_command_node(
 
     resolved_tokens: list[str] = []
     raw_args = " ".join(pkg_words)
-    for pw in pkg_words:
+    for w_node, pw in zip(pkg_word_nodes, pkg_words):
         resolved = resolve_bash_expansion(pw, all_vars_with_arch)
-        resolved_tokens.extend(resolved.split())
+        # For groupinstall, a quoted word (e.g. "$GROUP") must not be
+        # word-split after expansion because the group name may contain
+        # spaces ("Development Tools"). For other actions, package names
+        # never contain spaces, so the split is always correct and is
+        # required for arch-specific variable resolution to work.
+        is_quoted_groupinstall = bool(
+            action == "groupinstall"
+            and ctx.command_str
+            and ctx.command_str[w_node.pos[0]] in ('"', "'")
+        )
+        if " " in pw or is_quoted_groupinstall:
+            resolved_tokens.append(resolved)
+        else:
+            resolved_tokens.extend(resolved.split())
 
     arch_resolved_tokens: set[str] = set()
     if not arch_context:
@@ -693,6 +747,7 @@ def _parse_and_walk(
 
         ctx.shell_vars = {}
         ctx.arch_shell_vars = {}
+        ctx.command_str = preprocessed
         _walk_nodes(ast_nodes, ctx)
 
     return ctx
@@ -725,5 +780,6 @@ def analyze_run_commands(
         has_update=ctx.has_update,
         reinstall_targets=sorted(ctx.reinstall_targets),
         builddep_packages=sorted(ctx.builddep_packages),
-        module_specs=sorted(ctx.module_specs),
+        module_enable=sorted(ctx.module_enable),
+        module_disable=sorted(ctx.module_disable),
     )

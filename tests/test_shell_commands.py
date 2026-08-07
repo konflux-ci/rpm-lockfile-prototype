@@ -509,20 +509,93 @@ class TestBuilddepParsing(unittest.TestCase):
 
 
 class TestModuleParsing(unittest.TestCase):
-    def test_module_install(self):
+    def test_module_install_with_profile(self):
         run_values = ["dnf module install -y nodejs:18/development"]
         result = analyze_run_commands(run_values)
-        self.assertEqual(result.module_specs, ["nodejs:18/development"])
+        self.assertIn("@nodejs:18/development", result.packages)
+        self.assertEqual(result.module_enable, [])
+
+    def test_module_install_default_profile(self):
+        run_values = ["dnf module install -y nodejs:18"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("@nodejs:18", result.packages)
+        self.assertEqual(result.module_enable, [])
 
     def test_module_enable(self):
         run_values = ["dnf module enable -y nodejs:18"]
         result = analyze_run_commands(run_values)
-        self.assertEqual(result.module_specs, ["nodejs:18"])
+        self.assertEqual(result.module_enable, ["nodejs:18"])
+        self.assertNotIn("@nodejs:18", result.packages)
 
     def test_module_without_stream_ignored(self):
         run_values = ["dnf module enable -y nodejs"]
         result = analyze_run_commands(run_values)
-        self.assertEqual(result.module_specs, [])
+        self.assertEqual(result.module_enable, [])
+
+    def test_module_disable(self):
+        run_values = ["dnf module disable -y nodejs"]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.module_disable, ["nodejs"])
+        self.assertEqual(result.module_enable, [])
+        self.assertNotIn("@nodejs", result.packages)
+
+    def test_module_disable_with_stream(self):
+        run_values = ["dnf module disable -y nodejs:18"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("nodejs:18", result.module_disable)
+        self.assertEqual(result.module_enable, [])
+
+    def test_module_install_arch_context(self):
+        run_values = [
+            "if [ $(arch) = x86_64 ]; then dnf module install -y nodejs:18; fi"
+        ]
+        result = analyze_run_commands(run_values, arches=["x86_64", "aarch64"])
+        self.assertIn("@nodejs:18", result.arch_packages.get("x86_64", set()))
+        self.assertNotIn("@nodejs:18", result.packages)
+
+
+class TestGroupInstallParsing(unittest.TestCase):
+    def test_groupinstall_one_word(self):
+        run_values = ["dnf groupinstall -y core"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("@core", result.packages)
+
+    def test_groupinstall_quoted_multiword(self):
+        run_values = ["dnf groupinstall -y 'Development Tools'"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("@Development Tools", result.packages)
+
+    def test_group_install_two_words(self):
+        run_values = ["dnf group install -y core"]
+        result = analyze_run_commands(run_values)
+        self.assertIn("@core", result.packages)
+
+    def test_groupinstall_quoted_variable_multiword(self):
+        run_values = ['dnf groupinstall -y "$GROUP"']
+        result = analyze_run_commands(
+            run_values, env_vars={"GROUP": "Development Tools"}
+        )
+        self.assertIn("@Development Tools", result.packages)
+        self.assertNotIn("@Development", result.packages)
+        self.assertNotIn("@Tools", result.packages)
+
+    def test_groupinstall_arch_context(self):
+        run_values = [
+            "if [ $(arch) = x86_64 ]; then dnf groupinstall -y core; fi"
+        ]
+        result = analyze_run_commands(run_values, arches=["x86_64", "aarch64"])
+        self.assertIn("@core", result.arch_packages.get("x86_64", set()))
+        self.assertNotIn("@core", result.packages)
+
+    def test_group_install_arch_context(self):
+        run_values = [
+            "if [ $(arch) = aarch64 ]; then dnf group install -y 'Development Tools'; fi"
+        ]
+        result = analyze_run_commands(run_values, arches=["x86_64", "aarch64"])
+        self.assertIn(
+            "@Development Tools", result.arch_packages.get("aarch64", set())
+        )
+        self.assertNotIn("@Development Tools", result.packages)
 
 
 class TestVariablePackageManager(unittest.TestCase):

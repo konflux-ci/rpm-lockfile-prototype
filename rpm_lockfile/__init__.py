@@ -509,6 +509,7 @@ class ContainerfilePackages:
     upgrade: set[str] = field(default_factory=set)
     reinstall: set[str] = field(default_factory=set)
     module_enable: set[str] = field(default_factory=set)
+    module_disable: set[str] = field(default_factory=set)
     builddep: list[str] = field(default_factory=list)
 
 
@@ -529,7 +530,8 @@ def _extract_containerfile_packages(
             result.arch_specific.setdefault(arch, set()).update(pkgs)
         result.upgrade.update(selected.update_targets)
         result.reinstall.update(selected.reinstall_targets)
-        result.module_enable.update(selected.module_specs)
+        result.module_enable.update(selected.module_enable)
+        result.module_disable.update(selected.module_disable)
         result.builddep = list(selected.builddep_packages)
     if result.common or result.arch_specific:
         logger.info(
@@ -763,7 +765,8 @@ def main():
                 | cf_pkgs.module_enable,
                 module_disable=set(
                     filter_for_arch(arch, config.get("moduleDisable", []))
-                ),
+                )
+                | cf_pkgs.module_disable,
                 no_sources=no_sources,
                 install_weak_deps=config.get("installWeakDeps"),
                 upgrade_packages=upgrade_pkgs,

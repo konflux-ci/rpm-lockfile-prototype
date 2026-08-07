@@ -44,7 +44,8 @@ class StagePackages:
     update_targets: list[str] = field(default_factory=list)
     reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
-    module_specs: list[str] = field(default_factory=list)
+    module_enable: list[str] = field(default_factory=list)
+    module_disable: list[str] = field(default_factory=list)
 
     def merge(self, other: StagePackages) -> StagePackages:
         """
@@ -69,7 +70,8 @@ class StagePackages:
             builddep_packages=sorted(
                 set(self.builddep_packages + other.builddep_packages)
             ),
-            module_specs=sorted(set(self.module_specs + other.module_specs)),
+            module_enable=sorted(set(self.module_enable + other.module_enable)),
+            module_disable=sorted(set(self.module_disable + other.module_disable)),
         )
 
 
@@ -431,7 +433,8 @@ def extract_packages_from_scripts(
     all_reinstalls: set[str] = set()
     all_arch_packages: dict[str, set[str]] = {}
     all_builddep: set[str] = set()
-    all_modules: set[str] = set()
+    all_module_enable: set[str] = set()
+    all_module_disable: set[str] = set()
     scripts_have_bare_update: bool = False
 
     for run_body in run_values:
@@ -506,7 +509,8 @@ def extract_packages_from_scripts(
             all_updates.update(result.update_targets)
             all_reinstalls.update(result.reinstall_targets)
             all_builddep.update(result.builddep_packages)
-            all_modules.update(result.module_specs)
+            all_module_enable.update(result.module_enable)
+            all_module_disable.update(result.module_disable)
             if result.has_update:
                 scripts_have_bare_update = True
 
@@ -530,7 +534,8 @@ def extract_packages_from_scripts(
         update_targets=sorted(all_updates),
         reinstall_targets=sorted(all_reinstalls),
         builddep_packages=sorted(all_builddep),
-        module_specs=sorted(all_modules),
+        module_enable=sorted(all_module_enable),
+        module_disable=sorted(all_module_disable),
     )
 
 
