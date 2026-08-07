@@ -1,0 +1,12 @@
+packages:
+  - nvr: which-2.21-29.el9
+    arch: x86_64
+
+  - nvr: tar-2:1.34-7.el9
+    arch: x86_64
+
+  - nvr: wget-1.21.1-8.el9
+    arch: x86_64
+
+  # centos-release-nfv-openvswitch intentionally absent: not in RHEL repos.
+  # excludePackages must prevent DNF from trying to install it.

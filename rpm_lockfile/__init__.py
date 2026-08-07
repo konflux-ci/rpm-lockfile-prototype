@@ -109,6 +109,11 @@ def filter_for_arch(arch, pkgs):
                 yield pkg["name"]
 
 
+def _apply_excludes(pkgs: set, exclude_pkgs: set) -> set:
+    """Return pkgs with all entries in exclude_pkgs removed."""
+    return pkgs - exclude_pkgs
+
+
 def mkdir(dir):
     os.mkdir(dir)
     return dir
@@ -593,6 +598,7 @@ def main():
             "packages",
             "reinstallPackages",
             "upgradePackages",
+            "excludePackages",
             "moduleEnable",
             "moduleDisable",
             "assumeProvides",
@@ -729,17 +735,30 @@ def main():
         packages |= cf_pkgs.common
         packages |= cf_pkgs.arch_specific.get(arch, set())
 
+        exclude_pkgs = set(config.get("excludePackages", []))
+        install_pkgs = _apply_excludes(
+            set(filter_for_arch(arch, config.get("packages", []))) | packages,
+            exclude_pkgs,
+        )
+        reinstall_pkgs = _apply_excludes(
+            set(filter_for_arch(arch, config.get("reinstallPackages", [])))
+            | cf_pkgs.reinstall,
+            exclude_pkgs,
+        )
+        upgrade_pkgs = _apply_excludes(
+            set(filter_for_arch(arch, config.get("upgradePackages", [])))
+            | cf_pkgs.upgrade,
+            exclude_pkgs,
+        )
+
         data["arches"].append(
             process_arch(
                 arch,
                 rpmdb,
                 repos,
-                set(filter_for_arch(arch, config.get("packages", []))) | packages,
+                install_pkgs,
                 allow_erasing=allowerasing,
-                reinstall_packages=set(
-                    filter_for_arch(arch, config.get("reinstallPackages", []))
-                )
-                | cf_pkgs.reinstall,
+                reinstall_packages=reinstall_pkgs,
                 module_enable=set(filter_for_arch(arch, config.get("moduleEnable", [])))
                 | cf_pkgs.module_enable,
                 module_disable=set(
@@ -747,10 +766,7 @@ def main():
                 ),
                 no_sources=no_sources,
                 install_weak_deps=config.get("installWeakDeps"),
-                upgrade_packages=set(
-                    filter_for_arch(arch, config.get("upgradePackages", []))
-                )
-                | cf_pkgs.upgrade,
+                upgrade_packages=upgrade_pkgs,
                 zchunk=config.get("zchunk"),
                 assume_provides=assume_provides,
                 match_context_versions=config.get("matchContextVersions"),
