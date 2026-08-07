@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.1] - 2026-08-07
+
+### Fixed
+
+- Multi-assignment `ENV` instructions (e.g., `ENV KEY1=val1 KEY2=val2`) are
+  now correctly parsed, ensuring packages referenced via those variables are
+  included in the lockfile.
+
 ## [0.28.0] - 2026-08-04
 
 ### Added
