@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.29.0] - 2026-08-07
+
+### Added
+
+- New `excludePackages` configuration key to filter out specific packages
+  before dependency resolution. This is useful when `packagesFromContainerfile`
+  extracts package names from RUN commands guarded by OS-specific checks (e.g.,
+  packages only available in CentOS repos). Exclusions apply to install,
+  `reinstallPackages`, and `upgradePackages` sets, and variable substitution
+  is applied to `excludePackages` entries.
+
 ## [0.28.1] - 2026-08-07
 
 ### Fixed
