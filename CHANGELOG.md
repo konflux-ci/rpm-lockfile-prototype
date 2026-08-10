@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.30.0] - 2026-08-11
+
+### Added
+
+- `dnf groupinstall` / `dnf group install` commands in `RUN` instructions are
+  now parsed and translated to `@group-name` package entries, including
+  quoted multi-word group names like `'Development Tools'`.
+
+- `dnf module disable` is now recognized in `RUN` instructions  and wired
+  through to `moduleDisable` in the resolved configuration.
+
+### Fixed
+
+- `dnf module install foo:bar` in `RUN` instructions is now correctly wired to
+  install the module and not just enable it.
+
 ## [0.29.0] - 2026-08-07
 
 ### Added
