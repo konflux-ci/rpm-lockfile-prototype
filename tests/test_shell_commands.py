@@ -527,10 +527,10 @@ class TestModuleParsing(unittest.TestCase):
         self.assertEqual(result.module_enable, ["nodejs:18"])
         self.assertNotIn("@nodejs:18", result.packages)
 
-    def test_module_without_stream_ignored(self):
+    def test_module_enable_without_stream(self):
         run_values = ["dnf module enable -y nodejs"]
         result = analyze_run_commands(run_values)
-        self.assertEqual(result.module_enable, [])
+        self.assertEqual(result.module_enable, ["nodejs"])
 
     def test_module_disable(self):
         run_values = ["dnf module disable -y nodejs"]
