@@ -407,6 +407,19 @@ def _process_assignments(
                 ctx.shell_vars[var_name] = resolved
 
 
+def _first_non_flag_subcommand(
+    word_values: list[str], after_idx: int
+) -> tuple[str | None, int]:
+    """
+    Return the first word after after_idx that is not a flag (i.e. does not
+    start with '-'), paired with its index.  Returns (None, -1) if none found.
+    """
+    for sub_idx, sub_w in enumerate(word_values[after_idx + 1 :], after_idx + 1):
+        if not sub_w.startswith("-"):
+            return sub_w.lower(), sub_idx
+    return None, -1
+
+
 def _detect_pkg_action(
     word_values: list[str], ctx: _WalkContext
 ) -> tuple[str | None, int]:
@@ -432,26 +445,20 @@ def _detect_pkg_action(
         if wl in ("builddep", "build-dep"):
             return "builddep", idx
         if wl == "module":
-            for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
-                sub_wl = sub_w.lower()
-                if sub_wl == "install":
-                    return "module_install", sub_idx
-                if sub_wl == "enable":
-                    return "module_enable", sub_idx
-                if sub_wl == "disable":
-                    return "module_disable", sub_idx
-                if not sub_wl.startswith("-"):
-                    break
+            sub_cmd, sub_idx = _first_non_flag_subcommand(word_values, idx)
+            if sub_cmd == "install":
+                return "module_install", sub_idx
+            if sub_cmd == "enable":
+                return "module_enable", sub_idx
+            if sub_cmd == "disable":
+                return "module_disable", sub_idx
             return None, -1
         if wl in ("groupinstall", "group-install"):
             return "groupinstall", idx
         if wl == "group":
-            for sub_idx, sub_w in enumerate(word_values[idx + 1 :], idx + 1):
-                sub_wl = sub_w.lower()
-                if sub_wl in ("install", "localinstall"):
-                    return "groupinstall", sub_idx
-                if not sub_wl.startswith("-"):
-                    break
+            sub_cmd, sub_idx = _first_non_flag_subcommand(word_values, idx)
+            if sub_cmd == "install":
+                return "groupinstall", sub_idx
             return None, -1
 
     return None, -1
@@ -538,42 +545,27 @@ def _classify_package_tokens(
             continue
         token = re.split(r"\s+(?:>=|<=|==|!=|>|<)\s+", token)[0].strip()
 
-        if action == "builddep":
-            if _is_valid_package_token(token):
-                ctx.builddep_packages.add(token)
-            continue
-
-        if action == "module_enable":
-            if _is_valid_package_token(token) and ":" in token:
-                ctx.module_enable.add(token)
-            continue
-
-        if action == "module_install":
-            if _is_valid_package_token(token) and ":" in token and token not in arch_resolved_tokens:
-                _add_package(f"@{token}", ctx, arch_context)
-            continue
-
-        if action == "module_disable":
-            if _is_valid_package_token(token):
-                ctx.module_disable.add(token)
-            continue
-
-        if action == "groupinstall":
-            if _is_valid_package_token(token) and token not in arch_resolved_tokens:
-                _add_package(f"@{token}", ctx, arch_context)
-            continue
-
         if not _is_valid_package_token(token):
             continue
-        if token in arch_resolved_tokens:
-            continue
 
-        if action == "update":
-            ctx.update_targets.add(token)
+        if action == "builddep":
+            ctx.builddep_packages.add(token)
+        elif action == "module_enable":
+            ctx.module_enable.add(token)
+        elif action == "module_disable":
+            ctx.module_disable.add(token)
+        elif action in ("module_install", "groupinstall"):
+            if token not in arch_resolved_tokens:
+                _add_package(f"@{token}", ctx, arch_context)
+        elif action == "update":
+            if token not in arch_resolved_tokens:
+                ctx.update_targets.add(token)
         elif action == "reinstall":
-            ctx.reinstall_targets.add(token)
+            if token not in arch_resolved_tokens:
+                ctx.reinstall_targets.add(token)
         else:
-            _add_package(token, ctx, arch_context)
+            if token not in arch_resolved_tokens:
+                _add_package(token, ctx, arch_context)
 
 
 def _process_command_node(
