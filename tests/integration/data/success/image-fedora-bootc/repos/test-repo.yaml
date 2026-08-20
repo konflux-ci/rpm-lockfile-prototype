@@ -1,0 +1,8 @@
+packages:
+  - nvr: test-package-1.0-1
+    requires:
+      - bash
+
+  # bash is already installed in the fedora-bootc image; it should not
+  # appear in the lockfile even though it is listed as a decoy here.
+  - nvr: bash-5.2.32-1.fc41
