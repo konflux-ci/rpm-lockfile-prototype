@@ -1,0 +1,10 @@
+contentOrigin:
+  repos:
+    - repoid: test-repo
+      baseurl: http://localhost:PORT/test-repo
+packages:
+  - test-package
+arches:
+  - x86_64
+context:
+  image: quay.io/fedora/fedora-bootc@sha256:8422f122a1567759c5dd5dcda2007e0ff8c01c1dfd67c4146364196c8e078e4c
