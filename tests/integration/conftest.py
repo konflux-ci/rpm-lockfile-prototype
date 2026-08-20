@@ -155,6 +155,7 @@ def prepare_test_case(test_case_name, tmp_path, port):
             "expected.lock.yaml",
             "expected.stdout",
             "expected.stderr",
+            "timeout",
             "Containerfile",
             "Dockerfile",
         ):
@@ -200,6 +201,19 @@ def load_expected_stdout(test_case_name):
 def load_expected_stderr(test_case_name):
     """Load expected stderr patterns, if defined."""
     return _load_expected_patterns(test_case_name, "expected.stderr")
+
+
+def _load_timeout(test_case_name, default=120):
+    """Return the subprocess timeout for a test case.
+
+    If the test case directory contains a ``timeout`` file, its contents are
+    parsed as an integer number of seconds and returned.  Otherwise the default
+    is used.
+    """
+    timeout_path = _find_test_case_dir(test_case_name) / "timeout"
+    if timeout_path.exists():
+        return int(timeout_path.read_text().strip())
+    return default
 
 
 @dataclasses.dataclass
@@ -279,7 +293,7 @@ def run_test_case(
             text=True,
             cwd=str(tmp_path),
             env=env,
-            timeout=120,
+            timeout=_load_timeout(test_case_name),
             check=False,
         )
 
