@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: http://localhost:PORT/test-repo/test-installroot-only-1.0-1.noarch.rpm
+    repoid: test-repo
+    size: 22030
+    checksum: sha256:414d2197cf05b97b54fbf0e2e2e41ef47138434c51383a1587a32a0a1f25e316
+    name: test-installroot-only
+    evr: 1.0-1
+    sourcerpm: test-installroot-only-1.0-1.src.rpm
+  source:
+  - url: http://localhost:PORT/test-repo/test-installroot-only-1.0-1.src.rpm
+    repoid: test-repo
+    size: 72039
+    checksum: sha256:7c9986ddfeecf8f53109a78afb552ac9280aa1cbd275fe8b95300ff01b848987
+    name: test-installroot-only
+    evr: 1.0-1
+  module_metadata: []

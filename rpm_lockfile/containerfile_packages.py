@@ -41,6 +41,8 @@ class StagePackages:
     packages: list[str] = field(default_factory=list)
     has_update: bool = False
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
+    installroot_packages: list[str] = field(default_factory=list)
+    installroot_arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     reinstall_targets: list[str] = field(default_factory=list)
     builddep_packages: list[str] = field(default_factory=list)
@@ -63,6 +65,19 @@ class StagePackages:
             packages=sorted(set(self.packages + other.packages)),
             has_update=self.has_update or other.has_update,
             arch_packages=merged_arch,
+            installroot_packages=sorted(
+                set(self.installroot_packages + other.installroot_packages)
+            ),
+            installroot_arch_packages={
+                arch: sorted(
+                    set(self.installroot_arch_packages.get(arch, []))
+                    | set(other.installroot_arch_packages.get(arch, []))
+                )
+                for arch in sorted(
+                    set(self.installroot_arch_packages)
+                    | set(other.installroot_arch_packages)
+                )
+            },
             update_targets=sorted(set(self.update_targets + other.update_targets)),
             reinstall_targets=sorted(
                 set(self.reinstall_targets + other.reinstall_targets)

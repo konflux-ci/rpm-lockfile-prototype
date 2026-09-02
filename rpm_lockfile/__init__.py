@@ -31,6 +31,7 @@ from .containerfile_packages import (
     resolve_builddep_packages,
     select_stage,
 )
+from .lockfile_merge import merge_arch_results
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,30 @@ def filter_for_arch(arch, pkgs):
 def _apply_excludes(pkgs: set, exclude_pkgs: set) -> set:
     """Return pkgs with all entries in exclude_pkgs removed."""
     return pkgs - exclude_pkgs
+
+
+def _installroot_packages_for_arch(cf_pkgs: ContainerfilePackages, arch: str) -> set[str]:
+    return set(cf_pkgs.installroot) | set(cf_pkgs.installroot_arch_specific.get(arch, set()))
+
+
+def _needs_image_pass(
+    install_pkgs: set[str],
+    reinstall_pkgs: set[str],
+    upgrade_pkgs: set[str],
+    module_enable: set[str],
+    module_disable: set[str],
+) -> bool:
+    """
+    Return True when an image-backed resolve pass is needed alongside
+    --installroot bare resolution (non-installroot work for this arch).
+    """
+    return bool(
+        install_pkgs
+        or reinstall_pkgs
+        or upgrade_pkgs
+        or module_enable
+        or module_disable
+    )
 
 
 def mkdir(dir):
@@ -506,6 +531,8 @@ def logging_setup(debug=False):
 class ContainerfilePackages:
     common: set[str] = field(default_factory=set)
     arch_specific: dict[str, set[str]] = field(default_factory=dict)
+    installroot: set[str] = field(default_factory=set)
+    installroot_arch_specific: dict[str, set[str]] = field(default_factory=dict)
     upgrade: set[str] = field(default_factory=set)
     reinstall: set[str] = field(default_factory=set)
     module_enable: set[str] = field(default_factory=set)
@@ -528,6 +555,9 @@ def _extract_containerfile_packages(
         result.common.update(selected.packages)
         for arch, pkgs in selected.arch_packages.items():
             result.arch_specific.setdefault(arch, set()).update(pkgs)
+        result.installroot.update(selected.installroot_packages)
+        for arch, pkgs in selected.installroot_arch_packages.items():
+            result.installroot_arch_specific.setdefault(arch, set()).update(pkgs)
         result.upgrade.update(selected.update_targets)
         result.reinstall.update(selected.reinstall_targets)
         result.module_enable.update(selected.module_enable)
@@ -543,6 +573,15 @@ def _extract_containerfile_packages(
             logger.debug("Containerfile packages: %s", sorted(result.common))
         for arch, pkgs in sorted(result.arch_specific.items()):
             logger.debug("Containerfile packages [%s]: %s", arch, sorted(pkgs))
+        if result.installroot:
+            logger.debug(
+                "Containerfile --installroot packages: %s",
+                sorted(result.installroot),
+            )
+        for arch, pkgs in sorted(result.installroot_arch_specific.items()):
+            logger.debug(
+                "Containerfile --installroot packages [%s]: %s", arch, sorted(pkgs)
+            )
         if result.upgrade:
             logger.debug("Containerfile upgrade packages: %s", sorted(result.upgrade))
         if result.reinstall:
@@ -733,15 +772,13 @@ def main():
         elif args.flatpak or context.get("flatpak"):
             packages = read_packages_from_container_yaml(arch)
 
-        # Merge Containerfile-extracted packages
+        # Merge Containerfile-extracted packages (normal installs only).
         packages |= cf_pkgs.common
         packages |= cf_pkgs.arch_specific.get(arch, set())
+        installroot_pkgs = _installroot_packages_for_arch(cf_pkgs, arch)
 
         exclude_pkgs = set(config.get("excludePackages", []))
-        install_pkgs = _apply_excludes(
-            set(filter_for_arch(arch, config.get("packages", []))) | packages,
-            exclude_pkgs,
-        )
+        config_install = set(filter_for_arch(arch, config.get("packages", [])))
         reinstall_pkgs = _apply_excludes(
             set(filter_for_arch(arch, config.get("reinstallPackages", [])))
             | cf_pkgs.reinstall,
@@ -752,27 +789,82 @@ def main():
             | cf_pkgs.upgrade,
             exclude_pkgs,
         )
+        module_enable = set(filter_for_arch(arch, config.get("moduleEnable", []))) | (
+            cf_pkgs.module_enable
+        )
+        module_disable = set(filter_for_arch(arch, config.get("moduleDisable", []))) | (
+            cf_pkgs.module_disable
+        )
+        process_kwargs = {
+            "allow_erasing": allowerasing,
+            "no_sources": no_sources,
+            "install_weak_deps": config.get("installWeakDeps"),
+            "zchunk": config.get("zchunk"),
+            "assume_provides": assume_provides,
+            "match_context_versions": config.get("matchContextVersions"),
+        }
 
+        if is_image_context and installroot_pkgs:
+            arch_results: list[dict] = []
+            bare_install = _apply_excludes(installroot_pkgs, exclude_pkgs)
+            if bare_install:
+                logger.info(
+                    "Resolving %d --installroot packages against bare rpmdb for %s",
+                    len(bare_install),
+                    arch,
+                )
+                arch_results.append(
+                    process_arch(
+                        arch,
+                        empty_rpmdb(),
+                        repos,
+                        bare_install,
+                        reinstall_packages=set(),
+                        module_enable=set(),
+                        module_disable=set(),
+                        upgrade_packages=set(),
+                        **process_kwargs,
+                    )
+                )
+            install_pkgs = _apply_excludes(packages | config_install, exclude_pkgs)
+            if _needs_image_pass(
+                install_pkgs, reinstall_pkgs, upgrade_pkgs, module_enable, module_disable
+            ):
+                arch_results.append(
+                    process_arch(
+                        arch,
+                        rpmdb,
+                        repos,
+                        install_pkgs,
+                        reinstall_packages=reinstall_pkgs,
+                        module_enable=module_enable,
+                        module_disable=module_disable,
+                        upgrade_packages=upgrade_pkgs,
+                        **process_kwargs,
+                    )
+                )
+            data["arches"].append(
+                merge_arch_results(arch_results)
+                if len(arch_results) > 1
+                else arch_results[0]
+            )
+            continue
+
+        install_pkgs = _apply_excludes(
+            packages | config_install | installroot_pkgs,
+            exclude_pkgs,
+        )
         data["arches"].append(
             process_arch(
                 arch,
                 rpmdb,
                 repos,
                 install_pkgs,
-                allow_erasing=allowerasing,
                 reinstall_packages=reinstall_pkgs,
-                module_enable=set(filter_for_arch(arch, config.get("moduleEnable", [])))
-                | cf_pkgs.module_enable,
-                module_disable=set(
-                    filter_for_arch(arch, config.get("moduleDisable", []))
-                )
-                | cf_pkgs.module_disable,
-                no_sources=no_sources,
-                install_weak_deps=config.get("installWeakDeps"),
+                module_enable=module_enable,
+                module_disable=module_disable,
                 upgrade_packages=upgrade_pkgs,
-                zchunk=config.get("zchunk"),
-                assume_provides=assume_provides,
-                match_context_versions=config.get("matchContextVersions"),
+                **process_kwargs,
             )
         )
 

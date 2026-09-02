@@ -632,3 +632,43 @@ class TestVariablePackageManager(unittest.TestCase):
         run_values = ["${DNF:-microdnf} install -y tar"]
         result = analyze_run_commands(run_values)
         self.assertIn("tar", result.packages)
+
+
+class TestInstallrootExtraction(unittest.TestCase):
+    def test_installroot_install_uses_equals_form(self):
+        run_values = [
+            "dnf --installroot=/mnt/rootfs install -y rsync xz tar gzip python3-pyyaml "
+            "&& dnf --installroot=/mnt/rootfs clean all"
+        ]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(
+            result.installroot_packages,
+            ["gzip", "python3-pyyaml", "rsync", "tar", "xz"],
+        )
+        self.assertEqual(result.packages, [])
+
+    def test_installroot_spaced_form(self):
+        run_values = ["dnf --installroot /mnt/rootfs install -y rsync xz"]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.installroot_packages, ["rsync", "xz"])
+        self.assertNotIn("/mnt/rootfs", result.installroot_packages)
+
+    def test_normal_install_not_installroot(self):
+        run_values = ["dnf install -y gcc make"]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["gcc", "make"])
+        self.assertEqual(result.installroot_packages, [])
+
+    def test_mixed_normal_and_installroot(self):
+        run_values = [
+            "dnf install -y gcc && dnf --installroot=/mnt/rootfs install -y rsync"
+        ]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.packages, ["gcc"])
+        self.assertEqual(result.installroot_packages, ["rsync"])
+
+    def test_installroot_clean_all_only(self):
+        run_values = ["dnf --installroot=/mnt/rootfs clean all"]
+        result = analyze_run_commands(run_values)
+        self.assertEqual(result.installroot_packages, [])
+        self.assertEqual(result.packages, [])

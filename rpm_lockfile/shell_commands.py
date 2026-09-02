@@ -62,6 +62,8 @@ class RunCommandResult:
 
     packages: list[str] = field(default_factory=list)
     arch_packages: dict[str, list[str]] = field(default_factory=dict)
+    installroot_packages: list[str] = field(default_factory=list)
+    installroot_arch_packages: dict[str, list[str]] = field(default_factory=dict)
     update_targets: list[str] = field(default_factory=list)
     has_update: bool = False
     reinstall_targets: list[str] = field(default_factory=list)
@@ -82,6 +84,8 @@ class _WalkContext:
     arch_shell_vars: dict[str, dict[str, str]] = field(default_factory=dict)
     packages: set[str] = field(default_factory=set)
     arch_packages: dict[str, set[str]] = field(default_factory=dict)
+    installroot_packages: set[str] = field(default_factory=set)
+    installroot_arch_packages: dict[str, set[str]] = field(default_factory=dict)
     update_targets: set[str] = field(default_factory=set)
     has_update: bool = False
     reinstall_targets: set[str] = field(default_factory=set)
@@ -469,6 +473,8 @@ def _resolve_arch_specific_tokens(
     raw_args: str,
     all_vars: dict[str, str],
     ctx: _WalkContext,
+    *,
+    installroot: bool = False,
 ) -> set[str]:
     """
     Resolve arch-specific variable expansions and add per-arch packages.
@@ -507,16 +513,44 @@ def _resolve_arch_specific_tokens(
                     _is_valid_package_token(token)
                     and token not in common_resolved_tokens
                 ):
-                    ctx.arch_packages.setdefault(arch, set()).add(token)
+                    if installroot:
+                        ctx.installroot_arch_packages.setdefault(arch, set()).add(token)
+                    else:
+                        ctx.arch_packages.setdefault(arch, set()).add(token)
                     arch_resolved.add(token)
 
     return arch_resolved
 
 
-def _add_package(pkg: str, ctx: _WalkContext, arch_context: list[str] | None) -> None:
+def _command_has_installroot(word_values: list[str]) -> bool:
+    """
+    Return True when a dnf/yum command installs into a separate root.
+    """
+    for idx, word in enumerate(word_values):
+        if word.startswith("--installroot="):
+            return True
+        if word == "--installroot" and idx + 1 < len(word_values):
+            return True
+    return False
+
+
+def _add_package(
+    pkg: str,
+    ctx: _WalkContext,
+    arch_context: list[str] | None,
+    *,
+    installroot: bool = False,
+) -> None:
     """
     Add a package spec to the arch-specific or common package set.
     """
+    if installroot:
+        if arch_context:
+            for arch in arch_context:
+                ctx.installroot_arch_packages.setdefault(arch, set()).add(pkg)
+        else:
+            ctx.installroot_packages.add(pkg)
+        return
     if arch_context:
         for arch in arch_context:
             ctx.arch_packages.setdefault(arch, set()).add(pkg)
@@ -530,6 +564,8 @@ def _classify_package_tokens(
     action: str,
     ctx: _WalkContext,
     arch_context: list[str] | None,
+    *,
+    installroot: bool = False,
 ):
     """
     Classify resolved tokens into packages, update targets, or
@@ -556,7 +592,7 @@ def _classify_package_tokens(
             ctx.module_disable.add(token)
         elif action in ("module_install", "groupinstall"):
             if token not in arch_resolved_tokens:
-                _add_package(f"@{token}", ctx, arch_context)
+                _add_package(f"@{token}", ctx, arch_context, installroot=installroot)
         elif action == "update":
             if token not in arch_resolved_tokens:
                 ctx.update_targets.add(token)
@@ -565,7 +601,7 @@ def _classify_package_tokens(
                 ctx.reinstall_targets.add(token)
         else:
             if token not in arch_resolved_tokens:
-                _add_package(token, ctx, arch_context)
+                _add_package(token, ctx, arch_context, installroot=installroot)
 
 
 def _process_command_node(
@@ -635,14 +671,20 @@ def _process_command_node(
         else:
             resolved_tokens.extend(resolved.split())
 
+    installroot = _command_has_installroot(resolved_word_values)
     arch_resolved_tokens: set[str] = set()
     if not arch_context:
         arch_resolved_tokens = _resolve_arch_specific_tokens(
-            pkg_words, raw_args, all_vars, ctx
+            pkg_words, raw_args, all_vars, ctx, installroot=installroot
         )
 
     _classify_package_tokens(
-        resolved_tokens, arch_resolved_tokens, action, ctx, arch_context
+        resolved_tokens,
+        arch_resolved_tokens,
+        action,
+        ctx,
+        arch_context,
+        installroot=installroot,
     )
 
 
@@ -767,6 +809,11 @@ def analyze_run_commands(
         packages=sorted(ctx.packages),
         arch_packages={
             arch: sorted(pkgs) for arch, pkgs in sorted(ctx.arch_packages.items())
+        },
+        installroot_packages=sorted(ctx.installroot_packages),
+        installroot_arch_packages={
+            arch: sorted(pkgs)
+            for arch, pkgs in sorted(ctx.installroot_arch_packages.items())
         },
         update_targets=sorted(ctx.update_targets),
         has_update=ctx.has_update,
