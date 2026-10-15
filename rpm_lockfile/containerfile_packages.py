@@ -568,8 +568,9 @@ def analyze_containerfile_stages(
     Return Value(s):
         list[StagePackages]: Per-stage package analysis.
     """
-    dfp = DockerfileParser(str(containerfile_path))
-    entries = dfp.structure
+    with open(containerfile_path, "rb") as f:
+        dfp = DockerfileParser(fileobj=f)
+        entries = dfp.structure
 
     pre_from_entries: list[dict] = []
     stage_entry_lists: list[list[dict]] = []
