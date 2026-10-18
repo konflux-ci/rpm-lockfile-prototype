@@ -325,13 +325,11 @@ def _get_containerfile_labels(containerfile, config_dir):
 def split_image(image_spec):
     # De don't want to validate the digest here in any way, so even wrong
     # length should be accepted.
-    m = re.match(r"([^:@]+)(:[^@]+)?(@sha\d+:[a-f0-9]+)?$", image_spec)
+    # The tag can not contain a slash, so a colon followed by a port number in
+    # the registry (e.g. localhost:5000/image) is not mistaken for a tag.
+    m = re.match(r"([^@]+?)(?::([^:/@]+))?(?:@(sha\d+:[a-f0-9]+))?$", image_spec)
     if m:
-        repo = m.group(1)
-        tag = m.group(2)
-        digest_suffix = m.group(3)
-        digest = digest_suffix[1:] if digest_suffix else None
-        return repo, tag, digest
+        return m.group(1), m.group(2), m.group(3)
     raise RuntimeError(f"Unknown format for image specification: {image_spec}")
 
 
@@ -363,8 +361,8 @@ def strip_tag(image_spec):
 def check_image_spec(image_spec):
     """Check if the image is fully qualified with a registry."""
     # We only check that there's a slash in the image name, and the part before
-    # slash contains at least one dot.
-    m = re.match(r".+\..+/.+", image_spec)
+    # slash contains at least one dot or a port number.
+    m = re.match(r".+\..+/.+", image_spec) or re.match(r"[^/]+:\d+/.+", image_spec)
     return bool(m)
 
 

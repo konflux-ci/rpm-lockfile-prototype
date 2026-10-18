@@ -50,6 +50,9 @@ def test_find_containerfile(tmpdir, files, expected):
         ("example.com/image:latest", "example.com/image:latest"),
         ("example.com/image@sha256:abcdef", "example.com/image@sha256:abcdef"),
         ("example.com/image:latest@sha256:0123456", "example.com/image@sha256:0123456"),
+        ("localhost:5000/image:tag", "localhost:5000/image:tag"),
+        ("localhost:5000/image@sha256:abc", "localhost:5000/image@sha256:abc"),
+        ("localhost:5000/image:tag@sha256:abc", "localhost:5000/image@sha256:abc"),
     ],
 )
 def test_strip_tag(image_spec, expected):
@@ -69,6 +72,38 @@ def test_make_image_spec(repo, tag, digest, expected):
 
 
 @pytest.mark.parametrize(
+    "image_spec,expected",
+    [
+        ("example.com/image", ("example.com/image", None, None)),
+        ("example.com/image:tag", ("example.com/image", "tag", None)),
+        ("example.com/image@sha256:abc", ("example.com/image", None, "sha256:abc")),
+        (
+            "example.com/image:tag@sha256:abc",
+            ("example.com/image", "tag", "sha256:abc"),
+        ),
+        ("localhost:5000/image", ("localhost:5000/image", None, None)),
+        ("localhost:5000/image:tag", ("localhost:5000/image", "tag", None)),
+        (
+            "localhost:5000/image@sha256:abc",
+            ("localhost:5000/image", None, "sha256:abc"),
+        ),
+        (
+            "localhost:5000/image:tag@sha256:abc",
+            ("localhost:5000/image", "tag", "sha256:abc"),
+        ),
+    ],
+)
+def test_split_image(image_spec, expected):
+    assert utils.split_image(image_spec) == expected
+
+
+@pytest.mark.parametrize("image_spec", ["image@latest", "image:tag@sha256:xyz"])
+def test_split_image_invalid(image_spec):
+    with pytest.raises(RuntimeError):
+        utils.split_image(image_spec)
+
+
+@pytest.mark.parametrize(
     "image_spec",
     [
         "example.com/image:latest",
@@ -76,6 +111,8 @@ def test_make_image_spec(repo, tag, digest, expected):
         "example.com/image:latest@sha256:0123456",
         "registry.example.com/image:latest@sha256:0123456",
         "registry.example.com/namespace/image:stable",
+        "localhost:5000/image:tag",
+        "localhost:5000/namespace/image@sha256:abc",
     ],
 )
 def test_check_image_spec_correct(image_spec):
