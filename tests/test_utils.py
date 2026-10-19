@@ -815,3 +815,35 @@ def test_get_labels_base_vars_overridden_by_source():
     assert result["architecture"] == "x86_64"
     assert result["custom"] == "kept"
     assert result["vcs-ref"] == "abcdef"
+
+
+@pytest.mark.parametrize(
+    "tls_verify,expected_flags",
+    [
+        (None, []),
+        (True, ["--tls-verify=true"]),
+        (False, ["--tls-verify=false"]),
+    ],
+)
+def test_inspect_image_tls_verify(tls_verify, expected_flags):
+    image = "registry.example.com/image:latest"
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        utils.inspect_image(image, tls_verify=tls_verify)
+
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", "--no-tags", *expected_flags, f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+
+
+def test_inspect_image_tls_verify_is_part_of_cache_key():
+    image = "registry.example.com/image:latest"
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        utils.inspect_image(image, tls_verify=False)
+        utils.inspect_image(image, tls_verify=False)
+        utils.inspect_image(image)
+
+    assert mock_run.call_count == 2

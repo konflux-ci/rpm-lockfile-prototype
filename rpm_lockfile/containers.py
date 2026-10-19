@@ -27,7 +27,7 @@ RPMDB_PATHS = [
 USAGE_THRESHOLD = 80
 
 
-def _copy_image(baseimage, arch, destdir):
+def _copy_image(baseimage, arch, destdir, tls_verify=None):
     """Download image into given location."""
     if not utils.check_image_spec(baseimage):
         logger.warning(
@@ -42,22 +42,26 @@ def _copy_image(baseimage, arch, destdir):
         "skopeo",
         f"--override-arch={arch}",
         "copy",
-        f"docker://{baseimage}",
-        f"dir:{destdir}",
     ]
+    if tls_verify is not None:
+        cmd.append(f"--src-tls-verify={utils.bool_flag(tls_verify)}")
+    cmd.extend([f"docker://{baseimage}", f"dir:{destdir}"])
     utils.logged_run(cmd, check=True)
 
 
-def setup_rpmdb(dest_dir, baseimage, arch):
+def setup_rpmdb(dest_dir, baseimage, arch, tls_verify=None):
     """
     Extract rpmdb from `baseimage` for `arch` to `dest_dir`.
+
+    If `tls_verify` is not None, it is passed to skopeo to enable or disable
+    TLS verification. Otherwise skopeo uses its own default.
     """
     image, _, digest = utils.split_image(baseimage)
 
     if not digest:
         # We don't have a digest yet, so find the correct one from the
         # registry.
-        digest = utils.inspect_image(baseimage, arch)["Digest"]
+        digest = utils.inspect_image(baseimage, arch, tls_verify=tls_verify)["Digest"]
 
     # Construct a new image pull spec with the digest (we no longer need the
     # tag). We need to pull the image by the digest used in the cache.
@@ -73,7 +77,7 @@ def setup_rpmdb(dest_dir, baseimage, arch):
         # into the cache.
         # First it goes into a temporary location...
         tmp_cache = cache.with_suffix(f".{os.getpid()}")
-        _online_setup_rpmdb(tmp_cache, image, arch)
+        _online_setup_rpmdb(tmp_cache, image, arch, tls_verify)
         try:
             # ...and then atomically moves into the proper one.
             tmp_cache.rename(cache)
@@ -94,7 +98,7 @@ def setup_rpmdb(dest_dir, baseimage, arch):
     _maybe_cleanup(cache)
 
 
-def _online_setup_rpmdb(dest_dir, baseimage, arch):
+def _online_setup_rpmdb(dest_dir, baseimage, arch, tls_verify=None):
     arch = utils.translate_arch(arch)
 
     # Ensure the top destination directory exists. The base image may not
@@ -104,7 +108,7 @@ def _online_setup_rpmdb(dest_dir, baseimage, arch):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
-        _copy_image(baseimage, arch, tmpdir)
+        _copy_image(baseimage, arch, tmpdir, tls_verify)
 
         # The manifest is always in the same location, and contains information
         # about individual layers.

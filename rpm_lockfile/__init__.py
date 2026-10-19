@@ -56,6 +56,10 @@ IMAGE_HELP = "Use rpmdb from the given image."
 VALIDATE_HELP = "Run schema validation on the input file."
 PRINT_SCHEMA_HELP = "Print schema for the input file to stdout."
 ALLOWERASING_HELP = "Allow  erasing  of  installed  packages to resolve dependencies."
+TLS_VERIFY_HELP = """
+Require HTTPS and verify certificates when skopeo talks to the registry
+(true or false). If not given, skopeo uses its own default.
+"""
 
 
 def copy_local_rpmdb(cache_dir):
@@ -314,10 +318,20 @@ def local_rpmdb():
     return rpmdb_preparer(lambda root_dir, _: copy_local_rpmdb(root_dir))
 
 
-def image_rpmdb(baseimage):
+def image_rpmdb(baseimage, tls_verify=None):
     return rpmdb_preparer(
-        lambda root_dir, arch: containers.setup_rpmdb(root_dir, baseimage, arch)
+        lambda root_dir, arch: containers.setup_rpmdb(
+            root_dir, baseimage, arch, tls_verify=tls_verify
+        )
     )
+
+
+def _parse_bool(value):
+    if value.lower() in ("true", "1", "yes"):
+        return True
+    if value.lower() in ("false", "0", "no"):
+        return False
+    raise argparse.ArgumentTypeError(f"expected true or false, got {value!r}")
 
 
 def process_arch(
@@ -582,6 +596,9 @@ def main():
         "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
     )
     parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
+    parser.add_argument(
+        "--tls-verify", type=_parse_bool, metavar="BOOL", help=TLS_VERIFY_HELP
+    )
     args = parser.parse_args()
 
     logging_setup(args.debug)
@@ -671,7 +688,8 @@ def main():
                 containerfile,
                 **_get_containerfile_filters(context),
                 extra_args=_get_containerfile_extra_args(config_dir, context),
-            )
+            ),
+            tls_verify=args.tls_verify,
         )
 
     # Determine package extraction source — independent of rpmdb mode.
