@@ -187,12 +187,12 @@ def test_extraction(
     baseimage = "registry.example.com/image:latest"
     resolved_image = f"registry.example.com/image@{digest}"
 
-    def fake_copy(image, arch, destdir):
+    def fake_copy(image, arch, destdir, tls_verify=None):
         image_spec.write_to(destdir)
         assert image == resolved_image
         assert arch == "amd64"
 
-    def fake_inspect(image, arch=None):
+    def fake_inspect(image, arch=None, tls_verify=None):
         return {"Digest": digest}
 
     with (
@@ -225,12 +225,12 @@ def test_caching(tmp_path, rpmdb, baseimage, caplog, disk_is_free):
 
     cache_dir = tmp_path / "cache"
 
-    def fake_copy(image, arch, destdir):
+    def fake_copy(image, arch, destdir, tls_verify=None):
         image_spec.write_to(destdir)
         assert image == resolved_image
         assert arch == "amd64"
 
-    def fake_inspect(image, arch=None):
+    def fake_inspect(image, arch=None, tls_verify=None):
         return {"Digest": digest}
 
     with (
@@ -274,10 +274,10 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
     arch = "x86_64"
     default_digest = "sha256:abcdef"
 
-    def fake_setup(destdir, image, arch):
+    def fake_setup(destdir, image, arch, tls_verify=None):
         destdir.mkdir(parents=True)
 
-    def fake_inspect(image, f_arch=None):
+    def fake_inspect(image, f_arch=None, tls_verify=None):
         assert digest is None
         assert f_arch == arch
         assert image == input_image
@@ -296,7 +296,7 @@ def test_resolving_image(tmp_path, input_image, digest, resolved_image, disk_is_
     img_cache = cache_dir / "rpmdbs" / arch / (digest or default_digest)
 
     assert _online_setup.mock_calls == [
-        mock.call(img_cache.with_suffix(f".{os.getpid()}"), resolved_image, arch)
+        mock.call(img_cache.with_suffix(f".{os.getpid()}"), resolved_image, arch, None)
     ]
 
     assert copytree.mock_calls == [
@@ -318,12 +318,12 @@ def test_caching_on_full_disk(tmp_path, rpmdb, baseimage, caplog, disk_is_full):
 
     cache_dir = tmp_path / "cache"
 
-    def fake_copy(image, arch, destdir):
+    def fake_copy(image, arch, destdir, tls_verify=None):
         image_spec.write_to(destdir)
         assert image == resolved_image
         assert arch == "amd64"
 
-    def fake_inspect(image, arch=None):
+    def fake_inspect(image, arch=None, tls_verify=None):
         return {"Digest": digest}
 
     with (
@@ -353,7 +353,7 @@ def test_skopeo_failure_does_not_create_dest_dir(tmp_path, disk_is_free):
     digest = f"sha256:{'a' * 64}"
     baseimage = "registry.example.com/image:latest"
 
-    def fake_inspect(image, arch=None):
+    def fake_inspect(image, arch=None, tls_verify=None):
         return {"Digest": digest}
 
     with (
@@ -371,3 +371,57 @@ def test_skopeo_failure_does_not_create_dest_dir(tmp_path, disk_is_free):
     # the download and copy an empty directory into dest_dir.
     expected_cache = cache_dir / "rpmdbs" / "x86_64" / digest
     assert not expected_cache.exists()
+
+
+@pytest.mark.parametrize(
+    "tls_verify,expected_flags",
+    [
+        (None, []),
+        (True, ["--src-tls-verify=true"]),
+        (False, ["--src-tls-verify=false"]),
+    ],
+)
+def test_copy_image_tls_verify(tmp_path, tls_verify, expected_flags):
+    image = "registry.example.com/image:latest"
+    with mock.patch("rpm_lockfile.utils.logged_run") as logged_run:
+        containers._copy_image(image, "amd64", tmp_path, tls_verify)
+
+    logged_run.assert_called_once_with(
+        [
+            "skopeo",
+            "--override-arch=amd64",
+            "copy",
+            *expected_flags,
+            f"docker://{image}",
+            f"dir:{tmp_path}",
+        ],
+        check=True,
+    )
+
+
+@pytest.mark.parametrize("tls_verify", [None, True, False])
+def test_setup_rpmdb_passes_tls_verify(tmp_path, tls_verify, disk_is_free):
+    image_spec = FakeImage([{"var/lib/rpm/foo": File("foo")}])
+    digest = f"sha256:{'a' * 64}"
+    baseimage = "registry.example.com/image:latest"
+
+    def fake_copy(image, arch, destdir, f_tls_verify=None):
+        image_spec.write_to(destdir)
+        assert f_tls_verify is tls_verify
+
+    def fake_inspect(image, arch=None, tls_verify=None):
+        return {"Digest": digest}
+
+    with (
+        mock.patch("rpm_lockfile.utils.RPMDB_PATH", new="var/lib/rpm"),
+        mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy),
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=tmp_path / "cache"),
+        mock.patch("rpm_lockfile.utils.inspect_image") as inspect,
+    ):
+        inspect.side_effect = fake_inspect
+        containers.setup_rpmdb(
+            tmp_path / "dest", baseimage, "x86_64", tls_verify=tls_verify
+        )
+
+    inspect.assert_called_once_with(baseimage, "x86_64", tls_verify=tls_verify)
+    assert (tmp_path / "dest" / "var/lib/rpm/foo").read_text().strip() == "foo"

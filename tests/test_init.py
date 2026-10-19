@@ -1,3 +1,4 @@
+import argparse
 import os
 import tempfile
 from unittest.mock import mock_open, patch
@@ -263,3 +264,16 @@ class TestGetContainerfileExtraArgs:
         context = {"containerfile": {"file": "Containerfile", "argFile": "nonexistent.env"}}
         with pytest.raises(FileNotFoundError):
             _get_containerfile_extra_args(str(tmp_path), context)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [("true", True), ("True", True), ("1", True), ("false", False), ("no", False)],
+)
+def test_parse_bool(value, expected):
+    assert rpm_lockfile._parse_bool(value) is expected
+
+
+def test_parse_bool_rejects_garbage():
+    with pytest.raises(argparse.ArgumentTypeError):
+        rpm_lockfile._parse_bool("maybe")

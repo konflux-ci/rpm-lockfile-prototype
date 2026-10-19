@@ -284,12 +284,20 @@ def translate_arch(arch):
     return ARCHES.get(arch, arch)
 
 
+def bool_flag(value):
+    """Format a boolean the way skopeo expects it in `--flag=value`."""
+    return "true" if value else "false"
+
+
 @functools.lru_cache
-def inspect_image(image_spec, arch=None):
+def inspect_image(image_spec, arch=None, tls_verify=None):
     cmd = ["skopeo"]
     if arch:
         cmd.append(f"--override-arch={translate_arch(arch)}")
-    cmd.extend(["inspect", "--no-tags", f"docker://{strip_tag(image_spec)}"])
+    cmd.extend(["inspect", "--no-tags"])
+    if tls_verify is not None:
+        cmd.append(f"--tls-verify={bool_flag(tls_verify)}")
+    cmd.append(f"docker://{strip_tag(image_spec)}")
     cp = logged_run(cmd, stdout=subprocess.PIPE, check=True)
     return json.loads(cp.stdout)
 
