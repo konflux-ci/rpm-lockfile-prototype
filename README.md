@@ -86,6 +86,33 @@ options:
   --allowerasing        Allow erasing of installed packages to resolve dependencies.
 ```
 
+# Resolving several lockfiles in one run
+
+Use `batch-rpm-lockfile-prototype` when several lockfiles need to be refreshed in
+one container. Create a JSON manifest with paths relative to the working
+directory (absolute paths also work):
+
+```json
+{
+  "jobs": [
+    {"input": "component-a/rpms.in.yaml", "output": "component-a/rpms.lock.yaml"},
+    {"input": "component-b/rpms.in.yaml", "output": "component-b/rpms.lock.yaml"}
+  ]
+}
+```
+
+Run `batch-rpm-lockfile-prototype --manifest manifest.json`. Jobs are grouped by
+their RPM database source, with manifest order preserved within each group.
+Each job gets an independent DNF transaction and installroot; the command
+reuses prepared image RPM databases and compatible batch-managed DNF metadata
+within a group, then releases them before moving to the next group. If batch
+storage reaches 80% usage during a group, it releases those caches between
+jobs and rebuilds them as needed. It continues after a failed job and exits
+nonzero if any job fails. Batch-wide `--debug`, repeatable `--arch`,
+`--allowerasing`, and `--tls-verify` / `--no-tls-verify` options are passed to
+each resolution.
+Existing `rpm-lockfile-prototype INPUT_FILE` options and behavior are unchanged.
+
 # Running in a container
 
 In case `dnf` is not available, such as on Mac and Windows, `rpm-lockfile-prototype` can be run 
