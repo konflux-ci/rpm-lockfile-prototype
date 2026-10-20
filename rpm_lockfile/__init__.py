@@ -144,6 +144,7 @@ def resolver(
     zchunk: bool | None = None,
     assume_provides: list[str] | None = None,
     match_context_versions: list[str] | None = None,
+    dnf_cache_dir: str | None = None,
 ):
     packages = set()
     sources = set()
@@ -162,7 +163,7 @@ def resolver(
         if download_filelists:
             conf.optional_metadata_types = ["filelists"]
         conf.installroot = str(root_dir)
-        conf.cachedir = os.getenv(
+        conf.cachedir = dnf_cache_dir or os.getenv(
             "RPM_LOCKFILE_PROTOTYPE_DNF_CACHE", os.path.join(cache_dir, "cache")
         )
         conf.logdir = mkdir(os.path.join(cache_dir, "log"))
@@ -342,6 +343,7 @@ def process_arch(
     zchunk: bool | None = None,
     assume_provides: list[str] | None = None,
     match_context_versions: list[str] | None = None,
+    dnf_cache_dir: str | None = None,
 ):
     logger.info("Running solver for %s", arch)
 
@@ -364,6 +366,7 @@ def process_arch(
                     zchunk=zchunk,
                     assume_provides=assume_provides,
                     match_context_versions=match_context_versions,
+                    dnf_cache_dir=dnf_cache_dir,
                 )
                 break
             except MissingFilelists:
@@ -489,6 +492,55 @@ def _get_containerfile_extra_args(config_dir, context):
     return None
 
 
+class MissingRpmdbSourceError(ValueError):
+    pass
+
+
+def _rpmdb_source(
+    config_dir,
+    context,
+    *,
+    containerfile=None,
+    image=None,
+    local_system=False,
+    bare=False,
+    rpm_ostree_treefile=None,
+):
+    """Select the same RPM database source for batch planning and resolution."""
+    if local_system or context.get("localSystem"):
+        return "local", None, None
+    if (
+        bare
+        or context.get("bare")
+        or rpm_ostree_treefile
+        or context.get("rpmOstreeTreefile")
+    ):
+        return "empty", None, None
+
+    selected_image = image or context.get("image")
+    selected_containerfile = (
+        containerfile
+        or _get_containerfile_path(config_dir, context)
+        or utils.find_containerfile(Path.cwd())
+    )
+    if not selected_image and not selected_containerfile:
+        raise MissingRpmdbSourceError(
+            "No base image source found. Please provide one of:\n"
+            "  --image <image-name>\n"
+            "  --containerfile <path>\n"
+            "  --local-system\n"
+            "  --bare\n"
+            "Or set 'context'in the configuration file,\n"
+            "or ensure a Containerfile/Dockerfile exists in the current directory."
+        )
+    selected_image = selected_image or utils.extract_image(
+        selected_containerfile,
+        **_get_containerfile_filters(context),
+        extra_args=_get_containerfile_extra_args(config_dir, context),
+    )
+    return "image", selected_image, selected_containerfile
+
+
 def logging_setup(debug=False):
 
     class ExcludeErrorsFilter(logging.Filter):
@@ -566,41 +618,9 @@ def _extract_containerfile_packages(
     return result
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("-f", "--containerfile", help=CONTAINERFILE_HELP)
-    group.add_argument("--image", help=IMAGE_HELP)
-    group.add_argument("--local-system", action="store_true", help=LOCAL_SYSTEM_HELP)
-    group.add_argument("--bare", action="store_true", help=BARE_HELP)
-    group.add_argument("--rpm-ostree-treefile")
-    parser.add_argument("--flatpak", action="store_true", help=FLATPAK_HELP)
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--arch", action="append", help=ARCH_HELP)
-    parser.add_argument(
-        "--pull",
-        choices=["always", "missing", "never", "newer"],
-        default="newer",
-        help="DEPRECATED",
-    )
-    parser.add_argument("infile", metavar="INPUT_FILE", default="rpms.in.yaml")
-    parser.add_argument("--outfile", default="rpms.lock.yaml")
-    parser.add_argument(
-        "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
-    )
-    parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
-    parser.add_argument(
-        "--tls-verify",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=TLS_VERIFY_HELP,
-    )
-    args = parser.parse_args()
-
-    logging_setup(args.debug)
-
-    config_dir = os.path.dirname(os.path.realpath(args.infile))
-    with open(args.infile) as f:
+def _load_config(infile):
+    config_dir = os.path.dirname(os.path.realpath(infile))
+    with open(infile) as f:
         config = yaml.safe_load(f)
 
     schema.validate(config)
@@ -629,6 +649,44 @@ def main():
         elif isinstance(pfc, dict):
             pfc["file"] = utils.subst_vars(pfc["file"], variables)
 
+    return config, config_dir, variables
+
+
+def main(argv=None, *, batch_context=None):
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-f", "--containerfile", help=CONTAINERFILE_HELP)
+    group.add_argument("--image", help=IMAGE_HELP)
+    group.add_argument("--local-system", action="store_true", help=LOCAL_SYSTEM_HELP)
+    group.add_argument("--bare", action="store_true", help=BARE_HELP)
+    group.add_argument("--rpm-ostree-treefile")
+    parser.add_argument("--flatpak", action="store_true", help=FLATPAK_HELP)
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--arch", action="append", help=ARCH_HELP)
+    parser.add_argument(
+        "--pull",
+        choices=["always", "missing", "never", "newer"],
+        default="newer",
+        help="DEPRECATED",
+    )
+    parser.add_argument("infile", metavar="INPUT_FILE", default="rpms.in.yaml")
+    parser.add_argument("--outfile", default="rpms.lock.yaml")
+    parser.add_argument(
+        "--print-schema", action=schema.HelpAction, help=PRINT_SCHEMA_HELP
+    )
+    parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
+    parser.add_argument(
+        "--tls-verify",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=TLS_VERIFY_HELP,
+    )
+    args = parser.parse_args(argv)
+
+    logging_setup(args.debug)
+
+    config, config_dir, variables = _load_config(args.infile)
+
     data = {"lockfileVersion": 1, "lockfileVendor": "redhat", "arches": []}
     arches = args.arch or config.get("arches") or [platform.machine()]
 
@@ -648,44 +706,28 @@ def main():
     cf_pkgs = ContainerfilePackages()
 
     # Determine rpmdb source — independent of package extraction.
-    containerfile = None
-    is_image_context = True
-    if args.local_system or context.get("localSystem"):
-        rpmdb = local_rpmdb()
-        is_image_context = False
-    elif (
-        args.bare
-        or context.get("bare")
-        or args.rpm_ostree_treefile
-        or context.get("rpmOstreeTreefile")
-    ):
-        rpmdb = empty_rpmdb()
-        is_image_context = False
-    else:
-        image = args.image or context.get("image")
-        containerfile = (
-            args.containerfile
-            or _get_containerfile_path(config_dir, context)
-            or utils.find_containerfile(Path.cwd())
+    try:
+        source, image, containerfile = _rpmdb_source(
+            config_dir,
+            context,
+            containerfile=args.containerfile,
+            image=args.image,
+            local_system=args.local_system,
+            bare=args.bare,
+            rpm_ostree_treefile=args.rpm_ostree_treefile,
         )
-        if not image and not containerfile:
-            parser.error(
-                "No base image source found. Please provide one of:\n"
-                "  --image <image-name>\n"
-                "  --containerfile <path>\n"
-                "  --local-system\n"
-                "  --bare\n"
-                "Or set 'context'in the configuration file,\n"
-                "or ensure a Containerfile/Dockerfile exists in the current directory."
-            )
-        rpmdb = image_rpmdb(
-            image
-            or utils.extract_image(
-                containerfile,
-                **_get_containerfile_filters(context),
-                extra_args=_get_containerfile_extra_args(config_dir, context),
-            ),
-            tls_verify=args.tls_verify,
+    except MissingRpmdbSourceError as exc:
+        parser.error(str(exc))
+    is_image_context = source == "image"
+    if source == "local":
+        rpmdb = local_rpmdb()
+    elif source == "empty":
+        rpmdb = empty_rpmdb()
+    else:
+        rpmdb = (
+            batch_context.image_rpmdb(image, tls_verify=args.tls_verify)
+            if batch_context is not None
+            else image_rpmdb(image, tls_verify=args.tls_verify)
         )
 
     # Determine package extraction source — independent of rpmdb mode.
@@ -787,6 +829,13 @@ def main():
                 zchunk=config.get("zchunk"),
                 assume_provides=assume_provides,
                 match_context_versions=config.get("matchContextVersions"),
+                dnf_cache_dir=(
+                    batch_context.dnf_cache_dir(
+                        image if is_image_context else None, arch, repos
+                    )
+                    if batch_context is not None
+                    else None
+                ),
             )
         )
 
