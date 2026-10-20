@@ -57,8 +57,9 @@ VALIDATE_HELP = "Run schema validation on the input file."
 PRINT_SCHEMA_HELP = "Print schema for the input file to stdout."
 ALLOWERASING_HELP = "Allow  erasing  of  installed  packages to resolve dependencies."
 TLS_VERIFY_HELP = """
-Require HTTPS and verify certificates when skopeo talks to the registry
-(true or false). If not given, skopeo uses its own default.
+Require HTTPS and verify certificates when skopeo talks to the registry.
+Use --no-tls-verify to disable it. If neither is given, skopeo uses its own
+default.
 """
 
 
@@ -326,14 +327,6 @@ def image_rpmdb(baseimage, tls_verify=None):
     )
 
 
-def _parse_bool(value):
-    if value.lower() in ("true", "1", "yes"):
-        return True
-    if value.lower() in ("false", "0", "no"):
-        return False
-    raise argparse.ArgumentTypeError(f"expected true or false, got {value!r}")
-
-
 def process_arch(
     arch,
     rpmdb,
@@ -597,7 +590,10 @@ def main():
     )
     parser.add_argument("--allowerasing", action="store_true", help=ALLOWERASING_HELP)
     parser.add_argument(
-        "--tls-verify", type=_parse_bool, metavar="BOOL", help=TLS_VERIFY_HELP
+        "--tls-verify",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=TLS_VERIFY_HELP,
     )
     args = parser.parse_args()
 
