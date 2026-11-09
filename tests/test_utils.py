@@ -775,7 +775,7 @@ def test_load_variables_image(tmp_path):
         sources = [{"image": "registry.example.com/image:latest"}]
         result = utils.load_variables(sources, str(tmp_path))
     assert result == {"vcs-ref": "abc123", "architecture": "x86_64"}
-    mock.assert_called_once_with("registry.example.com/image:latest")
+    mock.assert_called_once_with("registry.example.com/image:latest", tls_verify=None)
 
 
 def test_load_variables_containerfile(tmp_path):
@@ -784,7 +784,7 @@ def test_load_variables_containerfile(tmp_path):
         sources = [{"containerfile": "Containerfile"}]
         result = utils.load_variables(sources, str(tmp_path))
     assert result == {"vcs-ref": "abc123"}
-    mock.assert_called_once_with("Containerfile", str(tmp_path))
+    mock.assert_called_once_with("Containerfile", str(tmp_path), tls_verify=None)
 
 
 def test_load_variables_empty(tmp_path):
@@ -847,3 +847,31 @@ def test_inspect_image_tls_verify_is_part_of_cache_key():
         utils.inspect_image(image)
 
     assert mock_run.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "tls_verify,expected_flags",
+    [(None, []), (True, ["--tls-verify=true"]), (False, ["--tls-verify=false"])],
+)
+def test_load_variables_image_passes_tls_verify(tmp_path, tls_verify, expected_flags):
+    """Labels are looked up with skopeo, which must honour --[no-]tls-verify."""
+    image = "registry.example.com/labels:1"
+    out = Mock(stdout=json.dumps({"Labels": {"vcs-ref": "abc"}}))
+    with patch("rpm_lockfile.utils.logged_run", return_value=out) as run:
+        result = utils.load_variables(
+            [{"image": image}], str(tmp_path), tls_verify=tls_verify
+        )
+    assert result == {"vcs-ref": "abc"}
+    cmd = run.call_args.args[0]
+    assert [c for c in cmd if c.startswith("--tls-verify")] == expected_flags
+
+
+def test_load_variables_containerfile_passes_tls_verify(tmp_path):
+    (tmp_path / "Containerfile").write_text("FROM registry.example.com/base:1\n")
+    out = Mock(stdout=json.dumps({"Labels": {"k": "v"}}))
+    with patch("rpm_lockfile.utils.logged_run", return_value=out) as run:
+        result = utils.load_variables(
+            [{"containerfile": "Containerfile"}], str(tmp_path), tls_verify=False
+        )
+    assert result == {"k": "v"}
+    assert "--tls-verify=false" in run.call_args.args[0]

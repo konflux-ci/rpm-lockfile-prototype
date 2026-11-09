@@ -250,7 +250,7 @@ def subst_vars_in_list(items, variables):
     return result
 
 
-def load_variables(sources, config_dir):
+def load_variables(sources, config_dir, tls_verify=None):
     """Process an ordered list of variable sources.
 
     Each source is a dict with exactly one key: file, containerfile, image,
@@ -263,10 +263,12 @@ def load_variables(sources, config_dir):
             variables.update(load_variables_file(source["file"], config_dir))
         elif "containerfile" in source:
             variables.update(
-                _get_containerfile_labels(source["containerfile"], config_dir)
+                _get_containerfile_labels(
+                    source["containerfile"], config_dir, tls_verify=tls_verify
+                )
             )
         elif "image" in source:
-            variables.update(_get_image_labels(source["image"]))
+            variables.update(_get_image_labels(source["image"], tls_verify=tls_verify))
         elif "inline" in source:
             variables.update(source["inline"])
         else:
@@ -302,14 +304,14 @@ def inspect_image(image_spec, arch=None, tls_verify=None):
     return json.loads(cp.stdout)
 
 
-def _get_image_labels(image_spec):
+def _get_image_labels(image_spec, tls_verify=None):
     """Given an image specification, return a dict with labels from the image."""
     if image_spec.lower() != "scratch":
-        return inspect_image(image_spec)["Labels"]
+        return inspect_image(image_spec, tls_verify=tls_verify)["Labels"]
     return {}
 
 
-def _get_containerfile_labels(containerfile, config_dir):
+def _get_containerfile_labels(containerfile, config_dir, tls_verify=None):
     """Find labels of the last base image used in the given containerfile."""
     if isinstance(containerfile, dict):
         fp = containerfile["file"]
@@ -326,7 +328,8 @@ def _get_containerfile_labels(containerfile, config_dir):
         extra_args = None
 
     return _get_image_labels(
-        extract_image(os.path.join(config_dir, fp), **filters, extra_args=extra_args)
+        extract_image(os.path.join(config_dir, fp), **filters, extra_args=extra_args),
+        tls_verify=tls_verify,
     )
 
 
@@ -374,7 +377,7 @@ def check_image_spec(image_spec):
     return bool(m)
 
 
-def get_labels(obj, config_dir, base_vars=None):
+def get_labels(obj, config_dir, base_vars=None, tls_verify=None):
     """Find labels from an image or the base image used in the containerfile
     from given configuration object. The given configuration dict is modified
     in place to remove any keys relevant for this lookup.
@@ -385,11 +388,13 @@ def get_labels(obj, config_dir, base_vars=None):
     vars = dict(base_vars) if base_vars else {}
     image = obj.pop("varsFromImage", None)
     if image:
-        vars |= _get_image_labels(image)
+        vars |= _get_image_labels(image, tls_verify=tls_verify)
 
     containerfile = obj.pop("varsFromContainerfile", None)
     if containerfile:
-        vars |= _get_containerfile_labels(containerfile, config_dir)
+        vars |= _get_containerfile_labels(
+            containerfile, config_dir, tls_verify=tls_verify
+        )
 
     return vars
 
