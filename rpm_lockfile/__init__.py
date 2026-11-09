@@ -605,7 +605,9 @@ def main():
 
     schema.validate(config)
 
-    variables = utils.load_variables(config.pop("variables", []), config_dir)
+    variables = utils.load_variables(
+        config.pop("variables", []), config_dir, tls_verify=args.tls_verify
+    )
 
     if variables:
         logger.info("Substitution variables: %s", ", ".join(sorted(variables)))
