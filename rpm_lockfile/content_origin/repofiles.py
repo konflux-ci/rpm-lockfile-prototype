@@ -18,6 +18,10 @@ repo level options are passed over to DNF.
 """
 
 
+# Spellings DNF accepts as false for boolean options such as `enabled`.
+_FALSE_VALUES = frozenset({"0", "false", "no"})
+
+
 class RepofileOrigin:
     schema: typing.ClassVar[dict] = {
         "oneOf": [
@@ -103,7 +107,8 @@ class RepofileOrigin:
         parser.read_string(contents)
 
         for section in parser.sections():
-            if parser.get(section, "enabled", fallback="1") == "0":
+            enabled = parser.get(section, "enabled", fallback="1")
+            if enabled.strip().lower() in _FALSE_VALUES:
                 continue
             options = {"repoid": section} | dict(parser.items(section))
             yield Repo.from_dict(options)
