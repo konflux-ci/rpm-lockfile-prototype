@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from rpm_lockfile.content_origin import Repo
 from rpm_lockfile.content_origin.repos import RepoOrigin
 
@@ -31,7 +33,7 @@ def test_collect_simple_mirrorlist(tmpdir):
     assert repos == [Repo(repoid="a", kwargs={"mirrorlist": url})]
 
 
-def fake_get_labels(obj, config_dir, base_vars=None):
+def fake_get_labels(obj, config_dir, base_vars=None, tls_verify=None):
     obj.pop("varsFromContainerfile", None)
     obj.pop("varsFromImage", None)
     return {
@@ -91,3 +93,18 @@ def test_collect_global_vars_overridden_by_source(tmpdir):
             )
         )
     assert repos == [EXPANDED_REPO]
+
+
+@pytest.mark.parametrize("tls_verify", [None, True, False])
+def test_collect_forwards_tls_verify_to_get_labels(tmpdir, tls_verify):
+    origin = RepoOrigin(tmpdir, tls_verify=tls_verify)
+    seen = []
+
+    def spy(obj, config_dir, base_vars=None, tls_verify=None):
+        seen.append(tls_verify)
+        return fake_get_labels(obj, config_dir, base_vars, tls_verify)
+
+    with patch("rpm_lockfile.utils.get_labels", new=spy):
+        list(origin.collect([TEMPLATE_CONFIG | {"varsFromImage": "reg/img:1"}]))
+
+    assert seen == [tls_verify]

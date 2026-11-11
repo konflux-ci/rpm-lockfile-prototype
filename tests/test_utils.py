@@ -379,7 +379,10 @@ FROM ${BASE_IMAGE}
                 "BASE_IMAGE": "registry.redhat.io/rhel9/rhel-bootc:latest@sha256:4140526fa1f9bec23eb35065dbb33ef8ed4d48039c024d3f04dc5a54b86f3e58"
             },
         )
-        assert result == "registry.redhat.io/rhel9/rhel-bootc:latest@sha256:4140526fa1f9bec23eb35065dbb33ef8ed4d48039c024d3f04dc5a54b86f3e58"
+        assert (
+            result
+            == "registry.redhat.io/rhel9/rhel-bootc:latest@sha256:4140526fa1f9bec23eb35065dbb33ef8ed4d48039c024d3f04dc5a54b86f3e58"
+        )
 
 
 def test_extract_image_extra_args_partial_override():
@@ -389,9 +392,7 @@ ARG NAMESPACE=default
 FROM ${REGISTRY}/${NAMESPACE}/base:latest
 """
     with patch("builtins.open", mock_open(read_data=file)):
-        result = utils.extract_image(
-            file, extra_args={"NAMESPACE": "custom"}
-        )
+        result = utils.extract_image(file, extra_args={"NAMESPACE": "custom"})
         assert result == "registry.io/custom/base:latest"
 
 
@@ -402,7 +403,11 @@ FROM ${BASE_IMAGE}
 """
     with patch("builtins.open", mock_open(read_data=file)):
         result = utils.extract_image(
-            file, extra_args={"UNRELATED": "something", "BASE_IMAGE": "registry.io/override:latest"}
+            file,
+            extra_args={
+                "UNRELATED": "something",
+                "BASE_IMAGE": "registry.io/override:latest",
+            },
         )
         assert result == "registry.io/override:latest"
 
@@ -630,14 +635,21 @@ def test_get_labels_from_containerfile_with_argfile(tmpdir):
     """argFile values are passed as extra_args to resolve ARGs with no default."""
     image = "registry.example.com/image:latest"
     containerfile = tmpdir / "Containerfile"
-    containerfile.write_text("ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nRUN date\n", encoding="utf-8")
+    containerfile.write_text(
+        "ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nRUN date\n", encoding="utf-8"
+    )
     argfile = tmpdir / "build-args.env"
     argfile.write_text(f"BASE_IMAGE={image}\n", encoding="utf-8")
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels(
-            {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
+            {
+                "varsFromContainerfile": {
+                    "file": "Containerfile",
+                    "argFile": "build-args.env",
+                }
+            },
             tmpdir,
         )
 
@@ -664,7 +676,12 @@ def test_get_labels_from_containerfile_argfile_overrides_default(tmpdir):
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         labels = utils.get_labels(
-            {"varsFromContainerfile": {"file": "Containerfile", "argFile": "build-args.env"}},
+            {
+                "varsFromContainerfile": {
+                    "file": "Containerfile",
+                    "argFile": "build-args.env",
+                }
+            },
             tmpdir,
         )
 
@@ -849,29 +866,75 @@ def test_inspect_image_tls_verify_is_part_of_cache_key():
     assert mock_run.call_count == 2
 
 
-@pytest.mark.parametrize(
+TLS_VERIFY_CASES = pytest.mark.parametrize(
     "tls_verify,expected_flags",
-    [(None, []), (True, ["--tls-verify=true"]), (False, ["--tls-verify=false"])],
+    [
+        (None, []),
+        (True, ["--tls-verify=true"]),
+        (False, ["--tls-verify=false"]),
+    ],
 )
-def test_load_variables_image_passes_tls_verify(tmp_path, tls_verify, expected_flags):
-    """Labels are looked up with skopeo, which must honour --[no-]tls-verify."""
-    image = "registry.example.com/labels:1"
-    out = Mock(stdout=json.dumps({"Labels": {"vcs-ref": "abc"}}))
-    with patch("rpm_lockfile.utils.logged_run", return_value=out) as run:
+
+
+def _assert_skopeo_inspect(mock_run, image, expected_flags):
+    mock_run.assert_called_once_with(
+        ["skopeo", "inspect", "--no-tags", *expected_flags, f"docker://{image}"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+
+
+@TLS_VERIFY_CASES
+def test_load_variables_image_tls_verify(tmp_path, tls_verify, expected_flags):
+    image = "registry.example.com/image:latest"
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         result = utils.load_variables(
             [{"image": image}], str(tmp_path), tls_verify=tls_verify
         )
-    assert result == {"vcs-ref": "abc"}
-    cmd = run.call_args.args[0]
-    assert [c for c in cmd if c.startswith("--tls-verify")] == expected_flags
+
+    assert result == INSPECT_OUTPUT["Labels"]
+    _assert_skopeo_inspect(mock_run, image, expected_flags)
 
 
-def test_load_variables_containerfile_passes_tls_verify(tmp_path):
-    (tmp_path / "Containerfile").write_text("FROM registry.example.com/base:1\n")
-    out = Mock(stdout=json.dumps({"Labels": {"k": "v"}}))
-    with patch("rpm_lockfile.utils.logged_run", return_value=out) as run:
+@TLS_VERIFY_CASES
+def test_load_variables_containerfile_tls_verify(tmp_path, tls_verify, expected_flags):
+    image = "registry.example.com/base:1"
+    (tmp_path / "Containerfile").write_text(f"FROM {image}\n")
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
         result = utils.load_variables(
-            [{"containerfile": "Containerfile"}], str(tmp_path), tls_verify=False
+            [{"containerfile": "Containerfile"}], str(tmp_path), tls_verify=tls_verify
         )
-    assert result == {"k": "v"}
-    assert "--tls-verify=false" in run.call_args.args[0]
+
+    assert result == INSPECT_OUTPUT["Labels"]
+    _assert_skopeo_inspect(mock_run, image, expected_flags)
+
+
+@TLS_VERIFY_CASES
+def test_get_labels_from_image_tls_verify(tls_verify, expected_flags):
+    image = "registry.example.com/image:latest"
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        labels = utils.get_labels(
+            {"varsFromImage": image}, "/top", tls_verify=tls_verify
+        )
+
+    assert labels == INSPECT_OUTPUT["Labels"]
+    _assert_skopeo_inspect(mock_run, image, expected_flags)
+
+
+@TLS_VERIFY_CASES
+def test_get_labels_from_containerfile_tls_verify(tmp_path, tls_verify, expected_flags):
+    image = "registry.example.com/base:1"
+    (tmp_path / "Containerfile").write_text(f"FROM {image}\n")
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps(INSPECT_OUTPUT))
+        labels = utils.get_labels(
+            {"varsFromContainerfile": "Containerfile"},
+            str(tmp_path),
+            tls_verify=tls_verify,
+        )
+
+    assert labels == INSPECT_OUTPUT["Labels"]
+    _assert_skopeo_inspect(mock_run, image, expected_flags)

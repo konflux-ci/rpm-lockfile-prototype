@@ -45,7 +45,7 @@ class ComposeOrigin:
         ]
     }
 
-    def __init__(self, config_dir=None, variables=None):
+    def __init__(self, config_dir=None, variables=None, tls_verify=None):
         self.session = requests.Session()
         try:
             self.cts_url = os.environ["CTS_URL"].rstrip("/")

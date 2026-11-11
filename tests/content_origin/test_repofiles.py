@@ -53,7 +53,7 @@ def test_collect_http_complex():
     origin.session.get.assert_called_once_with(repourl, timeout=ANY)
 
 
-def fake_get_labels(obj, config_dir, base_vars=None):
+def fake_get_labels(obj, config_dir, base_vars=None, tls_verify=None):
     obj.pop("varsFromContainerfile", None)
     obj.pop("varsFromImage", None)
     return {
@@ -204,3 +204,29 @@ def test_collect_local_absolute_path(tmpdir):
     repos = list(origin.collect_local(str(tmpdir / "test.repo")))
 
     assert repos == [REPO]
+
+
+@pytest.mark.parametrize("tls_verify", [None, True, False])
+def test_collect_forwards_tls_verify_to_get_labels(tls_verify):
+    origin = repofiles.RepofileOrigin("/test", tls_verify=tls_verify)
+    origin.session = Mock()
+    origin.session.get.return_value = Mock(text=REPOFILE)
+    seen = []
+
+    def spy(obj, config_dir, base_vars=None, tls_verify=None):
+        seen.append(tls_verify)
+        return fake_get_labels(obj, config_dir, base_vars, tls_verify)
+
+    with patch("rpm_lockfile.utils.get_labels", new=spy):
+        list(
+            origin.collect(
+                [
+                    {
+                        "location": "http://example.com/t.repo?x={vcs-ref}",
+                        "varsFromImage": "reg/img:1",
+                    }
+                ]
+            )
+        )
+
+    assert seen == [tls_verify]
