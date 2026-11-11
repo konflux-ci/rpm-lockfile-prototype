@@ -171,6 +171,23 @@ def test_parse_repofile_skips_disabled():
     assert repos[0].repoid == "enabled-repo"
 
 
+@pytest.mark.parametrize("value", ["0", "false", "False", "FALSE", "no", "No"])
+def test_parse_repofile_skips_disabled_boolean_spellings(value):
+    """DNF accepts 0/false/no (any case) as false for the enabled option."""
+    origin = repofiles.RepofileOrigin("/test")
+    contents = f"[off]\nbaseurl = https://example.com/off\nenabled = {value}\n"
+
+    assert list(origin.parse_repofile(contents)) == []
+
+
+@pytest.mark.parametrize("value", ["1", "true", "True", "yes"])
+def test_parse_repofile_keeps_enabled_boolean_spellings(value):
+    origin = repofiles.RepofileOrigin("/test")
+    contents = f"[on]\nbaseurl = https://example.com/on\nenabled = {value}\n"
+
+    assert [r.repoid for r in origin.parse_repofile(contents)] == ["on"]
+
+
 def test_parse_repofile_enabled_by_default():
     origin = repofiles.RepofileOrigin("/test")
     repos = list(origin.parse_repofile(REPOFILE_NO_ENABLED_KEY))
