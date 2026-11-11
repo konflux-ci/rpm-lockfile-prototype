@@ -425,3 +425,59 @@ def test_setup_rpmdb_passes_tls_verify(tmp_path, tls_verify, disk_is_free):
 
     inspect.assert_called_once_with(baseimage, "x86_64", tls_verify=tls_verify)
     assert (tmp_path / "dest" / "var/lib/rpm/foo").read_text().strip() == "foo"
+
+
+def test_failed_download_leaves_no_temporary_cache(tmp_path, disk_is_free):
+    """The per-process temporary directory must not outlive a failed download."""
+    cache_dir = tmp_path / "cache"
+    digest = f"sha256:{'a' * 64}"
+
+    with (
+        mock.patch("rpm_lockfile.utils.logged_run") as logged_run,
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", return_value={"Digest": digest}),
+    ):
+        logged_run.side_effect = subprocess.CalledProcessError(1, "skopeo")
+        with pytest.raises(subprocess.CalledProcessError):
+            containers.setup_rpmdb(
+                tmp_path / "dest", "registry.example.com/image:latest", "x86_64"
+            )
+
+    assert list((cache_dir / "rpmdbs" / "x86_64").iterdir()) == []
+
+
+def test_lost_cache_race_leaves_no_temporary_cache(tmp_path, disk_is_free):
+    """
+    If another process cached the same image first, the temporary directory
+    used by this process is removed instead of being left in the cache.
+    """
+    image_spec = FakeImage([{"var/lib/rpm/foo": File("foo")}])
+    digest = f"sha256:{'a' * 64}"
+    cache_dir = tmp_path / "cache"
+    arch_cache = cache_dir / "rpmdbs" / "x86_64"
+    real_online_setup = containers._online_setup_rpmdb
+
+    def fake_copy(image, arch, destdir, tls_verify=None):
+        image_spec.write_to(destdir)
+
+    def online_setup_losing_race(dest_dir, *args, **kwargs):
+        real_online_setup(dest_dir, *args, **kwargs)
+        # The other process finishes first and moves its result into place.
+        winner = arch_cache / digest / "var" / "lib" / "rpm"
+        winner.mkdir(parents=True)
+        (winner / "foo").write_text("foo")
+
+    with (
+        mock.patch("rpm_lockfile.containers._copy_image", new=fake_copy),
+        mock.patch("rpm_lockfile.utils.CACHE_PATH", new=cache_dir),
+        mock.patch("rpm_lockfile.utils.inspect_image", return_value={"Digest": digest}),
+        mock.patch(
+            "rpm_lockfile.containers._online_setup_rpmdb",
+            new=online_setup_losing_race,
+        ),
+    ):
+        containers.setup_rpmdb(
+            tmp_path / "dest", "registry.example.com/image:latest", "x86_64"
+        )
+
+    assert [p.name for p in arch_cache.iterdir()] == [digest]

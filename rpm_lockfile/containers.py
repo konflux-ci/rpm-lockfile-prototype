@@ -77,15 +77,21 @@ def setup_rpmdb(dest_dir, baseimage, arch, tls_verify=None):
         # into the cache.
         # First it goes into a temporary location...
         tmp_cache = cache.with_suffix(f".{os.getpid()}")
-        _online_setup_rpmdb(tmp_cache, image, arch, tls_verify)
         try:
-            # ...and then atomically moves into the proper one.
-            tmp_cache.rename(cache)
-        except OSError:
-            # The target directory exists and is not empty. This means another
-            # process managed to cache this particular image in the meantime.
-            # The data is available, nothing to do for us here.
-            pass
+            _online_setup_rpmdb(tmp_cache, image, arch, tls_verify)
+            try:
+                # ...and then atomically moves into the proper one.
+                tmp_cache.rename(cache)
+            except OSError:
+                # The target directory exists and is not empty. This means
+                # another process managed to cache this particular image in
+                # the meantime. The data is available, nothing to do for us
+                # here.
+                pass
+        finally:
+            # Nothing is left to clean up after a successful rename. In all
+            # other cases do not leave the temporary directory in the cache.
+            shutil.rmtree(tmp_cache, ignore_errors=True)
     else:
         logger.info("Using already downloaded rpmdb")
 
