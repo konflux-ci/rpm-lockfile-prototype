@@ -380,12 +380,15 @@ def process_arch(
     }
 
 
-def collect_content_origins(config_dir, origins, variables=None):
+def collect_content_origins(config_dir, origins, variables=None, tls_verify=None):
     loaders = content_origin.load()
+    # Only pass the option when it is set, so that content origin plugins that
+    # do not know about it keep working.
+    extra = {} if tls_verify is None else {"tls_verify": tls_verify}
     repos = []
     for source_type, source_data in origins.items():
         try:
-            collector = loaders[source_type](config_dir, variables=variables)
+            collector = loaders[source_type](config_dir, variables=variables, **extra)
         except KeyError:
             raise RuntimeError(f"Unknown content origin '{source_type}'")
         repos.extend(collector.collect(source_data))
@@ -645,7 +648,9 @@ def main():
             f"Only current architecture ({platform.machine()}) can be resolved against local system.",
         )
 
-    repos = collect_content_origins(config_dir, config["contentOrigin"], variables)
+    repos = collect_content_origins(
+        config_dir, config["contentOrigin"], variables, tls_verify=args.tls_verify
+    )
 
     cf_pkgs = ContainerfilePackages()
 

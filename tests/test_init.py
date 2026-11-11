@@ -1,6 +1,6 @@
 import os
 import tempfile
-from unittest.mock import mock_open, patch
+from unittest.mock import Mock, mock_open, patch
 from xml.etree import ElementTree
 
 import pytest
@@ -255,11 +255,36 @@ class TestGetContainerfileExtraArgs:
     def test_loads_argfile_when_specified(self, tmp_path):
         argfile = tmp_path / "build-args.env"
         argfile.write_text("BASE_IMAGE=registry.example.com/image:latest\n")
-        context = {"containerfile": {"file": "Containerfile", "argFile": "build-args.env"}}
+        context = {
+            "containerfile": {"file": "Containerfile", "argFile": "build-args.env"}
+        }
         result = _get_containerfile_extra_args(str(tmp_path), context)
         assert result == {"BASE_IMAGE": "registry.example.com/image:latest"}
 
     def test_raises_if_argfile_missing(self, tmp_path):
-        context = {"containerfile": {"file": "Containerfile", "argFile": "nonexistent.env"}}
+        context = {
+            "containerfile": {"file": "Containerfile", "argFile": "nonexistent.env"}
+        }
         with pytest.raises(FileNotFoundError):
             _get_containerfile_extra_args(str(tmp_path), context)
+
+
+@pytest.mark.parametrize(
+    "tls_verify,expected_kwargs",
+    [
+        (None, {"variables": {"a": "b"}}),
+        (True, {"variables": {"a": "b"}, "tls_verify": True}),
+        (False, {"variables": {"a": "b"}, "tls_verify": False}),
+    ],
+)
+def test_collect_content_origins_tls_verify(tls_verify, expected_kwargs):
+    loader = Mock()
+    loader.return_value.collect.return_value = ["repo"]
+
+    with patch("rpm_lockfile.content_origin.load", return_value={"repos": loader}):
+        repos = rpm_lockfile.collect_content_origins(
+            "/cfg", {"repos": ["x"]}, {"a": "b"}, tls_verify=tls_verify
+        )
+
+    assert repos == ["repo"]
+    loader.assert_called_once_with("/cfg", **expected_kwargs)
