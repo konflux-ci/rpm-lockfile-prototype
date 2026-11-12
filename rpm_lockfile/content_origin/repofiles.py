@@ -80,7 +80,7 @@ class RepofileOrigin:
         )
 
     def collect_repofile(self, url):
-        if url.startswith("http"):
+        if url.startswith(("http://", "https://")):
             yield from self.collect_http(url)
         else:
             yield from self.collect_local(url)

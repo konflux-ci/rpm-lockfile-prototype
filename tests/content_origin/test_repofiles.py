@@ -20,6 +20,18 @@ def test_collect_local():
     m.assert_called_once_with("/test/test.repo")
 
 
+@pytest.mark.parametrize("name", ["httpd.repo", "http-mirrors/test.repo", "httpsrepo.repo"])
+def test_collect_local_name_starting_with_http(name):
+    origin = repofiles.RepofileOrigin("/test")
+    origin.session = Mock()
+    with patch("builtins.open", mock_open(read_data=REPOFILE)) as m:
+        repos = list(origin.collect([name]))
+
+    assert repos == [REPO]
+    m.assert_called_once_with(f"/test/{name}")
+    origin.session.get.assert_not_called()
+
+
 def test_collect_http():
     origin = repofiles.RepofileOrigin("/test")
     origin.session = Mock()
