@@ -80,5 +80,8 @@ class ComposeOrigin:
     def collect_by_latest(self, filters):
         resp = self.session.get(f"{self.cts_url}/api/1/composes/", params=filters)
         resp.raise_for_status()
-        data = resp.json()["items"][0]
+        items = resp.json()["items"]
+        if not items:
+            raise RuntimeError(f"No compose found matching filters: {filters}")
+        data = items[0]
         yield from self.collect_from_url(data["compose_url"])
