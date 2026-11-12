@@ -288,3 +288,64 @@ def test_collect_content_origins_tls_verify(tls_verify, expected_kwargs):
 
     assert repos == ["repo"]
     loader.assert_called_once_with("/cfg", **expected_kwargs)
+
+
+class _MarkingErrors(Exception):
+    def __init__(self, no_match_pkg_specs):
+        super().__init__("no match")
+        self.no_match_pkg_specs = no_match_pkg_specs
+        self.value = "no match"
+
+
+@pytest.mark.parametrize("download_filelists", [False, True])
+def test_resolver_unmatched_absolute_path_spec(download_filelists):
+    # Filelists are only worth retrying for when they have not been downloaded
+    # yet. Once they have, an unmatched path is a plain resolution error.
+    with patch("rpm_lockfile.dnf") as dnf_mod:
+        dnf_mod.exceptions.MarkingErrors = _MarkingErrors
+        dnf_mod.exceptions.Error = type("Error", (Exception,), {})
+        base = dnf_mod.Base.return_value.__enter__.return_value
+        base.install_specs.side_effect = _MarkingErrors(["/usr/bin/missing"])
+
+        expected = (
+            rpm_lockfile.MissingFilelists if not download_filelists else RuntimeError
+        )
+        with pytest.raises(expected):
+            rpm_lockfile.resolver(
+                "x86_64",
+                "/root",
+                [],
+                {"/usr/bin/missing"},
+                False,
+                set(),
+                set(),
+                set(),
+                False,
+                None,
+                set(),
+                download_filelists=download_filelists,
+            )
+
+
+def test_process_arch_unmatched_absolute_path_spec():
+    rpmdb = rpm_lockfile.empty_rpmdb()
+    with patch("rpm_lockfile.dnf") as dnf_mod:
+        dnf_mod.exceptions.MarkingErrors = _MarkingErrors
+        dnf_mod.exceptions.Error = type("Error", (Exception,), {})
+        base = dnf_mod.Base.return_value.__enter__.return_value
+        base.install_specs.side_effect = _MarkingErrors(["/usr/bin/missing"])
+
+        with pytest.raises(RuntimeError, match="DNF error"):
+            rpm_lockfile.process_arch(
+                "x86_64",
+                rpmdb,
+                [],
+                {"/usr/bin/missing"},
+                False,
+                set(),
+                set(),
+                set(),
+                False,
+                None,
+                set(),
+            )

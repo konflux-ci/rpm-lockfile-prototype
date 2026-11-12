@@ -237,7 +237,9 @@ def resolver(
         try:
             base.install_specs(solvables)
         except dnf.exceptions.MarkingErrors as exc:
-            if any(spec.startswith("/") for spec in exc.no_match_pkg_specs):
+            if not download_filelists and any(
+                spec.startswith("/") for spec in exc.no_match_pkg_specs
+            ):
                 # User specified a package by absolute path, and we did not
                 # download filelists. Let's try again.
                 raise MissingFilelists()
