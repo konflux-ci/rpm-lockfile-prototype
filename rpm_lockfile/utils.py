@@ -307,7 +307,8 @@ def inspect_image(image_spec, arch=None, tls_verify=None):
 def _get_image_labels(image_spec, tls_verify=None):
     """Given an image specification, return a dict with labels from the image."""
     if image_spec.lower() != "scratch":
-        return inspect_image(image_spec, tls_verify=tls_verify)["Labels"]
+        # skopeo reports "Labels": null for images without any labels.
+        return inspect_image(image_spec, tls_verify=tls_verify).get("Labels") or {}
     return {}
 
 
