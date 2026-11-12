@@ -349,9 +349,8 @@ def _walk_if_node(node, ctx: _WalkContext):
             if body:
                 _walk_nodes([body], ctx, arch_ctx, in_conditional=not bool(arch_ctx))
 
-        elif word == "else":
-            if i + 1 < len(parts) and hasattr(parts[i + 1], "kind"):
-                _walk_nodes([parts[i + 1]], ctx, None, in_conditional=True)
+        elif word == "else" and i + 1 < len(parts) and hasattr(parts[i + 1], "kind"):
+            _walk_nodes([parts[i + 1]], ctx, None, in_conditional=True)
 
         i += 1
 
