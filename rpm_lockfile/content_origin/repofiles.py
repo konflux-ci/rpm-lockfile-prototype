@@ -108,7 +108,7 @@ class RepofileOrigin:
 
         for section in parser.sections():
             enabled = parser.get(section, "enabled", fallback="1")
-            if enabled.strip().lower() in _FALSE_VALUES:
+            if enabled.lower() in _FALSE_VALUES:
                 continue
             options = {"repoid": section} | dict(parser.items(section))
             yield Repo.from_dict(options)
