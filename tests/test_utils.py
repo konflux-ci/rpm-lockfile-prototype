@@ -938,3 +938,14 @@ def test_get_labels_from_containerfile_tls_verify(tmp_path, tls_verify, expected
 
     assert labels == INSPECT_OUTPUT["Labels"]
     _assert_skopeo_inspect(mock_run, image, expected_flags)
+
+
+def test_get_image_labels_image_without_labels():
+    # skopeo prints "Labels": null for images that define no labels.
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = Mock(stdout=json.dumps({"Labels": None}))
+        labels = utils.get_labels(
+            {"varsFromImage": "registry.example.com/image:latest"}, "/top"
+        )
+
+    assert labels == {}
