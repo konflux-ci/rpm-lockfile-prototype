@@ -230,6 +230,16 @@ RUN other
 """,
             "registry.io/base:latest",
         ),
+        # Bare ARG in a stage re-imports the global ARG and keeps its default
+        (
+            """ARG VERSION=9
+FROM registry.io/base:${VERSION} AS build
+ARG VERSION
+RUN true
+FROM registry.io/other:${VERSION}
+""",
+            "registry.io/other:9",
+        ),
         # Mixed literal and variable in FROM
         (
             """ARG TAG=v1.0
