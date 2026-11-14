@@ -139,8 +139,10 @@ def extract_image(
                     if not in_stage:
                         # Global ARG (before first FROM)
                         global_args[arg_name] = arg_value
-                    else:
-                        # Stage-specific ARG (after FROM)
+                    elif arg_value is not None or arg_name not in global_args:
+                        # Stage-specific ARG (after FROM). A bare `ARG NAME`
+                        # only re-imports the global ARG into the stage and
+                        # must not discard its default value.
                         stage_args[arg_name] = arg_value
                 continue
 
