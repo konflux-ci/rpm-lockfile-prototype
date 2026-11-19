@@ -1,3 +1,4 @@
+import gzip
 import os
 import tempfile
 from unittest.mock import Mock, mock_open, patch
@@ -89,6 +90,21 @@ class TestAssumeProvides:
             assert "primary" in data_types
             assert "filelists" in data_types
             assert "other" in data_types
+
+    def test_create_assumed_provides_repo_quotes_in_name(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = assumed_provides.create_repo(tmpdir, ['odd"name', "a&b<c>"])
+            repodata = os.path.join(repo_dir, "repodata")
+            for md_type in ("primary", "filelists", "other"):
+                with gzip.open(os.path.join(repodata, f"{md_type}.xml.gz")) as f:
+                    ElementTree.parse(f)
+            with gzip.open(os.path.join(repodata, "primary.xml.gz")) as f:
+                tree = ElementTree.parse(f)
+            names = {
+                el.get("name")
+                for el in tree.iter("{http://linux.duke.edu/metadata/rpm}entry")
+            }
+            assert names == {'odd"name', "a&b<c>"}
 
     def test_create_assumed_provides_repo_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:
