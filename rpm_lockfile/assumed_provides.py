@@ -8,10 +8,15 @@ dependency on createrepo_c is needed.
 import gzip
 import hashlib
 import os
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape as _escape
 
 REPO_ID = "_assumed-provides"
 PACKAGE_PREFIX = "_assumed-provides-"
+
+
+def escape(text):
+    """Escape *text* for use in XML text and double-quoted attribute values."""
+    return _escape(text, {'"': "&quot;"})
 
 
 def _primary_xml(entries):
