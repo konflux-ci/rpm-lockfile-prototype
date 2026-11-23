@@ -23,6 +23,7 @@ packages = ['rpm_lockfile', 'rpm_lockfile.content_origin', 'rpm_lockfile.vendor'
 [project.scripts]
 rpm-lockfile-prototype = "rpm_lockfile:main"
 caching-rpm-lockfile-prototype = "rpm_lockfile.caching_wrapper:main"
+batch-rpm-lockfile-prototype = "rpm_lockfile.batch:main"
 
 
 [tool.ruff]
