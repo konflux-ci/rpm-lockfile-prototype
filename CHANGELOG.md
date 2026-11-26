@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.31.0] - 2026-11-26
+
+### Added
+
+- New `--tls-verify` option to control TLS certificate verification for
+  skopeo calls, including label lookups for repo origins.
+
+### Fixed
+
+- Registry port numbers in image specs are now handled correctly.
+- `enabled` in `.repo` files now honours `false`/`no` spellings.
+- Only `http(s)://` locations are treated as URLs in `.repo` files.
+- A clear error is raised when no compose matches the configured filters.
+- Containerfiles not named `Dockerfile` no longer break the Dockerfile parser.
+- Global `ARG` defaults are kept when a stage re-declares the `ARG`.
+- Images without labels are treated as having no variables.
+- Double quotes are escaped in the assumed-provides repodata.
+- No redundant retry with filelists when they were already downloaded.
+
 ## [0.30.1] - 2026-08-20
 
 ### Fixed
